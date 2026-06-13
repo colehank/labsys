@@ -14,7 +14,10 @@ services:
   api:
     build: ../backend
     restart: unless-stopped
-    env_file: .env
+    env_file: ../.env              # 唯一真相源（仓库根 .env）
+    environment:
+      # DB 主机差异在此注入：容器用服务名 postgres + 同一个 POSTGRES_PASSWORD
+      CIBOL_DATABASE_URL: postgresql+asyncpg://cibol:${POSTGRES_PASSWORD:-cibol}@postgres:5432/cibol
     depends_on: [postgres]
     # WebSSH / SSH 下发需 api 容器能直连内网目标机（turing/lecun/...）。
     # 若默认 bridge 网络不通内网，改用宿主网络（见 RUNBOOK）：

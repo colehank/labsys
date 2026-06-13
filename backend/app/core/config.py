@@ -1,13 +1,21 @@
-"""应用配置 — 全部从环境变量 / .env 读取（pydantic-settings）。"""
+"""应用配置 — 全部从环境变量 / .env 读取（pydantic-settings）。
+
+唯一真相源是仓库根目录的 `.env`（本地 `uv run` 经绝对路径读取；
+容器里该路径不存在会被忽略，改由 docker compose 注入环境变量）。
+"""
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# config.py = <root>/backend/app/core/config.py → parents[3] = 仓库根
+_ROOT_ENV = Path(__file__).resolve().parents[3] / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="CIBOL_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ROOT_ENV, env_prefix="CIBOL_", extra="ignore")
 
     # ── 基础 ──
     env: str = "dev"

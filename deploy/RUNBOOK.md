@@ -22,16 +22,19 @@ git clone <仓库地址> ~/labsys && cd ~/labsys/deploy
 
 ## 2. 配置 `.env`（生产凭据）
 
+**唯一配置文件是仓库根目录的 `.env`**（本地 `uv run` 与 docker compose 都读它）：
+
 ```bash
+cd ~/labsys
 cp .env.example .env
 ```
 
-编辑 `deploy/.env`，**必须改**：
+编辑根目录 `.env`，**必须改**：
 
 | 变量 | 说明 |
 |---|---|
 | `CIBOL_ENV` | 改为 `prod` |
-| `POSTGRES_PASSWORD` + `CIBOL_DATABASE_URL` | 同一个强密码（URL 里也要改） |
+| `POSTGRES_PASSWORD` | 强密码（compose 会用它拼出容器 DATABASE_URL，无需另写 URL） |
 | `CIBOL_JWT_SECRET` | `openssl rand -hex 32` 生成 |
 | `CIBOL_CORS_ORIGINS` | 改成 turing 访问地址，如 `["http://172.16.185.103"]` |
 
@@ -43,24 +46,30 @@ cp .env.example .env
 | `CIBOL_BOOKING_ACCOUNT` / `CIBOL_BOOKING_PASSWORD` | 腾讯会议预约（校园门户账号） |
 | `CIBOL_SSH_ADMIN_KEY_PATH` | SSH 账号下发（labadmin 私钥，见 §6） |
 
-> `.env` 已被 `.gitignore` 忽略，勿提交。
+> `.env` 已被 `.gitignore` 忽略，勿提交。`CIBOL_DATABASE_URL` 不用填——
+> 容器由 compose 注入 `postgres` 主机，本地走代码默认 `localhost`。
 
 ## 3. 起服务（首次自动迁移 + seed）
 
+从 `deploy/` 运行，并用 `--env-file ../.env` 让 compose 读到根 `.env`（用于 `${POSTGRES_PASSWORD}` 替换 + 注入容器）：
+
 ```bash
 cd ~/labsys/deploy
-docker compose -f docker-compose.yml up -d --build
+docker compose --env-file ../.env -f docker-compose.yml up -d --build
 ```
 
 - `--build` 在 turing 上构建 amd64 镜像。
 - api 容器 entrypoint 会自动 `alembic upgrade head` + 幂等 seed（首次建库/灌数据，重启安全）。
-- 不带 `-f` 会叠加 `docker-compose.override.yml`（dev 用），**生产务必显式 `-f docker-compose.yml`**。
+- 显式 `-f docker-compose.yml` 避免叠加 `docker-compose.override.yml`（dev 用），**生产必须带**。
+
+> 后续所有 compose 命令都带 `--env-file ../.env -f docker-compose.yml`，可设个别名：
+> `alias dc='docker compose --env-file ../.env -f docker-compose.yml'`
 
 查看状态/日志：
 
 ```bash
-docker compose -f docker-compose.yml ps
-docker compose -f docker-compose.yml logs -f api      # 看 entrypoint 迁移+seed 输出
+docker compose --env-file ../.env -f docker-compose.yml ps
+docker compose --env-file ../.env -f docker-compose.yml logs -f api   # 看 entrypoint 迁移+seed
 ```
 
 ## 4. 冒烟自测
