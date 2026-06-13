@@ -84,8 +84,9 @@ import type { Me } from "../auth";
 
     const doBook = (id: string) => {
       if (!booking?.enabled) { toast("未配置腾讯会议预约凭据（联系系统管理员）", { tone: "error" }); return; }
+      toast("正在预约腾讯会议…门户审批约需 1–3 分钟，请保持页面打开", { tone: "info" });
       bookMeeting.mutate(id, {
-        onSuccess: () => toast("已预约腾讯会议"),
+        onSuccess: () => toast("已预约腾讯会议", { tone: "success" }),
         onError: (e: any) => toast(`预约失败：${e?.message || "请稍后重试"}`, { tone: "error" }),
       });
     };
@@ -151,10 +152,10 @@ import type { Me } from "../auth";
                       {sel.online && sel.online.url
                         ? <>
                             <IconButton size="sm" variant="solid" icon={I("video")} label="在线会议" onClick={() => window.open(sel.online.url, "_blank")} />
-                            {admin && <Button size="sm" variant="ghost" iconLeft={I("rotate-cw")} disabled={bookMeeting.isPending} onClick={() => doBook(sel.id)}>重新预约</Button>}
+                            {admin && <Button size="sm" variant="ghost" iconLeft={I("rotate-cw")} loading={bookMeeting.isPending} onClick={() => doBook(sel.id)}>{bookMeeting.isPending ? "预约中…" : "重新预约"}</Button>}
                           </>
                         : admin
-                          ? <Button size="sm" variant="primary" iconLeft={I("video")} disabled={bookMeeting.isPending}
+                          ? <Button size="sm" variant="primary" iconLeft={I("video")} loading={bookMeeting.isPending}
                               onClick={() => doBook(sel.id)}>{bookMeeting.isPending ? "预约中…" : "预约腾讯会议"}</Button>
                           : <Badge tone="warning" size="sm" dot>在线会议待设置</Badge>}
                     </div>
