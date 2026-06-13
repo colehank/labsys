@@ -1,0 +1,26 @@
+# ── 通用 ──
+.DS_Store
+*.log
+
+# ── 后端 (Python) ──
+backend/.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# ── 前端 (Node) ──
+frontend/node_modules/
+frontend/dist/
+
+# ── 部署密钥 / 环境 ──
+deploy/.env
+deploy/secrets/
+.env
+backend/.env
+*.pem
+*_ed25519
+
+# ── 设计交付物（大文件） ──
+CIBOL Design System-handoff.zip
+extracted/

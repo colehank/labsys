@@ -1,0 +1,39 @@
+# 本地与 turing 共用此文件；本地自动叠加 docker-compose.override.yml。
+# turing 部署： docker compose -f docker-compose.yml up -d --build  （不带 override）
+services:
+  # 前端：node 里 build → caddy 托管（dist 烤进镜像）+ 反代 /api /ws /sse 到 api
+  web:
+    build: ../frontend
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on: [api]
+
+  api:
+    build: ../backend
+    restart: unless-stopped
+    env_file: .env
+    depends_on: [postgres]
+    # WebSSH / SSH 下发需 api 容器能直连内网目标机（turing/lecun/...）。
+    # 若默认 bridge 网络不通内网，改用宿主网络（见 RUNBOOK）：
+    # network_mode: host
+
+  postgres:
+    image: postgres:16.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cibol
+      POSTGRES_USER: cibol
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cibol}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  # 说明：
+  # · 定时/异步任务用 APScheduler（在 api 进程内），无需 Celery worker。
+  # · 未用 Redis（如需缓存/限流再加回 redis 服务 + CIBOL_REDIS_URL）。
+  # · LLM 走外部 dmxapi.cn（OpenAI 兼容），无需自建网关。
+
+volumes:
+  pgdata: {}
+  caddy_data: {}

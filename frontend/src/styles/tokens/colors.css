@@ -1,0 +1,163 @@
+/* ============================================================
+   CIBOL · Color tokens
+   Humanist-warm palette. Base scales + semantic aliases.
+   Light = :root  ·  Dark = [data-theme="dark"]
+   Derived from the brand mark: stone #2A2A28, cream #F5F3EE.
+   ============================================================ */
+
+:root {
+  /* ---- Stone (warm neutral) ---- */
+  --stone-50:  #F6F3ED;
+  --stone-100: #ECE7DD;
+  --stone-200: #DBD4C6;
+  --stone-300: #C3BAAA;
+  --stone-400: #A39A8B;
+  --stone-500: #837B6F;
+  --stone-600: #66605A;
+  --stone-700: #4E4A44;
+  --stone-800: #38352F;
+  --stone-900: #2A2A28; /* brand stone */
+  --stone-950: #1B1A18;
+
+  /* ---- Cream / paper ---- */
+  --cream:     #F5F3EE; /* brand off-white */
+  --paper:     #FBFAF6;
+
+  /* ---- Terracotta (brand accent) ---- */
+  --terracotta-50:  #FBF0EA;
+  --terracotta-100: #F4DDD0;
+  --terracotta-200: #E9BCA3;
+  --terracotta-300: #DC9B77;
+  --terracotta-400: #CE7B50;
+  --terracotta-500: #BD5D3A; /* primary */
+  --terracotta-600: #A54E2F;
+  --terracotta-700: #883E26;
+  --terracotta-800: #6A3120;
+
+  /* ---- Supporting hues (muted, warm-leaning) ---- */
+  --sage-100:  #DEE7DD;
+  --sage-300:  #9DB8A2;
+  --sage-500:  #5C8A6B;
+  --sage-600:  #4C7458;
+
+  --amber-100: #F6E7C4;
+  --amber-400: #D6A23E;
+  --amber-500: #BE8A28;
+
+  --clay-100:  #F4D7CF;
+  --clay-400:  #C8634A;
+  --clay-500:  #B23A2E; /* danger / absence */
+
+  --slate-100: #D9E1E6;
+  --slate-400: #6E92A6;
+  --slate-500: #4E7596; /* info */
+
+  /* ============ Semantic aliases (LIGHT) ============ */
+  /* surfaces — flat: page = sidebar = card (one warm paper tone) */
+  --canvas:         var(--paper);
+  --surface:        var(--paper);
+  --surface-raised: #FFFFFF;
+  --surface-sunken: var(--paper);
+  --surface-hover:  var(--stone-100);
+  --overlay-scrim:  rgba(27, 26, 24, 0.42);
+
+  /* text */
+  --text-strong:    var(--stone-900);
+  --text-body:      var(--stone-800);
+  --text-muted:     var(--stone-600);
+  --text-faint:     var(--stone-500);
+  --text-on-accent: var(--cream);
+  --text-inverse:   var(--cream);
+
+  /* borders */
+  --border-subtle:  var(--stone-200);
+  --border-default: var(--stone-300);
+  --border-strong:  var(--stone-400);
+  --border-focus:   var(--terracotta-500);
+
+  /* accent / interactive */
+  --accent:         var(--terracotta-500);
+  --accent-hover:   var(--terracotta-600);
+  --accent-press:   var(--terracotta-700);
+  --accent-soft:    var(--terracotta-50);
+  --accent-soft-bd: var(--terracotta-200);
+  --accent-text:    var(--terracotta-600);
+
+  /* status */
+  --success:        var(--sage-500);
+  --success-soft:   var(--sage-100);
+  --success-text:   var(--sage-600);
+  --warning:        var(--amber-500);
+  --warning-soft:   var(--amber-100);
+  --warning-text:   var(--amber-500);
+  --danger:         var(--clay-500);
+  --danger-soft:    var(--clay-100);
+  --danger-text:    var(--clay-500);
+  --info:           var(--slate-500);
+  --info-soft:      var(--slate-100);
+  --info-text:      var(--slate-500);
+
+  /* terminal (always dark — see SSH surface) */
+  --term-bg:        #211F1B;
+  --term-fg:        #E7E1D4;
+  --term-dim:       #8C857A;
+  --term-green:     #8FB88B;
+  --term-amber:     #D9A85B;
+  --term-cyan:      #7FA7AE;
+  --term-accent:    #D2774E;
+
+  /* data-viz ramp (rank charts) */
+  --viz-1: var(--terracotta-500);
+  --viz-2: var(--sage-500);
+  --viz-3: var(--slate-500);
+  --viz-4: var(--amber-400);
+  --viz-5: var(--stone-400);
+}
+
+/* ============ Semantic aliases (DARK) ============ */
+[data-theme="dark"] {
+  --canvas:         #232220;
+  --surface:        #232220;
+  --surface-raised: #2C2A26;
+  --surface-sunken: #232220;
+  --surface-hover:  #322F2A;
+  --overlay-scrim:  rgba(0, 0, 0, 0.58);
+
+  --text-strong:    #F2EEE4;
+  --text-body:      #DED8CB;
+  --text-muted:     #A39A8B;
+  --text-faint:     #837B6F;
+  --text-on-accent: #1B1A18;
+  --text-inverse:   var(--stone-900);
+
+  --border-subtle:  #353230;
+  --border-default: #46423C;
+  --border-strong:  #5A554E;
+  --border-focus:   var(--terracotta-400);
+
+  --accent:         var(--terracotta-400);
+  --accent-hover:   var(--terracotta-300);
+  --accent-press:   var(--terracotta-200);
+  --accent-soft:    rgba(189, 93, 58, 0.16);
+  --accent-soft-bd: rgba(206, 123, 80, 0.34);
+  --accent-text:    var(--terracotta-300);
+
+  --success:        var(--sage-300);
+  --success-soft:   rgba(92, 138, 107, 0.18);
+  --success-text:   var(--sage-300);
+  --warning:        var(--amber-400);
+  --warning-soft:   rgba(190, 138, 40, 0.18);
+  --warning-text:   var(--amber-400);
+  --danger:         var(--clay-400);
+  --danger-soft:    rgba(178, 58, 46, 0.20);
+  --danger-text:    var(--clay-400);
+  --info:           var(--slate-400);
+  --info-soft:      rgba(78, 117, 150, 0.20);
+  --info-text:      var(--slate-400);
+
+  --viz-1: var(--terracotta-400);
+  --viz-2: var(--sage-300);
+  --viz-3: var(--slate-400);
+  --viz-4: var(--amber-400);
+  --viz-5: var(--stone-400);
+}

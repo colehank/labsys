@@ -1,0 +1,23 @@
+# 反向代理 + 静态前端托管。
+# 本地： http://localhost  →  前端静态 + /api 转发到 api:8000
+# turing： 把 :80 换成你的内网域名/主机，Caddy 自动签 TLS（或用内部 CA）。
+
+:80 {
+	# /api/* → 后端
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	# WebSSH / SSE 实时端点
+	handle /ws/* {
+		reverse_proxy api:8000
+	}
+	handle /sse/* {
+		reverse_proxy api:8000
+	}
+	# 其余 → 前端 SPA（dist 已挂到 /srv）
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

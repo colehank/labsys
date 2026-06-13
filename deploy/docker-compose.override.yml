@@ -1,0 +1,11 @@
+# 仅本地开发自动叠加：挂源码热重载、暴露端口直连调试。
+# turing 上用 `-f docker-compose.yml`（不带本 override）。
+services:
+  api:
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ../backend/app:/app/app
+    ports: ["8000:8000"]
+
+  postgres:
+    ports: ["5432:5432"]

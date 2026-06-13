@@ -1,0 +1,54 @@
+/* ============================================================
+   CIBOL · Typography tokens
+   Latin first, CJK fallback that harmonizes (Source Sans 3
+   + Noto Sans SC share Adobe Source metrics).
+   ============================================================ */
+
+:root {
+  /* families */
+  --font-sans:  "Source Sans 3", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", "Noto Sans SC", Georgia, serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* type scale (1.20 minor-third-ish, tuned) */
+  --text-2xs: 11px;
+  --text-xs:  12px;
+  --text-sm:  13px;
+  --text-md:  14px;   /* base UI */
+  --text-base:15px;   /* base reading */
+  --text-lg:  17px;
+  --text-xl:  20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 38px;
+  --text-5xl: 48px;
+  --text-6xl: 60px;
+
+  /* weights */
+  --fw-regular: 400; /* @kind other */
+  --fw-medium:  500; /* @kind other */
+  --fw-semibold:600; /* @kind other */
+  --fw-bold:    700; /* @kind other */
+
+  /* line heights */
+  --lh-tight:   1.15; /* @kind other */
+  --lh-snug:    1.3; /* @kind other */
+  --lh-normal:  1.5; /* @kind other */
+  --lh-relaxed: 1.7; /* @kind other */
+
+  /* letter spacing */
+  --ls-tighter: -0.02em; /* @kind other */
+  --ls-tight:   -0.01em; /* @kind other */
+  --ls-normal:  0; /* @kind other */
+  --ls-wide:    0.02em;
+  --ls-wider:   0.06em;   /* eyebrows / labels */
+  --ls-widest:  0.14em;   /* ALL-CAPS micro labels */
+
+  /* semantic roles */
+  --display-font: var(--font-serif);
+  --heading-font: var(--font-sans);
+  --body-font:    var(--font-sans);
+  --label-font:   var(--font-sans);
+  --numeral-font: var(--font-serif); /* big scores / ranks */
+  --code-font:    var(--font-mono);
+}

@@ -1,0 +1,2868 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CIBOL · 实验室系统 API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Api Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh",
+        "operationId": "refresh_api_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessToken"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "operationId": "change_password_api_auth_change_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List Users",
+        "description": "成员名册 —— 管理员可见（人员管理页）。",
+        "operationId": "list_users_api_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Users Api Users Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/users/me": {
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update Me",
+        "description": "更新本人资料 / 设置（「我的」页）。",
+        "operationId": "update_me_api_users_me_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/config": {
+      "get": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "Get Config",
+        "operationId": "get_config_api_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/announcements": {
+      "get": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "List Announcements",
+        "description": "当前生效的公告（未过期），按 pinned → level → 时间排序。",
+        "operationId": "list_announcements_api_announcements_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AnnouncementOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Announcements Api Announcements Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "Publish Announcement",
+        "operationId": "publish_announcement_api_announcements_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/announcements/{ann_id}/toggle-pin": {
+      "post": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "Toggle Pin",
+        "operationId": "toggle_pin_api_announcements__ann_id__toggle_pin_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ann_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ann Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/announcements/{ann_id}": {
+      "delete": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "Remove Announcement",
+        "operationId": "remove_announcement_api_announcements__ann_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ann_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ann Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meetings": {
+      "get": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "List Meetings",
+        "description": "整学期组会排期（按日期升序），含报告人与在线会议信息。",
+        "operationId": "list_meetings_api_meetings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Meetings Api Meetings Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/requests": {
+      "post": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Create Request",
+        "operationId": "create_request_api_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/requests/mine": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "My Requests",
+        "description": "与我相关的全部请求（我发起的 + 收到的对调），按时间倒序。",
+        "operationId": "my_requests_api_requests_mine_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RequestOut"
+                  },
+                  "type": "array",
+                  "title": "Response My Requests Api Requests Mine Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/requests/pending": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Pending Requests",
+        "description": "审批中心队列：请假/API/SSH 中待管理员处理（submitted）的请求。",
+        "operationId": "pending_requests_api_requests_pending_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RequestOut"
+                  },
+                  "type": "array",
+                  "title": "Response Pending Requests Api Requests Pending Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/requests/processed": {
+      "get": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Processed Requests",
+        "description": "审批中心历史：请假/API/SSH 中已通过或已驳回的，按时间倒序。",
+        "operationId": "processed_requests_api_requests_processed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RequestOut"
+                  },
+                  "type": "array",
+                  "title": "Response Processed Requests Api Requests Processed Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/requests/{req_id}/advance": {
+      "post": {
+        "tags": [
+          "requests"
+        ],
+        "summary": "Advance Request",
+        "operationId": "advance_request_api_requests__req_id__advance_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "req_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Req Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/servers": {
+      "get": {
+        "tags": [
+          "servers"
+        ],
+        "summary": "List Servers",
+        "operationId": "list_servers_api_servers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServerOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Servers Api Servers Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "servers"
+        ],
+        "summary": "Create Server",
+        "operationId": "create_server_api_servers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/servers/{server_id}": {
+      "patch": {
+        "tags": [
+          "servers"
+        ],
+        "summary": "Update Server",
+        "operationId": "update_server_api_servers__server_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Server Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "servers"
+        ],
+        "summary": "Delete Server",
+        "operationId": "delete_server_api_servers__server_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "server_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Server Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "notify"
+        ],
+        "summary": "My Notifications",
+        "operationId": "my_notifications_api_notifications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationOut"
+                  },
+                  "type": "array",
+                  "title": "Response My Notifications Api Notifications Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/{notif_id}/read": {
+      "post": {
+        "tags": [
+          "notify"
+        ],
+        "summary": "Mark Read",
+        "operationId": "mark_read_api_notifications__notif_id__read_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notif_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Notif Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/read-all": {
+      "post": {
+        "tags": [
+          "notify"
+        ],
+        "summary": "Mark All Read",
+        "operationId": "mark_all_read_api_notifications_read_all_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/eval/compute": {
+      "get": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Compute",
+        "operationId": "compute_api_eval_compute_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalComputeOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/eval/rank-series": {
+      "get": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Rank Series",
+        "operationId": "rank_series_api_eval_rank_series_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "from_",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2026-04-19",
+              "title": "From "
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2026-06-07",
+              "title": "To"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "total",
+              "title": "Metric"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankSeriesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/eval/reports": {
+      "get": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "List Reports",
+        "operationId": "list_reports_api_eval_reports_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReportOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Reports Api Eval Reports Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/eval/excellence": {
+      "get": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Excellence",
+        "operationId": "excellence_api_eval_excellence_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "count",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 5,
+              "title": "Count"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExcellenceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Publish Excellence",
+        "operationId": "publish_excellence_api_eval_excellence_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishExcellence"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExcellenceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/eval/reports/{key}/rating": {
+      "post": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Submit Rating",
+        "operationId": "submit_rating_api_eval_reports__key__rating_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingSubmit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/eval/reports/{key}/attendance": {
+      "post": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Set Attendance",
+        "operationId": "set_attendance_api_eval_reports__key__attendance_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttendanceSet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/eval/config": {
+      "get": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Get Config",
+        "operationId": "get_config_api_eval_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalConfigIO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Put Config",
+        "operationId": "put_config_api_eval_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalConfigIO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalConfigIO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/apikeys/mine": {
+      "get": {
+        "tags": [
+          "apikeys"
+        ],
+        "summary": "My Keys",
+        "operationId": "my_keys_api_apikeys_mine_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApiKeyOut"
+                  },
+                  "type": "array",
+                  "title": "Response My Keys Api Apikeys Mine Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/apikeys": {
+      "post": {
+        "tags": [
+          "apikeys"
+        ],
+        "summary": "Issue Key",
+        "description": "管理员签发：把 dmxapi 后台建好的令牌下发给某成员（审批 api 请求后调用）。",
+        "operationId": "issue_key_api_apikeys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyIssue"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/apikeys/{key_id}": {
+      "delete": {
+        "tags": [
+          "apikeys"
+        ],
+        "summary": "Revoke Key",
+        "operationId": "revoke_key_api_apikeys__key_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccessToken": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "AccessToken"
+      },
+      "AdvanceRequest": {
+        "properties": {
+          "next": {
+            "type": "string",
+            "title": "Next"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "next"
+        ],
+        "title": "AdvanceRequest"
+      },
+      "AnnLevel": {
+        "type": "string",
+        "enum": [
+          "info",
+          "important",
+          "urgent"
+        ],
+        "title": "AnnLevel"
+      },
+      "AnnouncementCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": ""
+          },
+          "level": {
+            "$ref": "#/components/schemas/AnnLevel",
+            "default": "info"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned",
+            "default": false
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience",
+            "default": "all"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author",
+            "default": ""
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiresat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "AnnouncementCreate"
+      },
+      "AnnouncementOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "level": {
+            "$ref": "#/components/schemas/AnnLevel"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publishedat"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiresat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "body",
+          "level",
+          "pinned",
+          "audience",
+          "author",
+          "publishedAt"
+        ],
+        "title": "AnnouncementOut"
+      },
+      "ApiKeyIssue": {
+        "properties": {
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": ""
+          },
+          "upstream_key": {
+            "type": "string",
+            "title": "Upstream Key"
+          },
+          "budget": {
+            "type": "number",
+            "title": "Budget",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_name",
+          "upstream_key"
+        ],
+        "title": "ApiKeyIssue"
+      },
+      "ApiKeyOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "masked_key": {
+            "type": "string",
+            "title": "Masked Key"
+          },
+          "budget": {
+            "type": "number",
+            "title": "Budget"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "used_rmb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Rmb"
+          },
+          "remain_rmb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remain Rmb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "masked_key",
+          "budget",
+          "status",
+          "created_at"
+        ],
+        "title": "ApiKeyOut"
+      },
+      "AttendanceSet": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "AttendanceSet"
+      },
+      "ChangePasswordRequest": {
+        "properties": {
+          "old_password": {
+            "type": "string",
+            "title": "Old Password"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 6,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest"
+      },
+      "ConfigOut": {
+        "properties": {
+          "semester": {
+            "$ref": "#/components/schemas/SemesterOut"
+          },
+          "meetingDefault": {
+            "$ref": "#/components/schemas/MeetingDefaultOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "semester",
+          "meetingDefault"
+        ],
+        "title": "ConfigOut"
+      },
+      "CreateRequest": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/RequestKind"
+          },
+          "fromDate": {
+            "type": "string",
+            "title": "Fromdate",
+            "default": ""
+          },
+          "toName": {
+            "type": "string",
+            "title": "Toname",
+            "default": ""
+          },
+          "toDate": {
+            "type": "string",
+            "title": "Todate",
+            "default": ""
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "CreateRequest"
+      },
+      "EvalComputeOut": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "weights": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Weights"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EvalRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "merged": {
+            "items": {
+              "$ref": "#/components/schemas/MergedOut"
+            },
+            "type": "array",
+            "title": "Merged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "weights",
+          "rows",
+          "merged"
+        ],
+        "title": "EvalComputeOut"
+      },
+      "EvalConfigIO": {
+        "properties": {
+          "weights": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Weights"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "range": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Range"
+          },
+          "progress_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weights",
+          "filters",
+          "range"
+        ],
+        "title": "EvalConfigIO"
+      },
+      "EvalRowOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "attitude": {
+            "type": "number",
+            "title": "Attitude"
+          },
+          "polish": {
+            "type": "number",
+            "title": "Polish"
+          },
+          "attRate": {
+            "type": "integer",
+            "title": "Attrate"
+          },
+          "discuss": {
+            "type": "integer",
+            "title": "Discuss"
+          },
+          "meeting": {
+            "type": "number",
+            "title": "Meeting"
+          },
+          "meetingRank": {
+            "type": "integer",
+            "title": "Meetingrank"
+          },
+          "nAttitude": {
+            "type": "number",
+            "title": "Nattitude"
+          },
+          "nPolish": {
+            "type": "number",
+            "title": "Npolish"
+          },
+          "nAtt": {
+            "type": "number",
+            "title": "Natt"
+          },
+          "nDisc": {
+            "type": "number",
+            "title": "Ndisc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "attitude",
+          "polish",
+          "attRate",
+          "discuss",
+          "meeting",
+          "meetingRank",
+          "nAttitude",
+          "nPolish",
+          "nAtt",
+          "nDisc"
+        ],
+        "title": "EvalRowOut"
+      },
+      "ExcellenceOut": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "from": {
+            "type": "string",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "title": "To"
+          },
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Names"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "published": {
+            "type": "boolean",
+            "title": "Published"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "from",
+          "to",
+          "names",
+          "count",
+          "published"
+        ],
+        "title": "ExcellenceOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "MeetingDefaultOut": {
+        "properties": {
+          "weekday": {
+            "type": "string",
+            "title": "Weekday"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "place": {
+            "type": "string",
+            "title": "Place"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weekday",
+          "time",
+          "place"
+        ],
+        "title": "MeetingDefaultOut"
+      },
+      "MeetingOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "y": {
+            "type": "integer",
+            "title": "Y"
+          },
+          "mo": {
+            "type": "integer",
+            "title": "Mo"
+          },
+          "day": {
+            "type": "integer",
+            "title": "Day"
+          },
+          "mdLabel": {
+            "type": "string",
+            "title": "Mdlabel"
+          },
+          "dateLabel": {
+            "type": "string",
+            "title": "Datelabel"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "tone": {
+            "type": "string",
+            "title": "Tone"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "online": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnlineMeetingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "presenters": {
+            "items": {
+              "$ref": "#/components/schemas/PresenterOut"
+            },
+            "type": "array",
+            "title": "Presenters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "y",
+          "mo",
+          "day",
+          "mdLabel",
+          "dateLabel",
+          "type",
+          "tone",
+          "status",
+          "presenters"
+        ],
+        "title": "MeetingOut"
+      },
+      "MergedOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "mRank": {
+            "type": "integer",
+            "title": "Mrank"
+          },
+          "pRank": {
+            "type": "integer",
+            "title": "Prank"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "finalRank": {
+            "type": "integer",
+            "title": "Finalrank"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "mRank",
+          "pRank",
+          "score",
+          "finalRank"
+        ],
+        "title": "MergedOut"
+      },
+      "NotificationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "title",
+          "body",
+          "read",
+          "created_at"
+        ],
+        "title": "NotificationOut"
+      },
+      "OnlineMeetingOut": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "title": "OnlineMeetingOut"
+      },
+      "PresenterOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": ""
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "topic"
+        ],
+        "title": "PresenterOut"
+      },
+      "PublishExcellence": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "title": "PublishExcellence"
+      },
+      "RankSeriesOut": {
+        "properties": {
+          "points": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "ranks": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ranks"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "points",
+          "ranks",
+          "total"
+        ],
+        "title": "RankSeriesOut"
+      },
+      "RatingSubmit": {
+        "properties": {
+          "presenter": {
+            "type": "string",
+            "title": "Presenter"
+          },
+          "attitude": {
+            "type": "number",
+            "title": "Attitude"
+          },
+          "polish": {
+            "type": "number",
+            "title": "Polish"
+          },
+          "top5": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Top5",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "presenter",
+          "attitude",
+          "polish"
+        ],
+        "title": "RatingSubmit"
+      },
+      "RefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshRequest"
+      },
+      "ReportOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "mo": {
+            "type": "integer",
+            "title": "Mo"
+          },
+          "day": {
+            "type": "integer",
+            "title": "Day"
+          },
+          "dateLabel": {
+            "type": "string",
+            "title": "Datelabel"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "presenters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Presenters"
+          },
+          "attendance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attendance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "mo",
+          "day",
+          "dateLabel",
+          "type",
+          "presenters",
+          "attendance"
+        ],
+        "title": "ReportOut"
+      },
+      "RequestEventOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "note",
+          "at"
+        ],
+        "title": "RequestEventOut"
+      },
+      "RequestKind": {
+        "type": "string",
+        "enum": [
+          "swap",
+          "absence",
+          "api",
+          "ssh"
+        ],
+        "title": "RequestKind"
+      },
+      "RequestOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RequestKind"
+          },
+          "from": {
+            "type": "string",
+            "title": "From"
+          },
+          "toName": {
+            "type": "string",
+            "title": "Toname",
+            "default": ""
+          },
+          "fromDate": {
+            "type": "string",
+            "title": "Fromdate",
+            "default": ""
+          },
+          "toDate": {
+            "type": "string",
+            "title": "Todate",
+            "default": ""
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "incoming": {
+            "type": "boolean",
+            "title": "Incoming",
+            "default": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/RequestEventOut"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "from",
+          "status",
+          "createdAt",
+          "history"
+        ],
+        "title": "RequestOut"
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "member",
+          "admin"
+        ],
+        "title": "Role"
+      },
+      "SemesterOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "short": {
+            "type": "string",
+            "title": "Short"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "short",
+          "start",
+          "end"
+        ],
+        "title": "SemesterOut"
+      },
+      "ServerCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "ip": {
+            "type": "string",
+            "title": "Ip",
+            "default": ""
+          },
+          "gpu": {
+            "type": "string",
+            "title": "Gpu",
+            "default": ""
+          },
+          "status": {
+            "$ref": "#/components/schemas/ServerStatus",
+            "default": "online"
+          },
+          "net": {
+            "type": "string",
+            "title": "Net",
+            "default": "intranet"
+          },
+          "desc": {
+            "type": "string",
+            "title": "Desc",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ServerCreate"
+      },
+      "ServerOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "ip": {
+            "type": "string",
+            "title": "Ip"
+          },
+          "gpu": {
+            "type": "string",
+            "title": "Gpu"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ServerStatus"
+          },
+          "net": {
+            "type": "string",
+            "title": "Net"
+          },
+          "desc": {
+            "type": "string",
+            "title": "Desc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "ip",
+          "gpu",
+          "status",
+          "net",
+          "desc"
+        ],
+        "title": "ServerOut"
+      },
+      "ServerStatus": {
+        "type": "string",
+        "enum": [
+          "online",
+          "busy",
+          "offline"
+        ],
+        "title": "ServerStatus"
+      },
+      "ServerUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "gpu": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServerStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "net": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net"
+          },
+          "desc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desc"
+          }
+        },
+        "type": "object",
+        "title": "ServerUpdate"
+      },
+      "TokenPair": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token"
+        ],
+        "title": "TokenPair"
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "ssh_pubkey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ssh Pubkey"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "title",
+          "settings",
+          "created_at"
+        ],
+        "title": "UserOut"
+      },
+      "UserSettingsUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "ssh_pubkey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ssh Pubkey"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settings"
+          }
+        },
+        "type": "object",
+        "title": "UserSettingsUpdate"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

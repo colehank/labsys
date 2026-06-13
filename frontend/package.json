@@ -1,0 +1,30 @@
+{
+  "name": "cibol-lab-system",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CIBOL · 实验室系统 — Vite + React + TypeScript implementation of the CIBOL design handoff.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "lucide-react": "^0.456.0",
+    "openapi-fetch": "^0.17.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
