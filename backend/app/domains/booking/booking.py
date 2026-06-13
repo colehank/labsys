@@ -51,14 +51,73 @@ async def _check_dialog(page: Page) -> bool:
 
 
 async def _handle_dialog(page: Page) -> None:
-    """处理登录后可能出现的「须知 / 提示」弹窗：勾选复选框并点确定。"""
+    """关闭登录后出现的「须知 / 提示 / 公告」弹窗。
+
+    容忍多种形态：可能有「我已阅读」复选框，确认按钮文案不一（确定 / 知道了 /
+    同意 …），都没有时退回右上角关闭按钮或 Escape。任何一步失败都不抛错。
+    """
     wrappers = page.locator("div.el-dialog__wrapper:visible")
-    if await wrappers.count() > 0:
-        wrapper = wrappers.last
+    if await wrappers.count() == 0:
+        return
+    wrapper = wrappers.last
+    # 1) 勾选「我已阅读」类复选框（若存在）
+    try:
         checkbox = wrapper.locator("input.el-checkbox__original").first
-        await checkbox.dispatch_event("click")
+        if await checkbox.count() > 0:
+            await checkbox.dispatch_event("click")
+    except Exception:
+        pass
+    # 2) 依次尝试常见确认按钮文案
+    for name in ("确定", "我知道了", "知道了", "我已阅读", "同意", "确认"):
+        try:
+            btn = wrapper.locator(
+                f"button:has-text('{name}'):not(.is-disabled)"
+            ).first
+            if await btn.count() > 0 and await btn.is_visible():
+                await btn.click()
+                return
+        except Exception:
+            pass
+    # 3) 兜底：任意可用的 primary 按钮
+    try:
         btn = wrapper.locator("button.el-button--primary:not(.is-disabled)").first
-        await btn.click()
+        if await btn.count() > 0 and await btn.is_visible():
+            await btn.click()
+            return
+    except Exception:
+        pass
+    # 4) 再兜底：右上角关闭按钮 / Escape
+    try:
+        close = wrapper.locator(".el-dialog__headerbtn").first
+        if await close.count() > 0:
+            await close.click()
+            return
+    except Exception:
+        pass
+    try:
+        await page.keyboard.press("Escape")
+    except Exception:
+        pass
+
+
+async def _dismiss_dialogs(page: Page, rounds: int = 5) -> None:
+    """反复关闭可见弹窗，直到清空为止；含对「迟出现」弹窗的短暂等待。
+
+    门户的公告/须知弹窗有时在 networkidle 之后才异步弹出，会拦截后续点击，
+    故在关键操作前调用本函数把遮罩清干净。
+    """
+    for _ in range(rounds):
+        # 给迟出现的弹窗一点时间冒出来
+        try:
+            await page.locator("div.el-dialog__wrapper:visible").last.wait_for(
+                state="visible", timeout=PLAYWRIGHT_TIMEOUT_SHORT
+            )
+        except Exception:
+            pass
+        if not await _check_dialog(page):
+            return
+        await _handle_dialog(page)
+        await page.wait_for_timeout(800)
 
 
 async def _select_room_group(page: Page, target_text: str = TENCENT_ROOM_GROUP) -> None:
@@ -256,43 +315,89 @@ async def _submit_and_confirm(page: Page) -> None:
         await page.wait_for_timeout(PLAYWRIGHT_TIMEOUT_MEDIUM)
 
 
-async def _get_meeting_info(page: Page, topic: str, start_time: str) -> dict[str, str]:
-    """在会议列表页按 start_time(YYYY-MM-DD HH:mm) 和 topic 匹配行，取会议号 / 密码。"""
-    # 等表格渲染
-    await page.wait_for_selector(".el-table__body tr.el-table__row")
+async def _filter_list_by(page: Page, query: str) -> None:
+    """在会议列表用搜索框按关键词过滤，避免会议多于一页时目标行落到后续页。
 
-    rows = page.locator(".el-table__body tr.el-table__row")
-    n = await rows.count()
-    # 时间为主、主题为辅匹配：列表里长主题可能被截断/换行，故只要时间命中即视为候选，
-    # 主题命中（双向子串，容忍截断）优先；都无主题命中时取第一条时间命中行（通常即最新提交）。
-    time_only: int | None = None
-    target_row = None
-    for i in range(n):
-        row = rows.nth(i)
-        # 各列：时间、主题、会议信息 分别是第 3、5、10 列（从 1 开始）
-        time_text = (await row.locator("td").nth(2).inner_text()).strip()
-        topic_text = (await row.locator("td").nth(4).inner_text()).strip()
-        if start_time not in time_text:
-            continue
-        if time_only is None:
-            time_only = i
-        if topic and (topic in topic_text or topic_text in topic):
-            target_row = row
-            break
-    if target_row is None and time_only is not None:
-        target_row = rows.nth(time_only)
+    也起到「刷新」作用：重新查询能拿到刚由门户批准、会议号已发放的最新状态。
+    搜索框/按钮缺失或交互失败都不抛错（退回不过滤的整页扫描）。
+    """
+    try:
+        box = page.locator("input[placeholder*='搜索']").first
+        if await box.count() == 0:
+            return
+        await box.fill(query)
+        btn = page.get_by_role("button", name="搜索")
+        if await btn.count() > 0:
+            await btn.first.click()
+        else:
+            await box.press("Enter")
+        await page.wait_for_load_state("networkidle")
+        await page.wait_for_timeout(800)
+    except Exception:
+        pass
 
-    if target_row is None:
-        raise RuntimeError("未在会议列表中找到匹配的会议行")
 
-    info_text = (await target_row.locator("td").nth(9).inner_text()).strip()
-    # 例：'会议号:788378215\n密码:123456'
-    m_id = re.search(r"会议号[:：]\s*(\d+)", info_text)
-    m_pw = re.search(r"密码[:：]\s*([0-9A-Za-z]+)", info_text)
-    if not (m_id and m_pw):
-        raise RuntimeError("未能从会议信息列解析出会议号或密码")
+async def _get_meeting_info(
+    page: Page,
+    topic: str,
+    start_time: str,
+    *,
+    retries: int = 14,
+    interval_ms: int = 13000,
+) -> dict[str, str]:
+    """在会议列表页按 start_time(YYYY-MM-DD HH:mm) 和 topic 匹配行，取会议号 / 密码。
 
-    return {"meeting_id": m_id.group(1), "password": m_pw.group(1)}
+    门户新预约先进「提交(待批准)」态，**会议号要等门户自动批准后才发放**
+    （实测约 1~3 分钟）。故此处轮询：每轮用搜索框按日期过滤（绕开分页 + 刷新状态）
+    后重读，匹配行且已发会议号才返回；只匹配到行但号未发则等待重试。
+    """
+    date_part = start_time.split(" ")[0]  # 'YYYY-MM-DD'，按日期过滤最稳
+    last_err = "未在会议列表中找到匹配的会议行"
+    for attempt in range(retries):
+        await _filter_list_by(page, date_part)
+        try:
+            await page.wait_for_selector(
+                ".el-table__body tr.el-table__row",
+                timeout=PLAYWRIGHT_VISIBILITY_TIMEOUT,
+            )
+        except Exception:
+            pass
+
+        rows = page.locator(".el-table__body tr.el-table__row")
+        n = await rows.count()
+        # 时间为主、主题为辅匹配：列表里长主题可能被截断/换行，故只要时间命中即视为候选，
+        # 主题命中（双向子串，容忍截断）优先；都无主题命中时取第一条时间命中行。
+        time_only: int | None = None
+        target_row = None
+        for i in range(n):
+            row = rows.nth(i)
+            # 各列：时间、主题、会议信息 分别是第 3、5、10 列（从 1 开始）
+            time_text = (await row.locator("td").nth(2).inner_text()).strip()
+            topic_text = (await row.locator("td").nth(4).inner_text()).strip()
+            if start_time not in time_text:
+                continue
+            if time_only is None:
+                time_only = i
+            if topic and (topic in topic_text or topic_text in topic):
+                target_row = row
+                break
+        if target_row is None and time_only is not None:
+            target_row = rows.nth(time_only)
+
+        if target_row is not None:
+            info_text = (await target_row.locator("td").nth(9).inner_text()).strip()
+            # 例：'会议号:788378215\n密码:123456'；待批准时 '会议号:\n密码:123456'
+            m_id = re.search(r"会议号[:：]\s*(\d+)", info_text)
+            m_pw = re.search(r"密码[:：]\s*([0-9A-Za-z]+)", info_text)
+            if m_id and m_pw:
+                return {"meeting_id": m_id.group(1), "password": m_pw.group(1)}
+            last_err = "会议已提交但门户尚未发放会议号（待自动批准，请稍后重试）"
+
+        # 未就绪：等待后下一轮重新搜索（即刷新）重试
+        if attempt < retries - 1:
+            await page.wait_for_timeout(interval_ms)
+
+    raise RuntimeError(last_err)
 
 
 def _parse_meeting_info(text: str) -> dict[str, str]:
@@ -405,14 +510,19 @@ async def book_tencent_meeting(
                 await page.click("a:has-text('登录')")
                 await page.wait_for_load_state("networkidle")
 
-                # 3) 处理登录后可能的弹窗（最多 3 次）
-                for _ in range(3):
-                    if await _check_dialog(page):
-                        await _handle_dialog(page)
-                        await page.wait_for_timeout(1000)
+                # 3) 处理登录后可能的弹窗（须知 / 公告，可能迟出现）
+                await _dismiss_dialogs(page)
 
-                # 4) 新建会议表单
-                await page.click("text=新建会议")
+                # 4) 新建会议表单 —— 点击前再清一次弹窗，被拦截则清完重试
+                await _dismiss_dialogs(page)
+                try:
+                    await page.click(
+                        "text=新建会议",
+                        timeout=PLAYWRIGHT_VISIBILITY_TIMEOUT * 2,
+                    )
+                except PlaywrightTimeoutError:
+                    await _dismiss_dialogs(page)
+                    await page.click("text=新建会议")
                 await page.wait_for_load_state("networkidle")
                 # 选腾讯会议（这是选腾讯的关键步骤）
                 await _select_room_group(page, TENCENT_ROOM_GROUP)

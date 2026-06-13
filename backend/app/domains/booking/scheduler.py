@@ -24,6 +24,7 @@ async def auto_book_pass() -> None:
     """一次扫描：对 [今天, 今天+N] 内、尚未成功预约的组会逐个预约。"""
     if not settings.booking_enabled:
         return
+    # 先用短会话收集待预约的会议 id（随即释放连接），再逐个用自包含的 book_meeting
     async with SessionLocal() as db:
         cfg = (await db.execute(select(LabConfig))).scalars().first()
         if cfg is None or not cfg.auto_book:
@@ -33,16 +34,18 @@ async def auto_book_pass() -> None:
             select(Meeting)
             .where(Meeting.date >= date.today(), Meeting.date <= horizon)
         )).scalars().all()
-        for m in rows:
-            if m.online_status == "ok" and m.online_url:
-                continue  # 已成功预约，跳过
-            try:
-                await book_meeting(db, m)
-                log.info("自动预约成功：%s %s", m.date, m.type.value)
-            except Exception as exc:  # noqa: BLE001 —— 单场失败不阻断其它
-                m.online_status = "failed"
-                await db.commit()
-                log.warning("自动预约失败：%s %s — %s", m.date, m.type.value, exc)
+        todo = [
+            (m.id, m.date, m.type.value)
+            for m in rows
+            if not (m.online_status == "ok" and m.online_url)
+        ]
+
+    for mid, mdate, mtype in todo:
+        try:
+            await book_meeting(mid)  # 自管会话；失败内部已标记 failed
+            log.info("自动预约成功：%s %s", mdate, mtype)
+        except Exception as exc:  # noqa: BLE001 —— 单场失败不阻断其它
+            log.warning("自动预约失败：%s %s — %s", mdate, mtype, exc)
 
 
 def start_scheduler() -> None:

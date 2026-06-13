@@ -9,8 +9,7 @@ from app.core.config import settings
 from app.core.deps import AdminUser, DbSession
 from app.domains.booking.scheduler import auto_book_pass
 from app.domains.booking.service import book_meeting
-from app.domains.lab.serializers import meeting_out
-from app.models import LabConfig, Meeting
+from app.models import LabConfig
 from app.schemas.lab import MeetingOut
 
 router = APIRouter(prefix="/booking", tags=["booking"])
@@ -51,24 +50,17 @@ async def update_settings(body: AutoBookUpdate, _: AdminUser, db: DbSession) -> 
 
 
 @router.post("/meetings/{meeting_id}/book", response_model=MeetingOut)
-async def book_one(meeting_id: str, _: AdminUser, db: DbSession) -> MeetingOut:
+async def book_one(meeting_id: str, _: AdminUser) -> MeetingOut:
     if not settings.booking_enabled:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail="未配置腾讯会议预约凭据（CIBOL_BOOKING_ACCOUNT / CIBOL_BOOKING_PASSWORD）")
-    meeting = await db.get(Meeting, meeting_id)
-    if meeting is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="组会不存在")
+    # book_meeting 自包含（按 id 工作、自管短会话、失败内部标记 failed）
     try:
-        meeting = await book_meeting(db, meeting)
+        return await book_meeting(meeting_id)
+    except LookupError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="组会不存在") from None
     except Exception as exc:  # noqa: BLE001
-        # 失败时 session 可能已脏：先回滚再用干净状态标记 failed
-        await db.rollback()
-        fresh = await db.get(Meeting, meeting_id)
-        if fresh is not None:
-            fresh.online_status = "failed"
-            await db.commit()
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"预约失败：{exc}") from exc
-    return meeting_out(meeting)
 
 
 @router.post("/run-auto", status_code=status.HTTP_202_ACCEPTED)
