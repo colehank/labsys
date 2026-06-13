@@ -4,6 +4,7 @@ services:
   # 前端：node 里 build → caddy 托管（dist 烤进镜像）+ 反代 /api /ws /sse 到 api
   web:
     build: ../frontend
+    image: labsys-web:latest        # 命名镜像：可在能连 DockerHub 的机器 build 后搬到内网机 load 直接用
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     volumes:
@@ -13,6 +14,7 @@ services:
 
   api:
     build: ../backend
+    image: labsys-api:latest        # 同上：命名后可 build-on-Mac → load-on-turing
     restart: unless-stopped
     env_file: ../.env              # 唯一真相源（仓库根 .env）
     environment:

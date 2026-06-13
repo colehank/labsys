@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { usePendingRequests, useProcessedRequests, useAdvanceRequest } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // Approvals — 管理员审批中心. 从 store 读取成员提交的申请，需管理员动作的项:
 //  · 轮空请假 (approve/reject)
@@ -198,6 +199,7 @@ import { usePendingRequests, useProcessedRequests, useAdvanceRequest } from "../
   }
 
   function Approvals() {
+    const isMobile = useIsMobile();
     const { data: pending = [] } = usePendingRequests();
     const { data: processed = [] } = useProcessedRequests();
     const advance = useAdvanceRequest();
@@ -217,7 +219,7 @@ import { usePendingRequests, useProcessedRequests, useAdvanceRequest } from "../
     const historyItems = [...resolved, ...HISTORY_SEED.map((q) => ({ q, state: q.state, when: q.when }))];
 
     return (
-      <div style={{ maxWidth: 880, margin: "0 auto", padding: "20px 32px 48px" }}>
+      <div style={{ maxWidth: 880, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "20px 32px 48px" }}>
         <Tabs active={tab} onChange={setTab} style={{ marginBottom: 18 }}
           tabs={[{ id: "pending", label: "待审批", badge: pendingItems.length || undefined }, { id: "history", label: "历史", badge: historyItems.length }]} />
 

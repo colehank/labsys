@@ -4,6 +4,7 @@ import { I, Icon } from "../lib/icons";
 import { STORE, toast } from "../store";
 import { DATA } from "../data";
 import { useConfig, useMeetings, useEvalCompute, useExcellence, useRankSeries, useCreateRequest, useEvalReports, useSubmitRating, useBookMeeting, useBookingSettings, type Meeting } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 import type { Me } from "../auth";
 
 // Meetings — 组会: schedule (unified panel: recent + month calendar + leave),
@@ -73,6 +74,7 @@ import type { Me } from "../auth";
   }
 
   function Schedule({ onLeave, admin, me }: any) {
+    const isMobile = useIsMobile();
     STORE.use();
     const { data: cfg } = useConfig();
     const { data: meetings = [] } = useMeetings();
@@ -109,7 +111,7 @@ import type { Me } from "../auth";
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* 组会日历 + 我的本学期报告 */}
         <Card padding="none">
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.1fr 1fr" }}>
             {/* LEFT — meeting-date blocks; click a block to reveal its detail */}
             <div style={{ padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -182,7 +184,7 @@ import type { Me } from "../auth";
             </div>
 
             {/* RIGHT — 我的本学期报告 (replaces the old day-detail panel) */}
-            <div style={{ padding: 20, borderLeft: "1px solid var(--border-subtle)" }}>
+            <div style={{ padding: 20, borderLeft: isMobile ? "none" : "1px solid var(--border-subtle)", borderTop: isMobile ? "1px solid var(--border-subtle)" : "none" }}>
               <div className="cibol-eyebrow" style={{ marginBottom: 4 }}>我的报告</div>
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", marginBottom: 4 }}>我的本学期报告</div>
               <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>点击设置汇报主题</p>
@@ -240,6 +242,7 @@ import type { Me } from "../auth";
   }
 
   function ReportRating({ index, presenter, candidates, onSubmit }: any) {
+    const isMobile = useIsMobile();
     const [att, setAtt] = React.useState(0);
     const [pol, setPol] = React.useState(0);
     const [confirm, setConfirm] = React.useState(false);
@@ -270,7 +273,7 @@ import type { Me } from "../auth";
             : <Badge tone="warning" size="sm" dot>待评</Badge>}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1.1fr" }}>
           {/* left — the two 5-point scores, filling the column height */}
           <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column" }}>
             <div className="cibol-eyebrow" style={{ marginBottom: 2 }}>报告评分</div>
@@ -289,7 +292,7 @@ import type { Me } from "../auth";
           </div>
 
           {/* right — this report's discussion Top 5 */}
-          <div style={{ padding: "18px 20px", borderLeft: "1px solid var(--border-subtle)", background: "var(--surface-sunken)" }}>
+          <div style={{ padding: "18px 20px", borderLeft: isMobile ? "none" : "1px solid var(--border-subtle)", borderTop: isMobile ? "1px solid var(--border-subtle)" : "none", background: "var(--surface-sunken)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span className="cibol-eyebrow">讨论贡献 Top 5</span>
               <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{chosen.length}/5</span>
@@ -568,6 +571,7 @@ import type { Me } from "../auth";
 
   // 我的得分 —— 与「表现统计」同源（store.computeEval），点击展开计算明细。
   function MyScores({ me }: { me: Me }) {
+    const isMobile = useIsMobile();
     const { data: ev } = useEvalCompute();
     const [open, setOpen] = React.useState(false);
     const row = ev?.rows.find((r) => r.name === me.name) || ev?.rows[0];
@@ -590,7 +594,7 @@ import type { Me } from "../auth";
             <span style={{ fontSize: 11.5, color: "var(--accent-text)", marginTop: 4 }}>组会总分</span>
           </div>
           {/* 四子分 */}
-          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px 16px", alignContent: "center", minWidth: 0 }}>
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "7px 16px", alignContent: "center", minWidth: 0 }}>
             {subs.map((s) => (
               <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
@@ -610,7 +614,7 @@ import type { Me } from "../auth";
           <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-faint)", marginBottom: 8 }}>计算明细 · 与表现统计同源</div>
             {subs.map((s) => (
-              <div key={s.label} style={{ display: "grid", gridTemplateColumns: "72px 1fr 64px 56px", gap: 10, alignItems: "center", padding: "5px 0", borderTop: "1px solid var(--border-subtle)" }}>
+              <div key={s.label} style={{ display: "grid", gridTemplateColumns: isMobile ? "64px 1fr auto" : "72px 1fr 64px 56px", gap: 10, alignItems: "center", padding: "5px 0", borderTop: "1px solid var(--border-subtle)" }}>
                 <span style={{ fontSize: 12.5, color: "var(--text-body)", display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: s.color, flexShrink: 0 }} />{s.label}</span>
                 <span style={{ fontSize: 12, color: "var(--text-faint)" }}>原始 <b className="cibol-mono" style={{ color: "var(--text-muted)", fontWeight: 600 }}>{s.raw}{s.unit ? " " + s.unit : ""}</b></span>
                 <span style={{ fontSize: 12, color: "var(--text-faint)", textAlign: "right" }}>归一 <b className="cibol-mono" style={{ color: "var(--text-strong)", fontWeight: 600 }}>{Math.round(s.norm)}</b></span>
@@ -628,6 +632,7 @@ import type { Me } from "../auth";
   }
 
   function Rank({ me }: { me: Me }) {
+    const isMobile = useIsMobile();
     const PRESETS: Record<string, string[]> = {
       month: ["2026-05-12", "2026-06-12"],
       term: ["2026-02-24", "2026-06-12"],
@@ -664,7 +669,7 @@ import type { Me } from "../auth";
         <Card padding="none">
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch" }}>
             {/* LEFT — 我的排名走势（含区间筛选：仅作用于本走势）*/}
-            <div style={{ flex: "1 1 360px", minWidth: 0, display: "flex", flexDirection: "column", borderRight: "1px solid var(--border-subtle)" }}>
+            <div style={{ flex: isMobile ? "1 1 100%" : "1 1 360px", minWidth: 0, display: "flex", flexDirection: "column", borderRight: isMobile ? "none" : "1px solid var(--border-subtle)", borderBottom: isMobile ? "1px solid var(--border-subtle)" : "none" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "16px 20px", borderBottom: "1px solid var(--border-subtle)" }}
                 data-comment-anchor="e9b8b6aba1-div-555-11">
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -691,7 +696,7 @@ import type { Me } from "../auth";
             </div>
 
             {/* RIGHT — 上次优秀名单（管理员发布的优秀奖） */}
-            <div style={{ flex: "1 1 360px", minWidth: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ flex: isMobile ? "1 1 100%" : "1 1 360px", minWidth: 0, display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "16px 20px", borderBottom: "1px solid var(--border-subtle)" }}>
                 <div>
                   <div className="cibol-eyebrow">{exc.published ? "管理员发布" : "本区间预览"}</div>
@@ -722,6 +727,7 @@ import type { Me } from "../auth";
   }
 
   function LeaveDialog({ open, onClose, session, me }: any) {
+    const isMobile = useIsMobile();
     const [kind, setKind] = React.useState("");
     const [swapId, setSwapId] = React.useState("");
     const [reason, setReason] = React.useState("");
@@ -758,7 +764,7 @@ import type { Me } from "../auth";
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-body)", marginBottom: 8 }}>请假方式</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
               {[["absence", "轮空请假", "本次报告轮空 · 记为未出勤", "calendar-x"], ["swap", "对调请假", "与他人对调顺序 · 记为未出勤", "repeat"]].map(([v, t, sub, ic]) => (
                 <button key={v} onClick={() => setKind(v)}
                   style={{ textAlign: "left", padding: "12px 14px", cursor: "pointer",
@@ -810,10 +816,11 @@ import type { Me } from "../auth";
   }
 
   function Meetings({ initialTab, admin, me }: any) {
+    const isMobile = useIsMobile();
     const [tab, setTab] = React.useState(initialTab || "schedule");
     const [leave, setLeave] = React.useState(null);
     return (
-      <div style={{ maxWidth: 1140, margin: "0 auto", padding: "20px 32px 48px" }}>
+      <div style={{ maxWidth: 1140, margin: "0 auto", padding: isMobile ? "16px 14px 28px" : "20px 32px 48px" }}>
         <Tabs active={tab} onChange={setTab} style={{ marginBottom: 24 }}
           tabs={[{ id: "schedule", label: "安排" }, { id: "rating", label: "评分" }, { id: "rank", label: "表现" }]} />
         {tab === "schedule" && <Schedule onLeave={(s) => setLeave(s)} admin={admin} me={me} />}

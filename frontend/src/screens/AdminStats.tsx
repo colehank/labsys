@@ -9,6 +9,7 @@ import {
   usePublishExcellence,
   useExcellence,
 } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminStats — 表现统计: 本评选期的排名工作台。
 //   三个板块（管理员的操作流程）:
@@ -112,6 +113,7 @@ import {
   }
 
   function AdminStats() {
+    const isMobile = useIsMobile();
     const { data: evData } = useEvalCompute();
     const { data: cfg } = useEvalConfig();
     const { data: excellence } = useExcellence();
@@ -153,6 +155,7 @@ import {
     const mRankAmong: Record<string, number> = {};
     evData.merged.forEach((m) => { mRankAmong[m.name] = m.mRank; });
     const ev = { rows: evData.rows, merged: evData.merged, total: evData.total, survivors, order, mRankAmong };
+    const tableCols = isMobile ? "1fr" : TABLE_COLS;
 
     // —— 最终表现表：入选者按终极名次在前，其余按组会表现在后（淡化）——
     const survSet = new Set(ev.survivors.map((s) => s.name));
@@ -183,7 +186,7 @@ import {
     };
 
     return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "16px 28px 20px", boxSizing: "border-box", gap: 12, maxWidth: 1200, margin: "0 auto", minHeight: 0 }}>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: isMobile ? "16px 14px 20px" : "16px 28px 20px", boxSizing: "border-box", gap: 12, maxWidth: 1200, margin: "0 auto", minHeight: 0 }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
@@ -215,12 +218,12 @@ import {
                 <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-faint)" }}>汇总权重</span>
                 <span style={{ fontSize: 11, color: "var(--text-faint)" }}>加权得组会表现分</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 22px", padding: "8px 16px 10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap: "6px 22px", padding: "8px 16px 10px" }}>
                 {L1.map((m) => <WeightChip key={m.key} label={m.label} color={m.color} value={w[m.wk]} onChange={(v) => setEvalWeights({ [m.wk]: v })} />)}
               </div>
             </div>
             {/* 表头 */}
-            <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 8, padding: "6px 16px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center", flexShrink: 0 }}>
+            <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: tableCols, gap: 8, padding: "6px 16px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center", flexShrink: 0 }}>
               <span style={{ ...hCell, color: "var(--text-strong)" }}>终极名次</span>
               <span style={hCell}>成员</span>
               {L1.map((m) => (
@@ -239,7 +242,7 @@ import {
                 const top3 = r.inSurv && r.finalRank <= 3;
                 const medal = ["var(--amber-500)", "var(--slate-400)", "var(--terracotta-400)"][r.finalRank - 1];
                 return (
-                  <div key={r.name} style={{ display: "grid", gridTemplateColumns: TABLE_COLS, gap: 8, padding: "4px 16px", alignItems: "center", borderBottom: i < topRows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : r.inSurv ? "transparent" : "var(--surface-sunken)", opacity: r.inSurv ? 1 : 0.55 }}>
+                  <div key={r.name} style={{ display: "grid", gridTemplateColumns: tableCols, gap: 8, padding: isMobile ? "8px 14px" : "4px 16px", alignItems: "center", borderBottom: i < topRows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : r.inSurv ? "transparent" : "var(--surface-sunken)", opacity: r.inSurv ? 1 : 0.55 }}>
                     {/* 终极名次 */}
                     {r.inSurv ? (
                       <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontSize: 12.5, fontWeight: 700, color: top3 ? "#fff" : "var(--text-muted)", background: top3 ? medal : "var(--surface-hover)", fontVariantNumeric: "tabular-nums" }}>{r.finalRank}</span>
@@ -267,7 +270,7 @@ import {
         </Panel>
 
         {/* ── 底部两栏：② 过滤下限 + ③ 进展表现 ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "0.85fr 1fr", gap: 12, height: 256, flexShrink: 0 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "0.85fr 1fr", gap: 12, height: isMobile ? "auto" : 256, flexShrink: 0 }}>
           {/* ② 过滤下限 */}
           <Panel step="2" title="过滤下限" sub="筛出入选者"
             right={<div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", background: "var(--accent-soft)", borderRadius: "var(--radius-pill)", whiteSpace: "nowrap", flexShrink: 0 }}>

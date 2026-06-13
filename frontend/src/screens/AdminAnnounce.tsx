@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useAnnouncements, usePublishAnnouncement, useTogglePin, useRemoveAnnouncement } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminAnnounce — 通知公告: 管理员撰写并发布面向全员的公告，发布后显示在所有用户首页。
 // 公告 schema 见 ui_kits/_shared/store.js 顶部。
@@ -22,6 +23,7 @@ import { useAnnouncements, usePublishAnnouncement, useTogglePin, useRemoveAnnoun
   const isExpired = (a) => a.expiresAt && a.expiresAt < new Date().toISOString().slice(0, 10);
 
   function Compose({ onPublish }: any) {
+    const isMobile = useIsMobile();
     const empty = { title: "", body: "", level: "info", pinned: false, audience: "all", expiresAt: "" };
     const [f, setF] = React.useState(empty);
     const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -47,7 +49,7 @@ import { useAnnouncements, usePublishAnnouncement, useTogglePin, useRemoveAnnoun
 
           <div>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-body)", marginBottom: 8 }}>级别</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
               {Object.entries(LEVELS).map(([v, m]) => {
                 const on = f.level === v;
                 return (
@@ -63,7 +65,7 @@ import { useAnnouncements, usePublishAnnouncement, useTogglePin, useRemoveAnnoun
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
             <Select label="受众" value={f.audience} onChange={(e) => set("audience", e.target.value)}
               options={Object.entries(AUDIENCE).map(([value, label]) => ({ value, label }))} />
             <div>
@@ -127,11 +129,12 @@ import { useAnnouncements, usePublishAnnouncement, useTogglePin, useRemoveAnnoun
   }
 
   function AdminAnnounce() {
+    const isMobile = useIsMobile();
     const { data: list = [] } = useAnnouncements();
     const liveCount = list.filter((a) => !isExpired(a)).length;
 
     return (
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>通知公告</h2>
           <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 3 }}>发布的公告会显示在所有成员的首页，可设级别、置顶与失效时间。</p>

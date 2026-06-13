@@ -4,6 +4,7 @@ import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import type { Me } from "../auth";
 import { useUpdateMe } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // My — 我的: a mature settings experience.
 // Read-first / edit-on-demand: each setting shows its current state as a quiet
@@ -269,15 +270,16 @@ import { useUpdateMe } from "../api/hooks";
   }
 
   function My({ onNavigate, embedded, me }: { onNavigate: any; embedded?: boolean; me: Me }) {
+    const isMobile = useIsMobile();
     const [group, setGroup] = React.useState("account");
     const [open, setOpen] = React.useState(null);
     const go = (g) => { setGroup(g); setOpen(null); };
 
     return (
-      <div style={{ maxWidth: embedded ? "none" : 940, margin: "0 auto", padding: embedded ? "22px 24px 32px" : "24px 32px 56px" }}>
+      <div style={{ maxWidth: embedded ? "none" : 940, margin: "0 auto", padding: embedded ? (isMobile ? "16px 14px 24px" : "22px 24px 32px") : (isMobile ? "16px 14px 40px" : "24px 32px 56px") }}>
         {/* profile header — only on the standalone page, not the 设置 dialog */}
         {!embedded && (
-        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 28, flexWrap: "wrap" }}>
           <Avatar name={me.name} size="xl" presence="online" />
           <div style={{ minWidth: 0 }}>
             <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 26, fontWeight: 600, color: "var(--text-strong)" }}>{me.name}</h2>
@@ -299,9 +301,9 @@ import { useUpdateMe } from "../api/hooks";
         </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 28, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "200px 1fr", gap: isMobile ? 18 : 28, alignItems: "start" }}>
           {/* left sub-nav */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, position: "sticky", top: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, position: isMobile ? "static" : "sticky", top: 24 }}>
             {GROUPS.map((g) => {
               const on = g.id === group;
               return (

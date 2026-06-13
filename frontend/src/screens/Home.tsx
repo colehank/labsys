@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useConfig, useAnnouncements, useMeetings, useMyRequests, useAdvanceRequest } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 import type { Me } from "../auth";
 
 // Home dashboard — personal overview. Exports to window.CIBOL_Screens.Home
@@ -91,6 +92,7 @@ import type { Me } from "../auth";
   }
 
   function Home({ onNavigate, me }: { onNavigate: any; me: Me }) {
+    const isMobile = useIsMobile();
     const { data: cfg } = useConfig();
     const { data: meetings = [] } = useMeetings();
     // 今天（6/14）组会刚结束 → 首页展示下一场上阶的组会。
@@ -105,7 +107,7 @@ import type { Me } from "../auth";
     const incoming = myReqs.find((r) => r.incoming && r.kind === "swap" && r.status === "pending");
     if (!cfg || !m) return null;
     return (
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 32px 48px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "16px 14px 28px" : "28px 32px 48px" }}>
         {/* greeting */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -123,7 +125,7 @@ import type { Me } from "../auth";
 
         <Announcements />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px,1fr))", gap: 20, alignItems: "stretch" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px,1fr))", gap: 20, alignItems: "stretch" }}>
           {/* next meeting */}
           <Card eyebrow="NEXT MEETING" title={m.date}
             style={{ height: "100%", display: "flex", flexDirection: "column" }}

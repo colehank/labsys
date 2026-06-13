@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { STORE, toast } from "../store";
 import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminMeetings — 组会管理: frequency-based auto-scheduler + manual ordering,
 // per-presenter 调换/轮空 (read-first), topic assignment.
@@ -141,6 +142,7 @@ import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "..
 
   // 「?」帮助按钮 —— 放在「排期设置」标题旁，点击弹出「如何排期」说明。
   function HowToHelp() {
+    const isMobile = useIsMobile();
     const [open, setOpen] = React.useState(false);
     const items = [
       ["wand-sparkles", "自动排期", "设好频率与人数，一键按花名册顺序自动轮转生成整学期。"],
@@ -155,7 +157,7 @@ import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "..
         <Dialog open={open} onClose={() => setOpen(false)} title="如何排期" subtitle="自动排期与手动调整说明"
           icon={I("circle-help")} tone="accent" width={520}
           footer={<Button variant="primary" onClick={() => setOpen(false)}>知道了</Button>}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
             {items.map(([ic, t, d], i) => (
               <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ width: 16, height: 16, color: "var(--accent)", flexShrink: 0, marginTop: 2, display: "inline-flex" }}>{I(ic)}</span>
@@ -203,6 +205,7 @@ import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "..
   }
 
   function SemesterDialog({ open, onClose }: any) {
+    const isMobile = useIsMobile();
     const store = STORE.use();
     const [sem, setSem] = React.useState(store.semester);
     const [md, setMd] = React.useState(store.meetingDefault);
@@ -224,7 +227,7 @@ import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "..
             </div>
           </div>
           <div style={{ height: 1, background: "var(--border-subtle)" }} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
             <Input label="默认时间" value={md.time} onChange={(e) => setMd({ ...md, time: e.target.value })} iconLeft={I("clock")} />
             <Input label="默认地点" value={md.place} onChange={(e) => setMd({ ...md, place: e.target.value })} iconLeft={I("map-pin")} />
           </div>
@@ -234,6 +237,7 @@ import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "..
   }
 
   function AdminMeetings() {
+    const isMobile = useIsMobile();
     const store = STORE.use();
     const { data: compute } = useEvalCompute();
     const roster = React.useMemo(() => (compute?.rows ?? []).map((row) => ({ name: row.name, role: "" })), [compute]);
@@ -300,8 +304,8 @@ import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "..
     const timeline = buildTimeline(slots, groups);
 
     return (
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>组会管理</h2>
             <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 3 }}>自动排期，可手动调整顺序与主题</p>
@@ -354,9 +358,9 @@ import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "..
             </div>
 
             {/* 排期概览 — inside same card */}
-            <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: "1px solid var(--border-subtle)" }}>
+            <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: "1px solid var(--border-subtle)", flexWrap: isMobile ? "wrap" : "nowrap" }}>
               {[["共安排", meetingCount, "calendar-check", "var(--accent)"], ["报告人次", totalSlots, "users", "var(--success)"], ["轮空", skipCount, "circle-slash", "var(--warning)"], ["已取消", cancelledCount, "calendar-x", "var(--danger)"]].map(([l, n, ic, c]) => (
-                <div key={l} style={{ flex: 1, display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
+                <div key={l} style={{ flex: isMobile ? "1 1 calc(50% - 5px)" : 1, display: "flex", alignItems: "center", gap: 11, padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
                   <span style={{ width: 30, height: 30, borderRadius: "var(--radius-sm)", background: "var(--surface)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <Icon name={ic} style={{ width: 15, height: 15, color: c }} />
                   </span>

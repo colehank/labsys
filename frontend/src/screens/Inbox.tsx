@@ -4,6 +4,7 @@ import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useMyRequests, useAdvanceRequest } from "../api/hooks";
 import { RequestTracker } from "./RequestTracker";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // Inbox — 消息: 个人消息中心。两类内容，互不重复：
 //   · 通知 — 与你相关、需知晓或处理的提醒（他人发起的对调、评分窗口、组会安排等）。
@@ -74,6 +75,7 @@ import { RequestTracker } from "./RequestTracker";
   }
 
   function Inbox({ onNavigate, embedded, me }: any) {
+    const isMobile = useIsMobile();
     const [tab, setTab] = React.useState("notif");
     const advance = useAdvanceRequest();
     const allRequests = useMyRequests().data ?? [];
@@ -92,7 +94,7 @@ import { RequestTracker } from "./RequestTracker";
     const closed = reqs.filter((r) => !ACTIVE.includes(r.status));
 
     return (
-      <div style={{ maxWidth: embedded ? "none" : 760, margin: embedded ? 0 : "0 auto", padding: embedded ? "16px 22px 26px" : "22px 32px 48px" }}>
+      <div style={{ maxWidth: embedded ? "none" : 760, margin: embedded ? 0 : "0 auto", padding: embedded ? (isMobile ? "14px 14px 20px" : "16px 22px 26px") : (isMobile ? "16px 14px 32px" : "22px 32px 48px") }}>
         {!embedded && <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)", marginBottom: 4 }}>消息</h2>}
         <Tabs active={tab} onChange={setTab} style={{ marginBottom: 16 }}
           tabs={[

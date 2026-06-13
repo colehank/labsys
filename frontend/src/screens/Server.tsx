@@ -7,6 +7,7 @@ import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useServers, useCreateRequest } from "../api/hooks";
 import { useAccessToken } from "../auth";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // Server — 服务器：真实 WebSSH 终端。
 // 设计：网页终端 = 用户本人的 SSH 会话，账号密码由用户自己输入，
@@ -28,6 +29,7 @@ type Conn = "idle" | "connecting" | "connected" | "closed";
 
 // 真实终端：xterm.js ↔ WebSocket(/ws/ssh/{id}) ↔ 后端 PTY。
 function Terminal({ host, creds, token, onState }: any) {
+  const isMobile = useIsMobile();
   const wrapRef = React.useRef<HTMLDivElement | null>(null);
   const fitRef = React.useRef<FitAddon | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
@@ -36,7 +38,7 @@ function Terminal({ host, creds, token, onState }: any) {
     if (!wrapRef.current || !creds) return;
     const term = new XTerm({
       fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
-      fontSize: 13.5,
+      fontSize: isMobile ? 12 : 13.5,
       cursorBlink: true,
       theme: {
         background: "#1a1b1e",
@@ -117,13 +119,14 @@ function Terminal({ host, creds, token, onState }: any) {
           ssh {creds?.username}@{host.name} ({host.ip}:{host.ssh_port})
         </span>
       </div>
-      <div ref={wrapRef} style={{ padding: "10px 12px", height: 420 }} />
+      <div ref={wrapRef} style={{ padding: "10px 12px", height: isMobile ? 320 : 420 }} />
     </div>
   );
 }
 
 // 服务器卡片：名+IP+重连。鼠标悬停弹出说明。点击卡片选中。
 function HostCard({ hh, on, onSelect, onReconnect }: any) {
+  const isMobile = useIsMobile();
   const [hover, setHover] = React.useState(false);
   const [spin, setSpin] = React.useState(false);
   const s = STATUS[hh.status];
@@ -136,7 +139,7 @@ function HostCard({ hh, on, onSelect, onReconnect }: any) {
     setTimeout(() => setSpin(false), 850);
   };
   return (
-    <div style={{ position: "relative", flex: "1 1 180px", minWidth: 180 }}
+    <div style={{ position: "relative", flex: isMobile ? "1 1 140px" : "1 1 180px", minWidth: isMobile ? 140 : 180 }}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <div role="button" tabIndex={disabled ? -1 : 0} onClick={disabled ? undefined : onSelect}
         onKeyDown={disabled ? undefined : (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
@@ -191,6 +194,7 @@ function HostCard({ hh, on, onSelect, onReconnect }: any) {
 }
 
 function Server() {
+  const isMobile = useIsMobile();
   const { data: HOSTS = [] } = useServers();
   const token = useAccessToken();
   const createReq = useCreateRequest();
@@ -238,7 +242,7 @@ function Server() {
   }[conn];
 
   return (
-    <div style={{ maxWidth: 1060, margin: "0 auto", padding: "24px 32px 48px" }}>
+    <div style={{ maxWidth: 1060, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "24px 32px 48px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
           {HOSTS.map((hh) => (

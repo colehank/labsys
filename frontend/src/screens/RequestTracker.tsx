@@ -4,6 +4,7 @@ import { Badge, Button } from "../ds";
 import { I } from "../lib/icons";
 import { STORE } from "../store";
 import { useAdvanceRequest } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 const REQ_META: Record<string, any> = {
   pending: { label: "待对方确认", tone: "warning", icon: "loader" },
@@ -49,6 +50,7 @@ function StepNode({ state, n, label }: { state: string; n: number; label: string
 }
 
 export function RequestTracker({ req, compact, collapsible }: { req: any; compact?: boolean; collapsible?: boolean }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(!collapsible);
   const advance = useAdvanceRequest();
   const meta = REQ_META[req.status] || REQ_META.pending;
@@ -86,11 +88,11 @@ export function RequestTracker({ req, compact, collapsible }: { req: any; compac
       </div>
 
       {open && <>
-        <div style={{ display: "flex", alignItems: "flex-start", padding: "16px 18px 14px", position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", padding: isMobile ? "16px 12px 14px" : "16px 18px 14px", position: "relative" }}>
           {[0, 1, 2].map((i) => (
             <React.Fragment key={i}>
               <StepNode state={stateOf(i)} n={i + 1} label={labelOf(i)} />
-              {i < 2 && <div style={{ flex: "0 0 auto", width: 22, height: 2, marginTop: 12, background: connDone(i) ? "var(--success)" : "var(--border-default)", alignSelf: "flex-start" }} />}
+              {i < 2 && <div style={{ flex: "0 0 auto", width: isMobile ? 12 : 22, height: 2, marginTop: 12, background: connDone(i) ? "var(--success)" : "var(--border-default)", alignSelf: "flex-start" }} />}
             </React.Fragment>
           ))}
         </div>

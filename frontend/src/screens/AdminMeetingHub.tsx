@@ -7,6 +7,7 @@ import { AdminMeetings } from "./AdminMeetings";
 import { AdminMeetingStats } from "./AdminMeetingStats";
 import { AdminStats } from "./AdminStats";
 import { AdminRecords } from "./AdminRecords";
+import { useIsMobile } from "../lib/useIsMobile";
 
 const SCREENS: Record<string, React.ComponentType<any>> = { AdminMeetings, AdminMeetingStats, AdminStats, AdminRecords };
 
@@ -23,13 +24,14 @@ const SCREENS: Record<string, React.ComponentType<any>> = { AdminMeetings, Admin
   ];
 
   function AdminMeetingHub() {
+    const isMobile = useIsMobile();
     const [tab, setTab] = React.useState("schedule");
     const Active = SCREENS[(TABS.find((t) => t.id === tab) || TABS[0]).key];
 
     return (
       <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
         {/* 顶部分段：组会中心的三个工作流。粘性，子页面在下方滚动区呈现。 */}
-        <div style={{ flexShrink: 0, padding: "10px 32px 0", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface)" }}>
+        <div style={{ flexShrink: 0, padding: isMobile ? "10px 14px 0" : "10px 32px 0", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface)" }}>
           <Tabs active={tab} onChange={setTab} tabs={TABS.map((t) => ({ id: t.id, label: t.label }))} />
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>

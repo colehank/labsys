@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminMeetingStats — 组会统计: 管理员逐次组会核对「出勤」。
 // 报告评分（态度/精良）与讨论参与来自成员匿名评分，此处只读 —— 单一数据源，不重复录入。
@@ -39,6 +40,7 @@ import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
   }
 
   function AdminMeetingStats() {
+    const isMobile = useIsMobile();
     const { data: compute } = useEvalCompute();
     const { data: reportData } = useEvalReports();
     const setAtt = useSetAttendance();
@@ -85,7 +87,7 @@ import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
 
     if (!r) {
       return (
-        <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 32px 48px" }}>
+        <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px" }}>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>组会统计</h2>
           <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>核对每次组会出勤 · 评分由成员提交</p>
         </div>
@@ -93,7 +95,7 @@ import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
     }
 
     return (
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 32px 48px" }}>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 6, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>组会统计</h2>
@@ -197,7 +199,7 @@ import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
 
         {/* 逐人出勤核对 + 讨论得分(只读) */}
         <Card padding="none" style={{ opacity: cancelled ? 0.5 : 1, pointerEvents: cancelled ? "none" : "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 16, padding: "11px 20px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto", gap: 16, padding: "11px 20px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center" }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)" }}>成员</span>
             <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", textAlign: "center" }}>出勤情况</span>
             <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", textAlign: "right", minWidth: 96 }}>讨论得分</span>
@@ -209,7 +211,7 @@ import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
               const me = name === "苏沐";
               const dv = disc[name] || 0;
               return (
-                <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 16, padding: "10px 20px", alignItems: "center", borderBottom: i < members.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : "transparent" }}>
+                <div key={name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto", gap: isMobile ? 8 : 16, padding: "10px 20px", alignItems: "center", borderBottom: i < members.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : "transparent" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <Avatar name={name} size="sm" />
                     <span style={{ fontSize: 13.5, fontWeight: me ? 600 : 500, color: "var(--text-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>

@@ -4,6 +4,7 @@ import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useMyKeys, useMyRequests, useCreateRequest } from "../api/hooks";
 import { DATA } from "../data";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // API — 申请 + 我的密钥 + 用量
   const { Card, Button, Badge, Input, Textarea, StatTile, Dialog, IconButton } = NS;
@@ -63,6 +64,7 @@ import { DATA } from "../data";
   }
 
   function API() {
+    const isMobile = useIsMobile();
     const [open, setOpen] = React.useState(false);
     const [nm, setNm] = React.useState("");
     const [rsn, setRsn] = React.useState("");
@@ -86,7 +88,7 @@ import { DATA } from "../data";
     // 服务器账号 —— 一个用户只有一个，跨服务器共享。
     const serverAccount = { user: "sumu", pwd: "L@b-7fa3e9qP2", hosts: ["turing", "lecun", "hinton", "fodor"] };
     return (
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 32px 48px" }}>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "24px 32px 48px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <Card eyebrow="我的密钥" title="我的 API 密钥" action={<Button variant="primary" iconLeft={I("plus")} onClick={() => setOpen(true)}>申请密钥</Button>}>
             {/* 用量概览 —— 原顶部统计卡，现归并到此处 */}

@@ -4,6 +4,7 @@ import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { DATA } from "../data";
 import { useEvalCompute, useExcellence } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminRecords — 表现记录: 只读的表现档案。
 //   ① 每位成员的 报告态度 / 制作精良 / 出勤 / 讨论参与 / 优秀(获奖次数)，可切换归一化。
@@ -23,6 +24,7 @@ import { useEvalCompute, useExcellence } from "../api/hooks";
   }
 
   function AdminRecords() {
+    const isMobile = useIsMobile();
     const [norm, setNorm] = React.useState(true);
 
     const evalQ = useEvalCompute();
@@ -71,6 +73,8 @@ import { useEvalCompute, useExcellence } from "../api/hooks";
       });
     }
 
+    const gridCols = isMobile ? "1fr" : GRID;
+
     const exportCSV = () => {
       const header = ["成员", "身份", "报告态度", "制作精良", "出勤率", "讨论参与", "优秀次数"];
       const lines = [header.join(",")];
@@ -87,7 +91,7 @@ import { useEvalCompute, useExcellence } from "../api/hooks";
     };
 
     return (
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 28px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "16px 14px 40px" : "20px 28px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
@@ -114,7 +118,7 @@ import { useEvalCompute, useExcellence } from "../api/hooks";
 
         {/* ① 成员表现表 */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-xs)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface-sunken)", alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface-sunken)", alignItems: "center" }}>
             <button onClick={() => toggleSort("name")} title="按姓名排序"
               style={{ ...hCell, display: "inline-flex", alignItems: "center", gap: 2, border: "none", background: "none", cursor: "pointer", padding: 0, color: sort.key === "name" ? "var(--accent-text)" : "var(--text-faint)" }}>成员{sortArrow("name")}</button>
             {COLS.map((c) => (
@@ -127,15 +131,16 @@ import { useEvalCompute, useExcellence } from "../api/hooks";
           {rows.map((r, i) => {
             const me = r.name === "苏沐";
             return (
-              <div key={r.name} style={{ display: "grid", gridTemplateColumns: GRID, gap: 10, padding: "9px 18px", alignItems: "center", borderBottom: i < rows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : "transparent" }}>
+              <div key={r.name} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 10, padding: "9px 18px", alignItems: "center", borderBottom: i < rows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : "transparent" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                   <Avatar name={r.name} size="xs" />
                   <span style={{ fontSize: 13, fontWeight: me ? 600 : 500, color: "var(--text-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
                 </div>
                 {COLS.map((c) => (
-                  <div key={c.key} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                  <div key={c.key} style={{ display: "flex", flexDirection: isMobile ? "row" : "column", alignItems: isMobile ? "center" : "stretch", justifyContent: isMobile ? "space-between" : "flex-start", gap: isMobile ? 10 : 3, minWidth: 0 }}>
+                    {isMobile && <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "var(--text-faint)" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: c.color, flexShrink: 0 }} />{c.label}</span>}
                     {norm
-                      ? <><MiniBar pct={c.pct(r)} color={c.color} /><span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>{c.raw(r)}</span></>
+                      ? <span style={{ display: "flex", flexDirection: isMobile ? "row" : "column", alignItems: "center", gap: isMobile ? 8 : 3 }}><MiniBar pct={c.pct(r)} color={c.color} /><span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>{c.raw(r)}</span></span>
                       : <span className="cibol-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)" }}>{c.raw(r)}</span>}
                   </div>
                 ))}

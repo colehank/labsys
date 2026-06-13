@@ -6,6 +6,7 @@ import { Sidebar, Avatar } from "../ds";
 import { I } from "../lib/icons";
 import { STORE } from "../store";
 import { DATA } from "../data";
+import { useIsMobile } from "../lib/useIsMobile";
 
 const NAV = [
   { section: "工作台" },
@@ -123,6 +124,100 @@ function BottomAction({ icon, label, onClick, collapsed, active }: any) {
   );
 }
 
+// ── 移动端：底部 Tab 栏 + 「更多」抽屉 ──
+function MobileTabBar({ active, onNavigate, admin, onOpenMore, badge }: any) {
+  const tabs = [
+    { id: "home", label: "首页", icon: I("house") },
+    { id: "meetings", label: "组会", icon: I("presentation") },
+    { id: "server", label: "服务器", icon: I("terminal") },
+    { id: "api", label: "密钥", icon: I("key-round") },
+  ];
+  const adminViews = ["approvals", "meeting-hub", "people-admin", "server-admin", "announce"];
+  const moreActive = adminViews.includes(active);
+  const cell = (key: string, on: boolean, icon: React.ReactNode, label: string, onClick: () => void, dot?: boolean) => (
+    <button key={key} type="button" onClick={onClick} style={{
+      flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
+      border: "none", background: "transparent", cursor: "pointer", padding: "6px 0", position: "relative",
+      color: on ? "var(--accent)" : "var(--text-muted)",
+    }}>
+      <span style={{ display: "inline-flex", width: 22, height: 22, position: "relative" }}>{icon}
+        {dot && <span style={{ position: "absolute", top: -3, right: -5, minWidth: 8, height: 8, borderRadius: "50%", background: "var(--terracotta-500)" }} />}
+      </span>
+      <span style={{ fontSize: 10.5, fontWeight: on ? 600 : 500 }}>{label}</span>
+    </button>
+  );
+  return (
+    <nav style={{
+      position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 60,
+      display: "flex", alignItems: "stretch",
+      background: "var(--surface)", borderTop: "1px solid var(--border-subtle)",
+      paddingBottom: "env(safe-area-inset-bottom, 0px)", boxShadow: "0 -2px 12px rgba(0,0,0,0.05)",
+    }}>
+      {tabs.map((t) => cell(t.id, active === t.id, t.icon, t.label, () => onNavigate(t.id)))}
+      {cell("more", moreActive, I("menu"), "更多", onOpenMore, badge > 0)}
+    </nav>
+  );
+}
+
+function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOpenPanel, onLogout, me, dark, onToggleDark, reqCount, unread }: any) {
+  if (!open) return null;
+  const adminItems = [
+    { id: "approvals", label: "审批中心", icon: I("clipboard-check"), badge: reqCount },
+    { id: "meeting-hub", label: "组会中心", icon: I("presentation") },
+    { id: "people-admin", label: "人员管理", icon: I("users-round") },
+    { id: "server-admin", label: "服务器管理", icon: I("server-cog") },
+    { id: "announce", label: "通知公告", icon: I("megaphone") },
+  ];
+  const row = (icon: React.ReactNode, label: string, onClick: () => void, badge?: any, danger?: boolean) => (
+    <button type="button" onClick={() => { onClick(); onClose(); }} style={{
+      display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "13px 16px", border: "none",
+      background: "transparent", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)", fontSize: 15,
+      color: danger ? "var(--danger-text)" : "var(--text-body)", borderRadius: "var(--radius-md)",
+    }}>
+      <span style={{ display: "inline-flex", width: 20, height: 20, color: danger ? "var(--danger-text)" : "var(--text-muted)", flexShrink: 0 }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {badge ? <span style={{ minWidth: 18, height: 18, padding: "0 5px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--terracotta-500)", color: "#fff", fontSize: 11, fontWeight: 700, borderRadius: "var(--radius-pill)" }}>{badge}</span> : null}
+    </button>
+  );
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.35)" }} />
+      <div style={{
+        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 71, maxHeight: "80vh", overflowY: "auto",
+        background: "var(--surface)", borderRadius: "18px 18px 0 0", boxShadow: "var(--shadow-lg)",
+        paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+      }}>
+        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 6px" }}>
+          <span style={{ width: 38, height: 4, borderRadius: 2, background: "var(--border-default)" }} />
+        </div>
+        {/* 用户 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 16px 14px", borderBottom: "1px solid var(--border-subtle)" }}>
+          <Avatar name={me.name} size="md" presence="online" />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text-strong)" }}>{me.name}</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-faint)" }}>{me.title}</div>
+          </div>
+        </div>
+        <div style={{ padding: "8px 8px" }}>
+          {admin && (
+            <>
+              <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-faint)", padding: "8px 12px 4px" }}>管理</div>
+              {adminItems.map((it) => row(it.icon, it.label, () => onNavigate(it.id), it.badge))}
+              <div style={{ height: 1, background: "var(--border-subtle)", margin: "6px 12px" }} />
+            </>
+          )}
+          {row(I("bell"), "消息", () => onOpenPanel("inbox"), unread)}
+          {row(I("settings"), "设置", () => onOpenPanel("settings"))}
+          {row(I(dark ? "moon" : "sun"), dark ? "深色模式" : "浅色模式", onToggleDark)}
+          {row(I(admin ? "shield-check" : "shield"), admin ? "管理员视图（点击切换为成员）" : "成员视图（点击切换为管理员）", onToggleAdmin)}
+          <div style={{ height: 1, background: "var(--border-subtle)", margin: "6px 12px" }} />
+          {row(I("log-out"), "退出登录", () => onLogout && onLogout(), null, true)}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function AppShell({ active, onNavigate, links, children, admin, onToggleAdmin, onOpenPanel, onLogout, me }: any) {
   const data = DATA;
   STORE.use(); // re-render when requests change so the badge stays current
@@ -132,8 +227,25 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
   const [collapsed, setCollapsed] = React.useState(true);
   const [dark, setDark] = React.useState(() => document.documentElement.getAttribute("data-theme") === "dark");
   React.useEffect(() => { document.documentElement.setAttribute("data-theme", dark ? "dark" : "light"); }, [dark]);
+  const isMobile = useIsMobile();
+  const [moreOpen, setMoreOpen] = React.useState(false);
 
   const nav = admin ? [...NAV, ...ADMIN_NAV] : NAV;
+
+  // ── 移动端布局：内容全宽 + 底部 Tab 栏 ──
+  if (isMobile) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--canvas)" }}>
+        <main style={{ minHeight: "100vh", paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))" }}>{children}</main>
+        <MobileTabBar active={active} onNavigate={onNavigate} admin={admin} badge={badgeCount} onOpenMore={() => setMoreOpen(true)} />
+        <MobileMoreSheet
+          open={moreOpen} onClose={() => setMoreOpen(false)} admin={admin}
+          onNavigate={onNavigate} onToggleAdmin={onToggleAdmin} onOpenPanel={onOpenPanel} onLogout={onLogout}
+          me={me} dark={dark} onToggleDark={() => setDark((v) => !v)} reqCount={reqCount} unread={badgeCount}
+        />
+      </div>
+    );
+  }
 
   const bottomActions = (
     <>

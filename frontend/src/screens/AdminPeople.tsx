@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useUsers } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminPeople — 人员管理: member roster with role, permission, add-member dialog.
   const { Card, Button, Badge, Avatar, Input, Select, IconButton, Dialog } = NS;
@@ -81,6 +82,7 @@ import { useUsers } from "../api/hooks";
   }
 
   function AdminPeople() {
+    const isMobile = useIsMobile();
     const { data: members = [] } = useUsers();
     const base = members.map((u) => ({ name: u.name, role: u.title }));
     const [extra, setExtra] = React.useState([]);
@@ -91,6 +93,7 @@ import { useUsers } from "../api/hooks";
     const [editing, setEditing] = React.useState(null);
 
     const roster = [...base, ...extra];
+    const peopleCols = isMobile ? "1fr auto" : "2.4fr 1.4fr 1fr 88px";
     const username = (n) => n === "苏沐" ? "sumu" : n.toLowerCase().replace(/\s/g, "");
     const acctOf = (m) => (over[m.name] && over[m.name].account) || username(m.name);
     const dispOf = (m) => ({ ...m, ...(over[m.name] || {}) });
@@ -106,21 +109,21 @@ import { useUsers } from "../api/hooks";
     };
 
     return (
-      <div style={{ maxWidth: 940, margin: "0 auto", padding: "24px 32px 48px" }} data-comment-anchor="155c0c10bc-div-19-7">
+      <div style={{ maxWidth: 940, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px" }} data-comment-anchor="155c0c10bc-div-19-7">
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>人员管理</h2>
             <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 3 }}>共 {roster.length} 名成员</p>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <div style={{ width: 220 }}><Input placeholder="搜索姓名或身份" iconLeft={I("search")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ width: isMobile ? "100%" : 220 }}><Input placeholder="搜索姓名或身份" iconLeft={I("search")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
             <Button variant="primary" iconLeft={I("user-plus")} onClick={() => setAdding(true)}>添加成员</Button>
           </div>
         </div>
 
         <Card padding="none">
           {/* header */}
-          <div style={{ display: "grid", gridTemplateColumns: "2.4fr 1.4fr 1fr 88px", gap: 12, padding: "12px 20px", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface-sunken)" }}>
+          <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: peopleCols, gap: 12, padding: "12px 20px", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface-sunken)" }}>
             {["成员", "身份", "权限", "操作"].map((h) => (
               <span key={h} style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)" }}>{h}</span>
             ))}
@@ -130,7 +133,7 @@ import { useUsers } from "../api/hooks";
             const d = dispOf(m);
             const isMe = m.name === "苏沐";
             return (
-              <div key={m.name} style={{ display: "grid", gridTemplateColumns: "2.4fr 1.4fr 1fr 88px", gap: 12, padding: "12px 20px", alignItems: "center", borderBottom: i < list.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
+              <div key={m.name} style={{ display: "grid", gridTemplateColumns: peopleCols, gap: isMobile ? 8 : 12, padding: "12px 20px", alignItems: "center", borderBottom: i < list.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                   <Avatar name={m.name} size="sm" />
                   <div style={{ minWidth: 0 }}>

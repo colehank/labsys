@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useServers, useCreateServer, useUpdateServer, useDeleteServer, type Server } from "../api/hooks";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminServers — 服务器管理: 管理员维护实验室服务器清单（名称/IP/硬件/状态/说明）。
 // 用户端「服务器」页只读展示，点击卡片显示说明。schema 见 ui_kits/_shared/store.js。
@@ -20,6 +21,7 @@ import { useServers, useCreateServer, useUpdateServer, useDeleteServer, type Ser
   };
 
   function ServerDialog({ open, initial, onClose }: any) {
+    const isMobile = useIsMobile();
     const blank = { name: "", ip: "", ssh_port: 22, gpu: "", status: "online", net: "intranet", desc: "" };
     const [f, setF] = React.useState(blank);
     React.useEffect(() => { if (open) setF(initial ? { ...initial } : blank); }, [open, initial]);
@@ -48,12 +50,12 @@ import { useServers, useCreateServer, useUpdateServer, useDeleteServer, type Ser
         subtitle={editing ? f.name : "新增一台实验室主机"} icon={I("server-cog")} tone="accent" width={500}
         footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" disabled={!valid} onClick={save}>{editing ? "保存修改" : "添加"}</Button></>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.4fr 0.7fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.4fr 1.4fr 0.7fr", gap: 12 }}>
             <Input label="主机名" placeholder="例如 turing" value={f.name} onChange={(e) => set("name", e.target.value)} iconLeft={I("server")} />
             <Input label="内网 IP" placeholder="172.16.x.x" value={f.ip} onChange={(e) => set("ip", e.target.value)} iconLeft={I("network")} />
             <Input label="SSH 端口" placeholder="22" value={String(f.ssh_port)} onChange={(e) => set("ssh_port", e.target.value)} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.4fr 1fr 1fr", gap: 12 }}>
             <Input label="硬件" placeholder="例如 8× A100 80G" value={f.gpu} onChange={(e) => set("gpu", e.target.value)} iconLeft={I("cpu")} />
             <Select label="网络" value={f.net} onChange={(e) => set("net", e.target.value)}
               options={Object.entries(NET).map(([value, m]) => ({ value, label: m.label }))} />
@@ -101,13 +103,14 @@ import { useServers, useCreateServer, useUpdateServer, useDeleteServer, type Ser
   }
 
   function AdminServers() {
+    const isMobile = useIsMobile();
     const { data: servers = [] } = useServers();
     const [add, setAdd] = React.useState(false);
     const online = servers.filter((s) => s.status === "online").length;
 
     return (
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>服务器管理</h2>
             <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 3 }}>维护实验室主机清单与说明，用户在「服务器」页点击卡片即可查看说明。</p>
