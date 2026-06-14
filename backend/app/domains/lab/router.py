@@ -4,12 +4,21 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.domains.lab.serializers import ann_sort_key, announcement_out, meeting_out
-from app.models import Announcement, LabConfig, Meeting, Semester
+from app.models import (
+    Announcement,
+    LabConfig,
+    Meeting,
+    MeetingStatus,
+    MeetingType,
+    Presenter,
+    Semester,
+)
 from app.schemas.lab import (
     AnnouncementCreate,
     AnnouncementOut,
@@ -92,6 +101,70 @@ async def list_meetings(_: CurrentUser, db: DbSession) -> list[MeetingOut]:
                 select(Meeting)
                 .options(selectinload(Meeting.presenters))
                 .order_by(Meeting.date)
+            )
+        ).scalars()
+    )
+    return [meeting_out(m) for m in rows]
+
+
+class PresenterIn(BaseModel):
+    name: str
+    topic: str = ""
+    kind: str = ""
+
+
+class MeetingIn(BaseModel):
+    date: date
+    type: str = "进展汇报"        # MeetingType 值：进展汇报 / 文献精读
+    time: str = ""
+    place: str = ""
+    presenters: list[PresenterIn] = []
+
+
+class ScheduleIn(BaseModel):
+    meetings: list[MeetingIn]
+
+
+@router.put("/meetings/schedule", response_model=list[MeetingOut])
+async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> list[MeetingOut]:
+    """整体保存组会排期（管理员）。
+
+    按日期 upsert：表里有该日期则更新、没有则新增；表里多出的日期删除。
+    匹配到日期的会议**保留其在线会议信息**（online_*），避免重排丢失已预约的腾讯会议。
+    """
+    existing = {
+        m.date: m
+        for m in (
+            await db.execute(select(Meeting).options(selectinload(Meeting.presenters)))
+        ).scalars()
+    }
+    seen: set[date] = set()
+    for mi in body.meetings:
+        seen.add(mi.date)
+        m = existing.get(mi.date)
+        if m is None:
+            m = Meeting(date=mi.date, status=MeetingStatus.scheduled)
+            db.add(m)
+        try:
+            m.type = MeetingType(mi.type)
+        except ValueError:
+            m.type = MeetingType.progress
+        m.time = mi.time
+        m.place = mi.place
+        # presenters 关系 cascade=all,delete-orphan → 整体替换
+        m.presenters = [
+            Presenter(name=p.name, topic=p.topic, kind=p.kind, ord=i)
+            for i, p in enumerate(mi.presenters)
+        ]
+    # 删除不在新排期里的日期
+    for d, m in existing.items():
+        if d not in seen:
+            await db.delete(m)
+    await db.commit()
+    rows = list(
+        (
+            await db.execute(
+                select(Meeting).options(selectinload(Meeting.presenters)).order_by(Meeting.date)
             )
         ).scalars()
     )

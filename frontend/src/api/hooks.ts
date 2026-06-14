@@ -36,6 +36,27 @@ export function useMeetings() {
   });
 }
 
+// 管理员整体保存组会排期（端点未在 openapi schema 里，走原生 fetch）
+export type ScheduleMeetingIn = {
+  date: string; type: string; time: string; place: string;
+  presenters: { name: string; topic: string; kind: string }[];
+};
+export function useSaveSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (meetings: ScheduleMeetingIn[]) => {
+      const r = await fetch(`/api/meetings/schedule`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens.access}` },
+        body: JSON.stringify({ meetings }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "保存失败");
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["meetings"] }),
+  });
+}
+
 // ── 请求（请假/对调/API/SSH）──
 export function useMyRequests() {
   return useQuery({

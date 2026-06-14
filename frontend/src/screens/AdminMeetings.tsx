@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { STORE, toast } from "../store";
-import { useEvalCompute, useBookingSettings, useUpdateBookingSettings } from "../api/hooks";
+import { useEvalCompute, useBookingSettings, useUpdateBookingSettings, useSaveSchedule } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminMeetings — 组会管理: frequency-based auto-scheduler + manual ordering,
@@ -296,6 +296,30 @@ import { useIsMobile } from "../lib/useIsMobile";
       setNewDate("");
     };
 
+    const saveSchedule = useSaveSchedule();
+    // 把当前排期（时间线里真实日期的会议）整理成后端要的格式并保存
+    const onSaveSchedule = () => {
+      const meetings = timeline
+        .filter((c: any) => c.type === "meeting" && c.slot && !c.slot.pending && c.slot.iso && c.slot.iso !== "9999")
+        .map((c: any, idx: number) => {
+          const kind = idx % 2 === 0 ? "进展汇报" : "文献精读";
+          return {
+            date: c.slot.iso,
+            type: kind,
+            time: store.meetingDefault?.time || "",
+            place: store.meetingDefault?.place || "",
+            presenters: (c.group.presenters || [])
+              .filter((p: any) => !p.skipped)
+              .map((p: any) => ({ name: p.name, topic: p.topic || "", kind })),
+          };
+        });
+      if (!meetings.length) { toast("排期为空，先生成排期再保存", { tone: "error" }); return; }
+      saveSchedule.mutate(meetings, {
+        onSuccess: () => toast(`排期已保存并更新（${meetings.length} 场组会）`, { tone: "success" }),
+        onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }),
+      });
+    };
+
     const dateStyle = { height: 38, padding: "0 11px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 14, colorScheme: "light dark" };
     const meetingCount = groups.length;
     const cancelledCount = slots.filter((s) => s.cancelled).length;
@@ -312,7 +336,7 @@ import { useIsMobile } from "../lib/useIsMobile";
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
             <Button size="sm" variant="secondary" iconLeft={I("settings")} onClick={() => setSemOpen(true)}>学期与地点</Button>
-            <Button size="sm" variant="primary" iconLeft={I("check")} onClick={() => toast("已保存 · 排期表")}>保存排期</Button>
+            <Button size="sm" variant="primary" iconLeft={I("check")} loading={saveSchedule.isPending} onClick={onSaveSchedule}>保存排期</Button>
           </div>
         </div>
         <SemesterDialog open={semOpen} onClose={() => setSemOpen(false)} />
