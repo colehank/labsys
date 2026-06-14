@@ -2,80 +2,101 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useUsers } from "../api/hooks";
+import { useUsers, useCreateUser, useAdminUpdateUser, useDeleteUser } from "../api/hooks";
+import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
-// AdminPeople — 人员管理: member roster with role, permission, add-member dialog.
+// AdminPeople — 人员管理：真实用户名册（来自 /api/users），管理员可增 / 删 / 改用户。
   const { Card, Button, Badge, Avatar, Input, Select, IconButton, Dialog } = NS;
 
-  const ROLES = ["老师", "科研助理", "博士生", "硕士生", "本科生"];
+  const ROLES = ["老师", "科研助理", "博士生", "硕士生", "本科生"]; // 身份（title）建议项
 
-  function AddMemberDialog({ open, onClose, onAdd }: any) {
-    const [name, setName] = React.useState("");
-    const [role, setRole] = React.useState("");
-    const [perm, setPerm] = React.useState("user");
-    React.useEffect(() => { if (open) { setName(""); setRole(""); setPerm("user"); } }, [open]);
-    const submit = () => { if (!name.trim() || !role) return; onAdd({ name: name.trim(), role, admin: perm === "admin" }); onClose(); };
+  // 权限选择（用户 / 管理员）。值对齐后端 Role：member / admin。
+  function PermPicker({ perm, setPerm }: any) {
     return (
-      <Dialog open={open} onClose={onClose} title="添加成员" subtitle="填写姓名、身份与权限即可加入实验室"
+      <div>
+        <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500, color: "var(--text-body)" }}>权限</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[["member", "用户"], ["admin", "管理员"]].map(([v, t]) => (
+            <button key={v} type="button" onClick={() => setPerm(v)}
+              style={{
+                flex: 1, height: 40, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600,
+                borderRadius: "var(--radius-md)",
+                border: `1px solid ${perm === v ? "var(--accent)" : "var(--border-default)"}`,
+                background: perm === v ? "var(--accent-soft)" : "var(--surface)",
+                color: perm === v ? "var(--accent-text)" : "var(--text-muted)",
+                transition: "all var(--dur-fast) var(--ease-out)",
+              }}>{t}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function AddUserDialog({ open, onClose }: any) {
+    const create = useCreateUser();
+    const [name, setName] = React.useState("");
+    const [email, setEmail] = React.useState("");
+    const [password, setPassword] = React.useState("");
+    const [title, setTitle] = React.useState("");
+    const [perm, setPerm] = React.useState("member");
+    React.useEffect(() => { if (open) { setName(""); setEmail(""); setPassword(""); setTitle(""); setPerm("member"); } }, [open]);
+    const submit = () => {
+      if (!name.trim() || !email.trim() || !password) { toast("请填写姓名、邮箱、密码", { tone: "error" }); return; }
+      create.mutate(
+        { name: name.trim(), email: email.trim(), password, title: title.trim(), role: perm as any },
+        {
+          onSuccess: () => { toast("已添加用户 · " + name.trim(), { tone: "success" }); onClose(); },
+          onError: (e: any) => toast(e?.message || "添加失败", { tone: "error" }),
+        },
+      );
+    };
+    return (
+      <Dialog open={open} onClose={onClose} title="添加用户" subtitle="设置登录邮箱与初始密码（邮箱不限域名）"
         icon={I("user-plus")} tone="accent" width={460}
-        footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" onClick={submit}>添加</Button></>}>
+        footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" loading={create.isPending} onClick={submit}>添加</Button></>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Input label="姓名" placeholder="例如：周野" value={name} onChange={(e) => setName(e.target.value)} iconLeft={I("user")} />
-          <Select label="身份" placeholder="选择身份" value={role} onChange={(e) => setRole(e.target.value)} options={ROLES} />
-          <div>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500, color: "var(--text-body)" }}>权限</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[["user", "用户"], ["admin", "管理员"]].map(([v, t]) => (
-                <button key={v} onClick={() => setPerm(v)}
-                  style={{
-                    flex: 1, height: 40, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600,
-                    borderRadius: "var(--radius-md)",
-                    border: `1px solid ${perm === v ? "var(--accent)" : "var(--border-default)"}`,
-                    background: perm === v ? "var(--accent-soft)" : "var(--surface)",
-                    color: perm === v ? "var(--accent-text)" : "var(--text-muted)",
-                    transition: "all var(--dur-fast) var(--ease-out)",
-                  }}>{t}</button>
-              ))}
-            </div>
-          </div>
+          <Input label="姓名" placeholder="例如：周野" value={name} onChange={(e: any) => setName(e.target.value)} iconLeft={I("user")} />
+          <Input label="邮箱（登录账号）" placeholder="name@example.com" value={email} onChange={(e: any) => setEmail(e.target.value)} iconLeft={I("at-sign")} autoComplete="off" />
+          <Input label="初始密码" type="password" placeholder="设置登录密码" value={password} onChange={(e: any) => setPassword(e.target.value)} iconLeft={I("lock")} autoComplete="new-password" />
+          <Select label="身份" placeholder="选择或留空" value={title} onChange={(e: any) => setTitle(e.target.value)} options={ROLES} />
+          <PermPicker perm={perm} setPerm={setPerm} />
         </div>
       </Dialog>
     );
   }
 
-  // 编辑成员信息：姓名、身份、权限、账号、密码
-  function EditMemberDialog({ member, onClose, onSave }: any) {
+  function EditUserDialog({ member, onClose }: any) {
+    const update = useAdminUpdateUser();
     const [name, setName] = React.useState("");
-    const [role, setRole] = React.useState("");
-    const [perm, setPerm] = React.useState("user");
-    const [account, setAccount] = React.useState("");
+    const [email, setEmail] = React.useState("");
+    const [title, setTitle] = React.useState("");
+    const [perm, setPerm] = React.useState("member");
     const [password, setPassword] = React.useState("");
     React.useEffect(() => {
       if (!member) return;
-      setName(member.name); setRole(member.role); setPerm(member.admin ? "admin" : "user");
-      setAccount(member.account); setPassword("");
+      setName(member.name); setEmail(member.email); setTitle(member.title || ""); setPerm(member.role); setPassword("");
     }, [member]);
     if (!member) return null;
-    const submit = () => { if (!name.trim() || !role) return; onSave({ name: name.trim(), role, admin: perm === "admin", account: account.trim(), password }); };
+    const submit = () => {
+      if (!name.trim() || !email.trim()) { toast("姓名、邮箱必填", { tone: "error" }); return; }
+      const patch: any = { name: name.trim(), email: email.trim(), title: title.trim(), role: perm };
+      if (password) patch.password = password;
+      update.mutate({ id: member.id, patch }, {
+        onSuccess: () => { toast("已保存 · " + name.trim(), { tone: "success" }); onClose(); },
+        onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }),
+      });
+    };
     return (
-      <Dialog open={!!member} onClose={onClose} title="编辑成员信息" subtitle={`${member.name} · 修改身份、权限与账号`}
+      <Dialog open={!!member} onClose={onClose} title="编辑用户" subtitle={`${member.name} · 改资料 / 权限 / 密码`}
         icon={I("user-pen")} tone="accent" width={460}
-        footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" onClick={submit}>保存</Button></>}>
+        footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" loading={update.isPending} onClick={submit}>保存</Button></>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Input label="姓名" placeholder="成员姓名" value={name} onChange={(e) => setName(e.target.value)} iconLeft={I("user")} />
-          <Select label="身份" placeholder="选择身份" value={role} onChange={(e) => setRole(e.target.value)} options={ROLES} />
-          <div>
-            <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500, color: "var(--text-body)" }}>权限</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[["user", "用户"], ["admin", "管理员"]].map(([v, t]) => (
-                <button key={v} onClick={() => setPerm(v)}
-                  style={{ flex: 1, height: 40, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, borderRadius: "var(--radius-md)", border: `1px solid ${perm === v ? "var(--accent)" : "var(--border-default)"}`, background: perm === v ? "var(--accent-soft)" : "var(--surface)", color: perm === v ? "var(--accent-text)" : "var(--text-muted)", transition: "all var(--dur-fast) var(--ease-out)" }}>{t}</button>
-              ))}
-            </div>
-          </div>
-          <Input label="账号" placeholder="登录账号" value={account} onChange={(e) => setAccount(e.target.value)} iconLeft={I("at-sign")} suffix="@cibol.lab" />
-          <Input label="密码" type="password" placeholder="留空则不修改密码" value={password} onChange={(e) => setPassword(e.target.value)} iconLeft={I("lock")} />
+          <Input label="姓名" value={name} onChange={(e: any) => setName(e.target.value)} iconLeft={I("user")} />
+          <Input label="邮箱（登录账号）" value={email} onChange={(e: any) => setEmail(e.target.value)} iconLeft={I("at-sign")} autoComplete="off" />
+          <Select label="身份" placeholder="选择或留空" value={title} onChange={(e: any) => setTitle(e.target.value)} options={ROLES} />
+          <PermPicker perm={perm} setPerm={setPerm} />
+          <Input label="重置密码" type="password" placeholder="留空则不修改密码" value={password} onChange={(e: any) => setPassword(e.target.value)} iconLeft={I("lock")} autoComplete="new-password" />
         </div>
       </Dialog>
     );
@@ -83,79 +104,79 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   function AdminPeople() {
     const isMobile = useIsMobile();
-    const { data: members = [] } = useUsers();
-    const base = members.map((u) => ({ name: u.name, role: u.title }));
-    const [extra, setExtra] = React.useState([]);
+    const { data: users = [] } = useUsers();
+    const { data: me } = useMe();
+    const del = useDeleteUser();
     const [q, setQ] = React.useState("");
-    const [admins, setAdmins] = React.useState({ "林知远": true });
-    const [over, setOver] = React.useState({}); // 按原姓名覆盖 name/role/account
     const [adding, setAdding] = React.useState(false);
-    const [editing, setEditing] = React.useState(null);
+    const [editing, setEditing] = React.useState<any>(null);
+    const [confirm, setConfirm] = React.useState<any>(null);
 
-    const roster = [...base, ...extra];
-    const peopleCols = isMobile ? "1fr auto" : "2.4fr 1.4fr 1fr 88px";
-    const username = (n) => n === "苏沐" ? "sumu" : n.toLowerCase().replace(/\s/g, "");
-    const acctOf = (m) => (over[m.name] && over[m.name].account) || username(m.name);
-    const dispOf = (m) => ({ ...m, ...(over[m.name] || {}) });
-    const list = roster.filter((m) => m.name.toLowerCase().includes(q.toLowerCase()) || m.role.includes(q));
-    const isAdminOf = (m) => (m.admin != null ? m.admin : false) || !!admins[m.name];
-    const onAdd = (m) => { setExtra((e) => [...e, m]); if (m.admin) setAdmins((s) => ({ ...s, [m.name]: true })); toast("已添加成员 · " + m.name); };
-    const onSaveEdit = (patch) => {
-      const orig = editing._orig;
-      setOver((s) => ({ ...s, [orig]: { name: patch.name, role: patch.role, account: patch.account } }));
-      setAdmins((s) => ({ ...s, [orig]: patch.admin }));
-      toast("已保存 · 成员信息");
-      setEditing(null);
+    const list = users.filter((u: any) =>
+      u.name.toLowerCase().includes(q.toLowerCase())
+      || (u.title || "").includes(q)
+      || u.email.toLowerCase().includes(q.toLowerCase()));
+    const peopleCols = isMobile ? "1fr auto" : "2.4fr 1.4fr 1fr 96px";
+
+    const onDelete = (u: any) => {
+      del.mutate(u.id, {
+        onSuccess: () => { toast("已删除 · " + u.name, { tone: "success" }); setConfirm(null); },
+        onError: (e: any) => { toast(e?.message || "删除失败", { tone: "error" }); setConfirm(null); },
+      });
     };
 
     return (
-      <div style={{ maxWidth: 940, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px" }} data-comment-anchor="155c0c10bc-div-19-7">
+      <div style={{ maxWidth: 940, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>人员管理</h2>
-            <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 3 }}>共 {roster.length} 名成员</p>
+            <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginTop: 3 }}>共 {users.length} 名成员</p>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ width: isMobile ? "100%" : 220 }}><Input placeholder="搜索姓名或身份" iconLeft={I("search")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
-            <Button variant="primary" iconLeft={I("user-plus")} onClick={() => setAdding(true)}>添加成员</Button>
+            <div style={{ width: isMobile ? "100%" : 220 }}><Input placeholder="搜索姓名 / 身份 / 邮箱" iconLeft={I("search")} value={q} onChange={(e: any) => setQ(e.target.value)} /></div>
+            <Button variant="primary" iconLeft={I("user-plus")} onClick={() => setAdding(true)}>添加用户</Button>
           </div>
         </div>
 
         <Card padding="none">
-          {/* header */}
           <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: peopleCols, gap: 12, padding: "12px 20px", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface-sunken)" }}>
             {["成员", "身份", "权限", "操作"].map((h) => (
               <span key={h} style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)" }}>{h}</span>
             ))}
           </div>
-          {list.map((m, i) => {
-            const adminRow = isAdminOf(m);
-            const d = dispOf(m);
-            const isMe = m.name === "苏沐";
+          {list.map((u: any, i: number) => {
+            const adminRow = u.role === "admin";
+            const isMe = !!(me && u.id === me.id);
             return (
-              <div key={m.name} style={{ display: "grid", gridTemplateColumns: peopleCols, gap: isMobile ? 8 : 12, padding: "12px 20px", alignItems: "center", borderBottom: i < list.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
+              <div key={u.id} style={{ display: "grid", gridTemplateColumns: peopleCols, gap: isMobile ? 8 : 12, padding: "12px 20px", alignItems: "center", borderBottom: i < list.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-                  <Avatar name={m.name} size="sm" />
+                  <Avatar name={u.name} size="sm" />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", whiteSpace: "nowrap" }}>{d.name}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", whiteSpace: "nowrap" }}>{u.name}</span>
                       {isMe && <Badge tone="neutral" size="sm">我</Badge>}
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acctOf(m)}@cibol.lab</div>
+                    <div style={{ fontSize: 12, color: "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.email}</div>
                   </div>
                 </div>
-                <span style={{ fontSize: 13.5, color: "var(--text-body)" }}>{d.role}</span>
+                <span style={{ fontSize: 13.5, color: "var(--text-body)" }}>{u.title || "—"}</span>
                 <span>{adminRow ? <Badge tone="accent" size="sm" dot>管理员</Badge> : <Badge tone="neutral" size="sm">用户</Badge>}</span>
                 <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                  <IconButton icon={I("ellipsis")} label="编辑信息" size="sm" onClick={() => setEditing({ ...m, name: d.name, role: d.role, account: acctOf(m), admin: adminRow, _orig: m.name })} />
+                  <IconButton icon={I("user-pen")} label="编辑" size="sm" onClick={() => setEditing(u)} />
+                  <IconButton icon={I("trash-2")} label={isMe ? "不能删除自己" : "删除"} size="sm" disabled={isMe} onClick={() => !isMe && setConfirm(u)} />
                 </div>
               </div>
             );
           })}
         </Card>
 
-        <AddMemberDialog open={adding} onClose={() => setAdding(false)} onAdd={onAdd} />
-        <EditMemberDialog member={editing} onClose={() => setEditing(null)} onSave={onSaveEdit} />
+        <AddUserDialog open={adding} onClose={() => setAdding(false)} />
+        <EditUserDialog member={editing} onClose={() => setEditing(null)} />
+        <Dialog open={!!confirm} onClose={() => setConfirm(null)} title="删除用户" subtitle={confirm?.name}
+          icon={I("trash-2")} tone="danger" width={400}
+          footer={<><Button variant="ghost" onClick={() => setConfirm(null)}>取消</Button><Button variant="primary" loading={del.isPending} onClick={() => confirm && onDelete(confirm)}>确认删除</Button></>}>
+          <p style={{ fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.6 }}>删除后该用户将无法登录，且无法恢复。若该用户有历史记录（组会报告 / 请求等）将无法删除。</p>
+        </Dialog>
       </div>
     );
   }

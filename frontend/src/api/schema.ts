@@ -102,11 +102,39 @@ export interface paths {
          */
         get: operations["list_users_api_users_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create User
+         * @description 管理员新建用户（设邮箱/密码/身份/权限）。邮箱不限域名。
+         */
+        post: operations["create_user_api_users_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete User
+         * @description 管理员删除用户。不能删自己；有历史关联（组会/请求等）的用户会被拒。
+         */
+        delete: operations["delete_user_api_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Admin Update User
+         * @description 管理员改用户资料 / 权限 / 密码（password 留空则不改）。
+         */
+        patch: operations["admin_update_user_api_users__user_id__patch"];
         trace?: never;
     };
     "/api/users/me": {
@@ -1412,6 +1440,43 @@ export interface components {
              */
             token_type: string;
         };
+        /**
+         * UserAdminUpdate
+         * @description 管理员改用户资料 / 权限 / 密码（password 留空则不改）。
+         */
+        UserAdminUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Title */
+            title?: string | null;
+            role?: components["schemas"]["Role"] | null;
+            /** Password */
+            password?: string | null;
+        };
+        /**
+         * UserCreate
+         * @description 管理员新建用户。email 任意合法邮箱（不限域名）。
+         */
+        UserCreate: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Password */
+            password: string;
+            /** Name */
+            name: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** @default member */
+            role: components["schemas"]["Role"];
+        };
         /** UserOut */
         UserOut: {
             /** Id */
@@ -1628,6 +1693,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+        };
+    };
+    create_user_api_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_api_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_update_user_api_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserAdminUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

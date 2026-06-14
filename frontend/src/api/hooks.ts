@@ -211,6 +211,31 @@ export function useUsers(enabled = true) {
   return useQuery({ queryKey: ["users"], queryFn: () => unwrap(api.GET("/api/users")), enabled });
 }
 
+export function useCreateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: components["schemas"]["UserCreate"]) => unwrap(api.POST("/api/users", { body })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
+export function useAdminUpdateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; patch: components["schemas"]["UserAdminUpdate"] }) =>
+      unwrap(api.PATCH("/api/users/{user_id}", { params: { path: { user_id: vars.id } }, body: vars.patch })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/api/users/{user_id}", { params: { path: { user_id: id } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
 export function useUpdateMe() {
   const qc = useQueryClient();
   return useMutation({
