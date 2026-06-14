@@ -11,26 +11,34 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   const WD = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   const fmt = (d) => `${d.getMonth() + 1}月${String(d.getDate()).padStart(2, "0")}日 ${WD[d.getDay()]}`;
+  // 本地日期 → YYYY-MM-DD（不能用 toISOString：它转 UTC，在东八区会回退一天，导致存库日期偏移）
+  const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   let UID = 1000;
 
   // 排期模型：日期槽(slots) 与 报告人队列(groups) 解耦。
   // 取消某个日期 → 该日期不再开会，报告人队列顺延到后续日期（必要时在末尾追加补开日期）。
-  function genSchedule(startISO, intervalDays, perSession, endISO, roster) {
+  function genSchedule(startISO, intervalDays, perSession, endISO, roster, weekday = null) {
     const slots = [], groups = [];
     let d = new Date(startISO + "T00:00:00");
+    // 指定了周几（每周/每两周模式）→ 把起始日对齐到 ≥ start 的第一个该周几，
+    // 之后按 interval（7/14 的倍数）累加，所有场次都落在同一周几。
+    if (weekday != null) {
+      const diff = ((weekday - d.getDay()) % 7 + 7) % 7;
+      d = new Date(d.getTime() + diff * 86400000);
+    }
     const end = new Date(endISO + "T00:00:00");
     let idx = 0, r = 0;
     while (d <= end && slots.length < 60) {
       const presenters = [];
       for (let k = 0; k < perSession; k++) { presenters.push({ name: roster[idx % roster.length].name, topic: "", skipped: false }); idx++; }
-      slots.push({ id: "s" + r, iso: d.toISOString().slice(0, 10), date: fmt(d), cancelled: false });
+      slots.push({ id: "s" + r, iso: isoLocal(d), date: fmt(d), cancelled: false });
       groups.push({ id: "g" + (r++), presenters });
       d = new Date(d.getTime() + intervalDays * 86400000);
     }
     return { slots, groups };
   }
 
-  const isoAfter = (iso, days) => { const d = new Date(iso + "T00:00:00"); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
+  const isoAfter = (iso, days) => { const d = new Date(iso + "T00:00:00"); d.setDate(d.getDate() + days); return isoLocal(d); };
 
   // 平衡：保证「未取消日期数 == 报告人队列长度」。不足则在末尾追加补开日期，多余则移除尾部补开日期。
   function rebalance(slots, groupCount, interval) {
@@ -268,6 +276,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [customCount, setCustomCount] = React.useState(4);
     const [start, setStart] = React.useState("2026-06-14");
     const [end, setEnd] = React.useState(store.semester.end);
+    const [weekday, setWeekday] = React.useState(() => new Date("2026-06-14T00:00:00").getDay()); // 0=周日，默认与 start 同星期
     const interval = freq === "custom" ? Math.max(1, Number(customDays)) : Number(freq);
     const perSession = countMode === "custom" ? Math.max(1, Number(customCount)) : Number(countMode);
 
@@ -282,11 +291,11 @@ import { useIsMobile } from "../lib/useIsMobile";
     React.useEffect(() => {
       if (seeded.current || !roster.length) return;
       seeded.current = true;
-      const g = genSchedule("2026-06-14", 7, 2, "2027-01-16", roster);
+      const g = genSchedule("2026-06-14", 7, 2, "2027-01-16", roster, 0);
       setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
     }, [roster]);
 
-    const regenerate = () => { const g = genSchedule(start, interval, perSession, end, roster); setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id); };
+    const regenerate = () => { const g = genSchedule(start, interval, perSession, end, roster, freq === "custom" ? null : weekday); setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id); };
     const patchGroup = (gid, fn) => setGroups((gs) => gs.map((g) => (g.id === gid ? fn(g) : g)));
     const setTopic = (gid, pi, v) => patchGroup(gid, (g) => ({ ...g, presenters: g.presenters.map((p, i) => (i === pi ? { ...p, topic: v } : p)) }));
     const toggleSkip = (gid, pi) => patchGroup(gid, (g) => ({ ...g, presenters: g.presenters.map((p, i) => (i === pi ? { ...p, skipped: !p.skipped } : p)) }));
@@ -380,6 +389,16 @@ import { useIsMobile } from "../lib/useIsMobile";
                 </span>
               )}
             </div>
+            {freq !== "custom" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13.5, color: "var(--text-body)", width: 72 }}>开会星期</span>
+                <div style={{ width: 120 }}>
+                  <Select size="sm" value={String(weekday)} onChange={(e) => setWeekday(Number(e.target.value))}
+                    options={WD.map((w, i) => ({ value: String(i), label: w }))} />
+                </div>
+                <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>每{freq === "7" ? "周" : "两周"}的{WD[weekday]}开会</span>
+              </div>
+            )}
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13.5, color: "var(--text-body)", width: 72 }}>每次人数</span>
               <Segmented value={countMode} onChange={setCountMode} options={[{ value: "1", label: "1 人" }, { value: "2", label: "2 人" }, { value: "3", label: "3 人" }, { value: "custom", label: "自定义" }]} />
