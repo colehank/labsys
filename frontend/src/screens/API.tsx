@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useMyKeys, useMyRequests, useCreateRequest } from "../api/hooks";
+import { useMyKeys, useMyRequests, useCreateRequest, useMyCredentials } from "../api/hooks";
 import { DATA } from "../data";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -31,34 +31,47 @@ import { useIsMobile } from "../lib/useIsMobile";
     );
   }
 
-  // 服务器账号 —— 一个用户只有一个账号，跨所有服务器共享。
-  function ServerAccountCard({ acc }: any) {
-    const [show, setShow] = React.useState(false);
+  // 服务器账号 —— 读用户真实保存的 SSH 账密（与「服务器」页、「我的 → 安全」同一份 ["credentials"]）。
+  // 密码加密落库、后端不返回明文，故此处只展示账号名，密码不明示。
+  function ServerAccountCard() {
+    const { data: credData } = useMyCredentials();
+    const items: any[] = credData?.items || [];
+    const feature = !!credData?.feature;
+    if (!feature) {
+      return <p style={{ fontSize: 13, color: "var(--text-faint)", margin: 0 }}>后端未启用账密加密，暂不能保存服务器账号。</p>;
+    }
+    if (!items.length) {
+      return (
+        <div style={{ padding: "14px 15px", border: "1px dashed var(--border-default)", borderRadius: "var(--radius-md)", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+          还没有服务器账号。在「服务器」页连接时勾选「记住」，或到「我的 → 安全 → 服务器账密」添加，保存后会显示在这里。
+        </div>
+      );
+    }
     return (
-      <div style={{ padding: "14px 15px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "var(--radius-md)", background: "var(--surface-sunken)", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{I("key-round", { size: 16 })}</span>
-            <span className="cibol-mono" style={{ fontWeight: 600, color: "var(--text-strong)" }}>{acc.user}</span>
-          </span>
-          <Badge tone="success" size="sm" dot>已开通</Badge>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", alignItems: "center", gap: "8px 10px", marginTop: 12 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>账号</span>
-          <code style={{ minWidth: 0, fontSize: 13, color: "var(--text-muted)", background: "var(--surface-sunken)", padding: "6px 10px", borderRadius: "var(--radius-sm)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acc.user}</code>
-          <CopyKeyButton value={acc.user} />
-          <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>密码</span>
-          <code style={{ minWidth: 0, fontSize: 13, color: "var(--text-muted)", background: "var(--surface-sunken)", padding: "6px 10px", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{show ? acc.pwd : "•".repeat(10)}</span>
-            <span role="button" tabIndex={0} onClick={() => setShow((v) => !v)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShow((v) => !v); } }}
-              style={{ flexShrink: 0, cursor: "pointer", color: "var(--accent-text)", fontSize: 12.5, fontFamily: "var(--font-sans)" }}>{show ? "隐藏" : "显示"}</span>
-          </code>
-          <CopyKeyButton value={acc.pwd} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 12, fontSize: 12.5, color: "var(--text-muted)" }}>
-          {I("info", { size: 13 })}
-          <span>同一账号可登录全部实验室服务器：{acc.hosts.join(" · ")}。</span>
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.map((c) => (
+          <div key={c.id} style={{ padding: "14px 15px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "var(--radius-md)", background: "var(--surface-sunken)", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{I("key-round", { size: 16 })}</span>
+                <span className="cibol-mono" style={{ fontWeight: 600, color: "var(--text-strong)" }}>{c.username}</span>
+              </span>
+              <Badge tone="success" size="sm" dot>已保存</Badge>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", alignItems: "center", gap: "8px 10px", marginTop: 12 }}>
+              <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>账号</span>
+              <code style={{ minWidth: 0, fontSize: 13, color: "var(--text-muted)", background: "var(--surface-sunken)", padding: "6px 10px", borderRadius: "var(--radius-sm)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.username}</code>
+              <CopyKeyButton value={c.username} />
+              <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>密码</span>
+              <code style={{ minWidth: 0, fontSize: 13, color: "var(--text-faint)", background: "var(--surface-sunken)", padding: "6px 10px", borderRadius: "var(--radius-sm)" }}>已加密保存（不展示）</code>
+              <span />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 12, fontSize: 12.5, color: "var(--text-muted)" }}>
+              {I("info", { size: 13 })}
+              <span>用于网页终端一键登录，一个账号通常可登录所有实验室服务器。改密码请去「服务器」页或「我的 → 安全」。</span>
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -85,8 +98,6 @@ import { useIsMobile } from "../lib/useIsMobile";
       );
       setNm(""); setRsn(""); setAmt(""); setOpen(false);
     };
-    // 服务器账号 —— 一个用户只有一个，跨服务器共享。
-    const serverAccount = { user: "sumu", pwd: "L@b-7fa3e9qP2", hosts: ["turing", "lecun", "hinton", "fodor"] };
     return (
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "24px 32px 48px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -142,8 +153,8 @@ import { useIsMobile } from "../lib/useIsMobile";
             </div>
           </Card>
 
-          <Card eyebrow="我的账号" title="服务器账号" subtitle="管理员开通后分配的登录账号与密码，跨所有服务器通用">
-            <ServerAccountCard acc={serverAccount} />
+          <Card eyebrow="我的账号" title="服务器账号" subtitle="你保存的服务器登录账号，网页终端一键登录用（与「服务器」页、「我的 → 安全」同步）">
+            <ServerAccountCard />
           </Card>
         </div>
 
