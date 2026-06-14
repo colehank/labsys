@@ -53,9 +53,26 @@ class Settings(BaseSettings):
     booking_default_duration_hours: float = 2.0
     booking_auto_days_ahead: int = 3  # 自动预约：组会前几天
 
+    # ── 邮件通知（校园 SMTP，如 mail.bnu.edu.cn）──
+    smtp_host: str = ""             # SMTP 服务器，如 mail.bnu.edu.cn
+    smtp_port: int = 465            # 465=SSL / 587=STARTTLS
+    smtp_user: str = ""             # 发件邮箱账号
+    smtp_password: str = ""         # 邮箱密码 / 授权码
+    smtp_ssl: bool = True           # True=隐式 SSL(465)；False=STARTTLS(587)
+    smtp_from: str = ""             # 发件显示地址；留空则用 smtp_user
+    smtp_from_name: str = "CIBOL 实验室系统"  # 发件人显示名
+
     @property
     def dmxapi_enabled(self) -> bool:
         return bool(self.dmxapi_system_token and self.dmxapi_user_id)
+
+    @property
+    def smtp_enabled(self) -> bool:
+        return bool(self.smtp_host and self.smtp_user and self.smtp_password)
+
+    @property
+    def smtp_sender(self) -> str:
+        return self.smtp_from or self.smtp_user
 
     @property
     def booking_enabled(self) -> bool:

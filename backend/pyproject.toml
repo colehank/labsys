@@ -20,6 +20,7 @@ dependencies = [
     "asyncssh>=2.18",
     "playwright>=1.49",        # 腾讯会议预约：自动化 vc.bnu.edu.cn 门户
     "apscheduler>=3.11",       # 自动预约调度
+    "aiosmtplib>=3.0",         # 邮件通知：校园 SMTP 发信
 ]
 
 [project.optional-dependencies]

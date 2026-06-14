@@ -3,16 +3,25 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
+from app.domains.notify.service import notify
 from app.domains.requests.engine import can_transition, initial_status, required_role
 from app.models import Request, RequestEvent, RequestKind, Role, User
 from app.schemas.request import AdvanceRequest, CreateRequest, RequestEventOut, RequestOut
 
 router = APIRouter(prefix="/requests", tags=["requests"])
+
+# 各申请类型的中文标签 —— 用于审批结果通知文案
+_KIND_LABEL = {
+    "swap": "组会调换",
+    "absence": "轮空请假",
+    "api": "API 密钥申请",
+    "ssh": "服务器账号申请",
+}
 
 _INITIAL_NOTE = {
     "swap": "已发送对调请求",
@@ -136,7 +145,8 @@ async def processed_requests(admin: AdminUser, db: DbSession) -> list[RequestOut
 
 @router.post("/{req_id}/advance", response_model=RequestOut)
 async def advance_request(
-    req_id: str, body: AdvanceRequest, me: CurrentUser, db: DbSession
+    req_id: str, body: AdvanceRequest, me: CurrentUser, db: DbSession,
+    tasks: BackgroundTasks,
 ) -> RequestOut:
     req = await _get_loaded(db, req_id)
     if req is None:
@@ -154,7 +164,21 @@ async def advance_request(
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="需要管理员审批")
 
     req.status = body.next
+    requester_id = req.requester_id
+    kind_label = _KIND_LABEL.get(req.kind.value, "申请")
     req.events.append(RequestEvent(status=body.next, note=body.note, actor_id=me.id, at=_now()))
     await db.commit()
+
+    # 审批有结果时通知发起人（站内 + 邮件，邮件走后台不拖慢响应）
+    if body.next in ("approved", "rejected") and requester_id != me.id:
+        result = "已通过 ✅" if body.next == "approved" else "已驳回"
+        note = f"\n备注：{body.note}" if body.note else ""
+        await notify(
+            db, user_id=requester_id, type="approval",
+            title=f"你的{kind_label}{result}",
+            body=f"管理员已处理你的{kind_label}。{note}".strip(),
+            tasks=tasks,
+        )
+
     loaded = await _get_loaded(db, req_id)
     return _serialize(loaded, me.id)
