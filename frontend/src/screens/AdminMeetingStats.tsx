@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
+import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminMeetingStats — 组会统计: 管理员逐次组会核对「出勤」。
@@ -43,6 +44,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const isMobile = useIsMobile();
     const { data: compute } = useEvalCompute();
     const { data: reportData } = useEvalReports();
+    const { data: meUser } = useMe();
     const setAtt = useSetAttendance();
 
     const rows = compute?.rows ?? [];
@@ -208,7 +210,7 @@ import { useIsMobile } from "../lib/useIsMobile";
             {members.map((name, i) => {
               const status = att[name] || "present";
               const isPresenter = r.presenters.includes(name);
-              const me = name === "苏沐";
+              const me = !!meUser && name === meUser.name;
               const dv = disc[name] || 0;
               return (
                 <div key={name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto", gap: isMobile ? 8 : 16, padding: "10px 20px", alignItems: "center", borderBottom: i < members.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : "transparent" }}>

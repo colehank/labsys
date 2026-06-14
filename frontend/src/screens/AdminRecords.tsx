@@ -4,6 +4,7 @@ import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { DATA } from "../data";
 import { useEvalCompute, useExcellence } from "../api/hooks";
+import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminRecords — 表现记录: 只读的表现档案。
@@ -29,6 +30,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 
     const evalQ = useEvalCompute();
     const excQ = useExcellence();
+    const { data: meUser } = useMe();
     const ev = evalQ.data || { rows: [], merged: [], total: 0 };
     const exc = excQ.data;
 
@@ -129,7 +131,7 @@ import { useIsMobile } from "../lib/useIsMobile";
             ))}
           </div>
           {rows.map((r, i) => {
-            const me = r.name === "苏沐";
+            const me = !!meUser && r.name === meUser.name;
             return (
               <div key={r.name} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 10, padding: "9px 18px", alignItems: "center", borderBottom: i < rows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : "transparent" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>

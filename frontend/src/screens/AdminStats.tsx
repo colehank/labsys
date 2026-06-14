@@ -9,6 +9,7 @@ import {
   usePublishExcellence,
   useExcellence,
 } from "../api/hooks";
+import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminStats — 表现统计: 本评选期的排名工作台。
@@ -115,6 +116,7 @@ import { useIsMobile } from "../lib/useIsMobile";
   function AdminStats() {
     const isMobile = useIsMobile();
     const { data: evData } = useEvalCompute();
+    const { data: meUser } = useMe();
     const { data: cfg } = useEvalConfig();
     const { data: excellence } = useExcellence();
     const updateConfig = useUpdateEvalConfig();
@@ -238,7 +240,7 @@ import { useIsMobile } from "../lib/useIsMobile";
             {/* 表体（滚动）*/}
             <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
               {topRows.map((r, i) => {
-                const me = r.name === "苏沐";
+                const me = !!meUser && r.name === meUser.name;
                 const top3 = r.inSurv && r.finalRank <= 3;
                 const medal = ["var(--amber-500)", "var(--slate-400)", "var(--terracotta-400)"][r.finalRank - 1];
                 return (
@@ -298,7 +300,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               )}
               {ev.order.map((name, i) => {
                 const row = ev.survivors.find((s) => s.name === name);
-                const me = name === "苏沐";
+                const me = !!meUser && name === meUser.name;
                 const dragging = drag === i;
                 return (
                   <div key={name} draggable
