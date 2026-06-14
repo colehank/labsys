@@ -15,6 +15,7 @@ from app.domains.lab.router import router as lab_router
 from app.domains.notify.router import router as notify_router
 from app.domains.requests.router import router as requests_router
 from app.domains.servers.router import router as servers_router
+from app.domains.ssh.credentials import router as credentials_router
 from app.domains.users.router import router as users_router
 
 @asynccontextmanager
@@ -50,7 +51,7 @@ async def health() -> dict[str, str]:
 
 # 各域路由统一挂在 /api 下
 for r in (auth_router, users_router, lab_router, requests_router, servers_router,
-          notify_router, evals_router, apikeys_router, booking_router):
+          credentials_router, notify_router, evals_router, apikeys_router, booking_router):
     app.include_router(r, prefix=settings.api_prefix)
 
 # WebSSH 实时端点（WebSocket，挂在 /ws 下，不带 api 前缀以匹配反代规则）

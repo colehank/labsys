@@ -3,7 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import type { Me } from "../auth";
-import { useUpdateMe, useServers, useMyCredentials, useSetServerCredential, useDeleteServerCredential } from "../api/hooks";
+import { useUpdateMe, useMyCredentials, useSaveCredential, useDeleteCredential } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // My — 我的: a mature settings experience.
@@ -83,58 +83,72 @@ import { useIsMobile } from "../lib/useIsMobile";
     );
   }
 
-  // 服务器账密：每台服务器一组账号+密码，加密保存。与「服务器」页「记住」同一份存储、双向同步。
+  // 服务器账密：用户级账号+密码（与服务器解耦、可多条、跨服务器共用），加密保存。
+  // 与「服务器」页同一份存储（["credentials"] 查询键）→ 自动同步。
   function ServerCredsList() {
-    const { data: servers = [] } = useServers();
-    const { data: saved = [] } = useMyCredentials();
-    const setCred = useSetServerCredential();
-    const delCred = useDeleteServerCredential();
-    const [editing, setEditing] = React.useState<string | null>(null);
+    const { data: credData } = useMyCredentials();
+    const items: any[] = credData?.items || [];
+    const feature = !!credData?.feature;
+    const saveCred = useSaveCredential();
+    const delCred = useDeleteCredential();
+    const [adding, setAdding] = React.useState(false);
+    const [editId, setEditId] = React.useState<string | null>(null);
     const [u, setU] = React.useState("");
     const [p, setP] = React.useState("");
-    const savedMap: Record<string, any> = Object.fromEntries(saved.map((c: any) => [c.server_id, c]));
-    const startEdit = (s: any) => { setEditing(s.id); setU(savedMap[s.id]?.username || ""); setP(""); };
-    const save = (sid: string) => {
+    const reset = () => { setAdding(false); setEditId(null); setU(""); setP(""); };
+    const save = () => {
       if (!u.trim()) { toast("请填写账号", { tone: "error" }); return; }
-      setCred.mutate({ serverId: sid, username: u.trim(), password: p },
-        { onSuccess: () => { setEditing(null); toast("已保存"); }, onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }) });
+      saveCred.mutate({ username: u.trim(), password: p },
+        { onSuccess: () => { reset(); toast("已保存"); }, onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }) });
     };
-    const clear = (sid: string) => delCred.mutate(sid, { onSuccess: () => toast("已清除") });
-    if (!servers.length) return <p style={{ fontSize: 13, color: "var(--text-faint)" }}>暂无服务器。</p>;
+    const del = (id: string) => delCred.mutate(id, { onSuccess: () => toast("已删除") });
+    if (!feature) return <p style={{ fontSize: 13, color: "var(--text-faint)" }}>后端未启用账密加密，暂不能保存。</p>;
+    const fieldBox = { display: "flex", flexDirection: "column" as const, gap: 10, maxWidth: 380 };
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {servers.map((s: any) => {
-          const c = savedMap[s.id]; const isEdit = editing === s.id;
+        {items.map((c) => {
+          const isEdit = editId === c.id;
           return (
-            <div key={s.id} style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "11px 13px" }}>
+            <div key={c.id} style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "11px 13px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span className="cibol-mono" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{s.name}</span>
-                <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-faint)" }}>{s.ip}</span>
-                {c ? <Badge tone="success" size="sm" dot>已设置 {c.username}</Badge> : <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>未设置</span>}
+                <span className="cibol-mono" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{c.username}</span>
+                <Badge tone="success" size="sm" dot>已保存</Badge>
                 <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-                  {c && !isEdit && <Button size="sm" variant="ghost" onClick={() => clear(s.id)} disabled={delCred.isPending}>清除</Button>}
-                  <Button size="sm" variant={isEdit ? "ghost" : "secondary"} onClick={() => isEdit ? setEditing(null) : startEdit(s)}>{isEdit ? "收起" : (c ? "更改" : "设置")}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => del(c.id)} disabled={delCred.isPending}>删除</Button>
+                  <Button size="sm" variant={isEdit ? "ghost" : "secondary"} onClick={() => { if (isEdit) reset(); else { setAdding(false); setEditId(c.id); setU(c.username); setP(""); } }}>{isEdit ? "收起" : "改密码"}</Button>
                 </div>
               </div>
               {isEdit && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 11, maxWidth: 380 }}>
-                  <Input label="账号" value={u} onChange={(e: any) => setU(e.target.value)} iconLeft={I("user")} placeholder="username" />
-                  <Input label="密码" type="password" value={p} onChange={(e: any) => setP(e.target.value)} iconLeft={I("lock")} placeholder="加密保存，用于网页终端一键登录"
-                    onKeyDown={(e: any) => { if (e.key === "Enter") save(s.id); }} />
-                  <Button variant="primary" style={{ alignSelf: "flex-start" }} onClick={() => save(s.id)} disabled={setCred.isPending}>保存</Button>
+                <div style={{ ...fieldBox, marginTop: 11 }}>
+                  <Input label="新密码" type="password" value={p} onChange={(e: any) => setP(e.target.value)} iconLeft={I("lock")} placeholder="加密保存" onKeyDown={(e: any) => { if (e.key === "Enter") save(); }} />
+                  <Button variant="primary" style={{ alignSelf: "flex-start" }} onClick={save} disabled={saveCred.isPending}>保存</Button>
                 </div>
               )}
             </div>
           );
         })}
+        {adding ? (
+          <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "11px 13px", ...fieldBox }}>
+            <Input label="账号" value={u} onChange={(e: any) => setU(e.target.value)} iconLeft={I("user")} placeholder="username" />
+            <Input label="密码" type="password" value={p} onChange={(e: any) => setP(e.target.value)} iconLeft={I("lock")} placeholder="加密保存，用于网页终端一键登录" onKeyDown={(e: any) => { if (e.key === "Enter") save(); }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button variant="primary" onClick={save} disabled={saveCred.isPending}>保存</Button>
+              <Button variant="ghost" onClick={reset}>取消</Button>
+            </div>
+          </div>
+        ) : (
+          <Button size="sm" variant="secondary" style={{ alignSelf: "flex-start" }} onClick={() => { reset(); setAdding(true); }}>+ 添加账号</Button>
+        )}
+        {!items.length && !adding && <p style={{ fontSize: 12.5, color: "var(--text-faint)", margin: 0 }}>还没有账号。添加后即可在服务器页一键登录（一个账号通常通所有机器）。</p>}
       </div>
     );
   }
 
   function Security({ open, setOpen, embedded }: any) {
-    const { data: saved = [] } = useMyCredentials();
+    const { data: credData } = useMyCredentials();
+    const n = credData?.items?.length || 0;
     return (
-      <Pane title="安全" desc="登录密码与服务器账号密码。" embedded={embedded}>
+      <Pane title="安全" desc="登录密码与服务器账密。" embedded={embedded}>
         <Row icon="lock" label="登录密码" value="上次更新 · 30 天前" open={open === "pw"} onToggle={() => setOpen(open === "pw" ? null : "pw")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 380 }}>
             <Input label="当前密码" type="password" />
@@ -143,8 +157,8 @@ import { useIsMobile } from "../lib/useIsMobile";
           </div>
         </Row>
         <Row icon="server" label="服务器账密"
-          valueNode={saved.length
-            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Badge tone="success" size="sm" dot>已设置 {saved.length} 台</Badge></span>
+          valueNode={n
+            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Badge tone="success" size="sm" dot>{n} 个账号</Badge></span>
             : <span style={{ color: "var(--text-faint)" }}>服务器账号密码，用于网页终端一键登录</span>}
           open={open === "ssh"} onToggle={() => setOpen(open === "ssh" ? null : "ssh")} last>
           <ServerCredsList />

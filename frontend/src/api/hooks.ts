@@ -92,68 +92,44 @@ export function useDeleteServer() {
   });
 }
 
-// 保存的 SSH 凭据（端点未在 openapi schema 里，走原生 fetch）
-export type CredStatus = { saved: boolean; username: string; feature: boolean };
+// 用户级 SSH 账密（与服务器解耦、可多条、跨服务器共用）。端点未在 openapi schema 里，走原生 fetch。
+export type Cred = { id: string; username: string };
+export type CredList = { feature: boolean; items: Cred[] };
 
-export function useServerCredential(serverId?: string) {
-  return useQuery({
-    queryKey: ["server-credential", serverId],
-    enabled: !!serverId,
-    queryFn: async (): Promise<CredStatus> => {
-      const r = await fetch(`/api/servers/${serverId}/credential`, {
-        headers: { Authorization: `Bearer ${tokens.access}` },
-      });
-      if (!r.ok) throw new Error("凭据查询失败");
-      return r.json();
-    },
-  });
-}
-
-export type CredItem = { server_id: string; server_name: string; username: string };
-
-// 列出「我」已保存登录凭据的服务器（设置页用；与服务器页同一份存储）
+// 单一查询键 ["credentials"]：服务器页与设置页共用、互相同步
 export function useMyCredentials() {
   return useQuery({
-    queryKey: ["my-credentials"],
-    queryFn: async (): Promise<CredItem[]> => {
-      const r = await fetch(`/api/servers/credentials`, { headers: { Authorization: `Bearer ${tokens.access}` } });
-      if (!r.ok) throw new Error("凭据列表查询失败");
+    queryKey: ["credentials"],
+    queryFn: async (): Promise<CredList> => {
+      const r = await fetch(`/api/credentials`, { headers: { Authorization: `Bearer ${tokens.access}` } });
+      if (!r.ok) throw new Error("账密查询失败");
       return r.json();
     },
   });
 }
 
-// 失效两端查询（服务器页的单条状态 + 设置页的列表）→ 双向同步
-function invalidateCreds(qc: ReturnType<typeof useQueryClient>, serverId: string) {
-  qc.invalidateQueries({ queryKey: ["server-credential", serverId] });
-  qc.invalidateQueries({ queryKey: ["my-credentials"] });
-}
-
-export function useSetServerCredential() {
+export function useSaveCredential() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { serverId: string; username: string; password: string }) => {
-      const r = await fetch(`/api/servers/${v.serverId}/credential`, {
-        method: "PUT",
+    mutationFn: async (v: { username: string; password: string }) => {
+      const r = await fetch(`/api/credentials`, {
+        method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens.access}` },
-        body: JSON.stringify({ username: v.username, password: v.password }),
+        body: JSON.stringify(v),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "保存失败");
     },
-    onSuccess: (_d, v) => invalidateCreds(qc, v.serverId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["credentials"] }),
   });
 }
 
-export function useDeleteServerCredential() {
+export function useDeleteCredential() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (serverId: string) => {
-      await fetch(`/api/servers/${serverId}/credential`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${tokens.access}` },
-      });
+    mutationFn: async (credId: string) => {
+      await fetch(`/api/credentials/${credId}`, { method: "DELETE", headers: { Authorization: `Bearer ${tokens.access}` } });
     },
-    onSuccess: (_d, serverId) => invalidateCreds(qc, serverId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["credentials"] }),
   });
 }
 

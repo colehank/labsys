@@ -26,7 +26,7 @@ from sqlalchemy import select
 from app.core.crypto import cred_enabled, decrypt, encrypt
 from app.core.db import SessionLocal
 from app.core.security import decode_token
-from app.models import Server, ServerCredential, User
+from app.models import Server, SshCredential, User
 
 router = APIRouter(tags=["webssh"])
 
@@ -60,6 +60,7 @@ async def webssh(ws: WebSocket, server_id: str, token: str = "") -> None:
         rows = int(hs.get("rows", 24))
         use_saved = bool(hs.get("use_saved", False))
         remember = bool(hs.get("remember", False))
+        cred_id = str(hs.get("cred_id", "")).strip()  # 用哪条已存账密；空则用默认(第一条)
         ssh_user = str(hs.get("username", "")).strip()
         ssh_pass = str(hs.get("password", ""))
     except (asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError):
@@ -67,18 +68,16 @@ async def webssh(ws: WebSocket, server_id: str, token: str = "") -> None:
         await ws.close()
         return
 
-    # use_saved：从库里取该用户在该服务器保存的加密凭据
+    # use_saved：取该用户的某条加密账密（cred_id 指定，否则取默认第一条）；账密与服务器无关
     if use_saved:
         async with SessionLocal() as db:
-            cred = (await db.execute(
-                select(ServerCredential).where(
-                    ServerCredential.user_id == user_id,
-                    ServerCredential.server_id == server_id,
-                )
-            )).scalars().first()
+            q = select(SshCredential).where(SshCredential.user_id == user_id)
+            if cred_id:
+                q = q.where(SshCredential.id == cred_id)
+            cred = (await db.execute(q.order_by(SshCredential.username))).scalars().first()
         pw = decrypt(cred.password_enc) if cred else None
         if cred is None or pw is None:
-            await ws.send_text("\r\n[错误] 没有已保存的凭据，请用账号密码连接。\r\n")
+            await ws.send_text("\r\n[错误] 没有可用的已保存账密，请用账号密码连接。\r\n")
             await ws.close()
             return
         ssh_user, ssh_pass = cred.username, pw
@@ -106,23 +105,19 @@ async def webssh(ws: WebSocket, server_id: str, token: str = "") -> None:
         await ws.close()
         return
 
-    # 连接成功 + 用户勾选「记住」+ 配了加密密钥 → 加密保存凭据（仅保存验证过能连的）
+    # 连接成功 + 勾「记住」+ 配了密钥 → 加密保存账密（用户级，按账号名 upsert；仅存验证过能连的）
     if remember and not use_saved and cred_enabled():
         try:
             async with SessionLocal() as db:
                 existing = (await db.execute(
-                    select(ServerCredential).where(
-                        ServerCredential.user_id == user_id,
-                        ServerCredential.server_id == server_id,
+                    select(SshCredential).where(
+                        SshCredential.user_id == user_id,
+                        SshCredential.username == ssh_user,
                     )
                 )).scalars().first()
                 if existing is None:
-                    db.add(ServerCredential(
-                        user_id=user_id, server_id=server_id,
-                        username=ssh_user, password_enc=encrypt(ssh_pass),
-                    ))
+                    db.add(SshCredential(user_id=user_id, username=ssh_user, password_enc=encrypt(ssh_pass)))
                 else:
-                    existing.username = ssh_user
                     existing.password_enc = encrypt(ssh_pass)
                 await db.commit()
         except Exception:  # noqa: BLE001 —— 保存失败不影响本次会话

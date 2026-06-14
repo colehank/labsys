@@ -6,7 +6,7 @@ import "@xterm/xterm/css/xterm.css";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useServers, useCreateRequest, useServerCredential } from "../api/hooks";
+import { useServers, useCreateRequest, useMyCredentials } from "../api/hooks";
 import { useAccessToken } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -78,7 +78,7 @@ function Terminal({ host, creds, token, onState, active }: any) {
       // 首帧握手：useSaved=用后端已保存的加密凭据自动连；否则送账号密码(remember 则保存)
       ws.send(JSON.stringify(
         creds.useSaved
-          ? { use_saved: true, cols: term.cols, rows: term.rows }
+          ? { use_saved: true, cred_id: creds.credId, cols: term.cols, rows: term.rows }
           : { username: creds.username, password: creds.password, remember: !!creds.remember, cols: term.cols, rows: term.rows },
       ));
     };
@@ -221,16 +221,26 @@ function Server() {
   const [password, setPassword] = React.useState("");
   const [remember, setRemember] = React.useState(true);
   // 每台连过的主机各自一个常驻会话（隐藏非当前的、不卸载 → 切换主机不断连）。
-  type Sess = { username: string; password: string; useSaved?: boolean; remember?: boolean; nonce: number };
+  type Sess = { username: string; password: string; useSaved?: boolean; remember?: boolean; credId?: string; nonce: number };
   const [sessions, setSessions] = React.useState<Record<string, Sess>>({});
   const [connByHost, setConnByHost] = React.useState<Record<string, Conn>>({});
-  const suppressAuto = React.useRef<Set<string>>(new Set()); // 用户主动断开/忘记过的 host，不再自动连
+  const suppressAuto = React.useRef<Set<string>>(new Set()); // 用户主动断开过的 host，不再自动连
   const [credsOpen, setCredsOpen] = React.useState(false);
   const [reqOpen, setReqOpen] = React.useState(false);
   const [reqReason, setReqReason] = React.useState("");
   const qc = useQueryClient();
 
-  const startSession = (hid: string, c: { username: string; password: string; useSaved?: boolean; remember?: boolean }) => {
+  // 用户级账密（与服务器解耦、可多条、跨服务器共用）。activeCredId = 当前用哪条连。
+  const { data: credData } = useMyCredentials();
+  const creds = credData?.items || [];
+  const feature = !!credData?.feature;
+  const [activeCredId, setActiveCredId] = React.useState<string>(() => localStorage.getItem("cibol.ssh.cred") || "");
+  const activeCred = creds.find((c) => c.id === activeCredId) || creds[0];
+  React.useEffect(() => {
+    if (activeCred && activeCred.id !== activeCredId) setActiveCredId(activeCred.id);
+  }, [activeCred?.id]);
+
+  const startSession = (hid: string, c: { username: string; password: string; useSaved?: boolean; remember?: boolean; credId?: string }) => {
     suppressAuto.current.delete(hid);
     setSessions((s) => ({ ...s, [hid]: { ...c, nonce: (s[hid]?.nonce || 0) + 1 } }));
   };
@@ -239,26 +249,27 @@ function Server() {
     setSessions((s) => { const n = { ...s }; delete n[hid]; return n; });
     setConnByHost((c) => { const n = { ...c }; delete n[hid]; return n; });
   };
+  const connectSaved = (hid: string, c: { id: string; username: string }) => {
+    localStorage.setItem("cibol.ssh.cred", c.id); setActiveCredId(c.id);
+    startSession(hid, { username: c.username, password: "", useSaved: true, credId: c.id });
+  };
 
   React.useEffect(() => {
     if (!hostName && HOSTS.length) setHostName((HOSTS.find((x) => x.status !== "offline") || HOSTS[0]).name);
   }, [HOSTS, hostName]);
   const host = HOSTS.find((x) => x.name === hostName) || HOSTS.find((x) => x.status !== "offline") || HOSTS[0];
 
-  const { data: credStatus } = useServerCredential(host?.id);
-
-  // 已保存凭据 → 自动连接（当前主机还没有会话、且未被用户主动断开过时）
+  // 有账密 → 自动用当前账号连接（当前主机无会话、且未被主动断开过时）
   React.useEffect(() => {
-    if (host && credStatus?.saved && !sessions[host.id] && !suppressAuto.current.has(host.id)) {
-      startSession(host.id, { username: credStatus.username, password: "", useSaved: true });
+    if (host && activeCred && !sessions[host.id] && !suppressAuto.current.has(host.id)) {
+      startSession(host.id, { username: activeCred.username, password: "", useSaved: true, credId: activeCred.id });
     }
-  }, [host?.id, credStatus?.saved, sessions]);
+  }, [host?.id, activeCred?.id, sessions]);
 
-  // 勾了「记住」且连上后，刷新凭据状态（服务器页单条 + 设置页列表 → 双向同步）
+  // 勾「记住」连上后刷新账密列表（新账号出现在选择器/设置页 → 与设置页同步）
   React.useEffect(() => {
     if (host && connByHost[host.id] === "connected" && sessions[host.id]?.remember) {
-      qc.invalidateQueries({ queryKey: ["server-credential", host.id] });
-      qc.invalidateQueries({ queryKey: ["my-credentials"] });
+      qc.invalidateQueries({ queryKey: ["credentials"] });
     }
   }, [host?.id, connByHost]);
 
@@ -268,7 +279,7 @@ function Server() {
     if (!username.trim()) { toast("请填写账号", { tone: "error" }); return; }
     if (!host) return;
     localStorage.setItem("cibol.ssh.user", username.trim());
-    startSession(host.id, { username: username.trim(), password, remember: remember && !!credStatus?.feature });
+    startSession(host.id, { username: username.trim(), password, remember: remember && feature });
     setCredsOpen(false);
   };
 
@@ -300,7 +311,7 @@ function Server() {
           {HOSTS.map((hh) => (
             <HostCard key={hh.id || hh.name} hh={hh} on={hh.name === hostName}
               onSelect={() => setHostName(hh.name)}
-              onReconnect={() => { setHostName(hh.name); const s = sessions[hh.id]; if (s) startSession(hh.id, s); else setCredsOpen(true); }} />
+              onReconnect={() => { setHostName(hh.name); const s = sessions[hh.id]; if (s) startSession(hh.id, s); else if (activeCred) connectSaved(hh.id, activeCred); else setCredsOpen(true); }} />
           ))}
         </div>
 
@@ -313,18 +324,25 @@ function Server() {
             {host.name} · {host.ip}:{host.ssh_port}
           </span>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-            {credStatus?.saved && (
+            {/* 有账密：显示当前账号(多条可下拉切换)；账号增删改去「设置 → 安全」 */}
+            {activeCred && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--success-text)" }}>
-                {I("lock", { size: 13 })} 已保存 {credStatus.username}
+                {I("lock", { size: 13 })}
+                {creds.length > 1
+                  ? <select value={activeCred.id}
+                      onChange={(e) => { const c = creds.find((x) => x.id === e.target.value); if (c && host) connectSaved(host.id, c); }}
+                      style={{ border: "1px solid var(--border-default)", borderRadius: 6, padding: "2px 6px", fontSize: 12.5, background: "var(--surface)", color: "var(--text-body)", cursor: "pointer" }}>
+                      {creds.map((c) => <option key={c.id} value={c.id}>{c.username}</option>)}
+                    </select>
+                  : <span>{activeCred.username}</span>}
               </span>
             )}
             {hasSession && <Button variant="ghost" onClick={disconnect}>断开</Button>}
-            {/* 已保存凭据：只保留运行时操作(断开/重连)，账号变更去「设置 → 安全」 */}
-            {credStatus?.saved
-              ? (!hasSession && <Button variant="primary" onClick={() => host && startSession(host.id, { username: credStatus.username, password: "", useSaved: true })}>连接</Button>)
+            {activeCred
+              ? (!hasSession && <Button variant="primary" onClick={() => host && connectSaved(host.id, activeCred)}>连接</Button>)
               : (<>
                   <Button variant="ghost" onClick={() => setReqOpen(true)}>申请账号</Button>
-                  <Button variant="primary" onClick={() => setCredsOpen(true)}>{hasSession ? "用别的账号" : "连接"}</Button>
+                  <Button variant="primary" onClick={() => setCredsOpen(true)}>连接</Button>
                 </>)}
           </div>
         </div>
@@ -364,9 +382,9 @@ function Server() {
         </>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Input label="账号" placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} iconLeft={I("user")} />
-          <Input label="密码" type="password" placeholder={remember && credStatus?.feature ? "连接成功后会加密记住" : "仅本次会话使用"} value={password} onChange={(e) => setPassword(e.target.value)} iconLeft={I("lock")}
+          <Input label="密码" type="password" placeholder={remember && feature ? "连接成功后会加密记住" : "仅本次会话使用"} value={password} onChange={(e) => setPassword(e.target.value)} iconLeft={I("lock")}
             onKeyDown={(e) => { if (e.key === "Enter") doConnect(); }} />
-          {credStatus?.feature && (
+          {feature && (
             <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--text-body)", cursor: "pointer", userSelect: "none" }}>
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
               <span>记住账号密码（加密保存，下次自动连接，跨设备）</span>
