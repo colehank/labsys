@@ -7,7 +7,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 import type { Me } from "../auth";
 
 // Home dashboard — personal overview. Exports to window.CIBOL_Screens.Home
-  const { Card, Button, Badge, Avatar, ScoreDots } = NS;
+  const { Card, Button, Badge, Avatar, ScoreDots, EmptyState } = NS;
 
   const ANN_LEVELS = {
     info: { label: "通知", tone: "info", icon: "info" },
@@ -104,6 +104,12 @@ import type { Me } from "../auth";
       ? { date: up.dateLabel, time: up.time || cfg.meetingDefault.time, place: up.place || cfg.meetingDefault.place, online: up.online, presenters: up.presenters }
       : null;
     const iPresentNext = !!up && up.presenters.some((p) => p.name === me.name);
+    // 今天是否真有组会 + 是否轮到我；时段问候按真实时间。
+    const todayMeeting = meetings.find((s) => s.y === today.getFullYear() && s.mo === today.getMonth() && s.day === today.getDate());
+    const iPresentToday = !!todayMeeting && todayMeeting.presenters.some((p) => p.name === me.name);
+    const upIsFuture = !!up && new Date(up.y, up.mo, up.day) >= today;
+    const hour = now.getHours();
+    const greet = hour < 12 ? "上午好" : hour < 18 ? "下午好" : "晚上好";
     const { data: myReqs = [] } = useMyRequests();
     const advance = useAdvanceRequest();
     const incoming = myReqs.find((r) => r.incoming && r.kind === "swap" && r.status === "pending");
@@ -116,12 +122,18 @@ import type { Me } from "../auth";
             <Badge tone="accent" dot>{cfg.semester.short}</Badge>
           </div>
           <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 30, fontWeight: 600, color: "var(--text-strong)", letterSpacing: "-0.01em" }}>
-            {me.name}，下午好
+            {me.name}，{greet}
           </h2>
           <p style={{ color: "var(--text-muted)", marginTop: 6, fontSize: 15 }}>
-            今天的组会已结束。{iPresentNext
-              ? <>下周轮到你<strong style={{ color: "var(--accent-text)", fontWeight: 600 }}>报告</strong>，记得提前准备。</>
-              : <>记得在窗口关闭前完成本次评分。</>}
+            {todayMeeting
+              ? <>今天有组会（{todayMeeting.time || cfg.meetingDefault.time} · {todayMeeting.place || cfg.meetingDefault.place}）。{iPresentToday
+                  ? <>今天轮到你<strong style={{ color: "var(--accent-text)", fontWeight: 600 }}>报告</strong>，加油！</>
+                  : <>记得准时参加。</>}</>
+              : upIsFuture
+                ? <>下一场组会是 <strong style={{ color: "var(--accent-text)", fontWeight: 600 }}>{up.dateLabel}</strong>{iPresentNext
+                    ? <>，轮到你<strong style={{ color: "var(--accent-text)", fontWeight: 600 }}>报告</strong>，记得提前准备。</>
+                    : <>，留意安排。</>}</>
+                : <>本学期组会已全部结束。</>}
           </p>
         </div>
 
@@ -179,14 +191,19 @@ import type { Me } from "../auth";
                   </div>
                 </div>
                 )}
+                {todayMeeting && (
                 <div style={{ display: "flex", gap: 11, alignItems: "center", padding: "11px 12px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
                   <Icon name="star" style={{ width: 17, height: 17, color: "var(--text-muted)" }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, color: "var(--text-strong)", fontWeight: 500 }}>为今日组会评分</div>
-                    <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 1 }}>窗口 6 小时后关闭</div>
+                    <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 1 }}>组会当天开放，记得及时完成</div>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => onNavigate("meetings", { tab: "rating" })}>去评分</Button>
                 </div>
+                )}
+                {!incoming && !todayMeeting && (
+                  <EmptyState compact title="暂无待办" description="有需要你确认或处理的事项会显示在这里。" />
+                )}
               </div>
             </Card>
           </div>
