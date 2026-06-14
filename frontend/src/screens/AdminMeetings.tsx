@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useEvalCompute, useBookingSettings, useUpdateBookingSettings, useSaveSchedule, useConfig, useSaveConfig } from "../api/hooks";
+import { useEvalCompute, useBookingSettings, useUpdateBookingSettings, useSaveSchedule, useConfig, useSaveConfig, useMeetings } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminMeetings — 组会管理: frequency-based auto-scheduler + manual ordering,
@@ -35,6 +35,21 @@ import { useIsMobile } from "../lib/useIsMobile";
       groups.push({ id: "g" + (r++), presenters });
       d = new Date(d.getTime() + intervalDays * 86400000);
     }
+    return { slots, groups };
+  }
+
+  // 把后端已保存的组会排期（与日历同源）还原成排期表的 slots/groups，供管理员精调。
+  function meetingsToSchedule(meetings) {
+    const sorted = [...meetings].sort((a, b) => (a.y - b.y) || (a.mo - b.mo) || (a.day - b.day));
+    const slots = [], groups = [];
+    sorted.forEach((m) => {
+      const iso = `${m.y}-${String(m.mo + 1).padStart(2, "0")}-${String(m.day).padStart(2, "0")}`;
+      slots.push({ id: "s" + (UID++), iso, date: m.dateLabel || fmt(new Date(iso + "T00:00:00")), cancelled: false });
+      groups.push({
+        id: "g" + (UID++), time: m.time || "", place: m.place || "",
+        presenters: (m.presenters || []).map((p) => ({ name: p.name, topic: p.topic || "", skipped: false })),
+      });
+    });
     return { slots, groups };
   }
 
@@ -265,6 +280,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const isMobile = useIsMobile();
     const { data: cfg } = useConfig();
     const { data: compute } = useEvalCompute();
+    const { data: meetings = [] } = useMeetings();
     const roster = React.useMemo(() => (compute?.rows ?? []).map((row) => ({ name: row.name, role: "" })), [compute]);
     const [semOpen, setSemOpen] = React.useState(false);
     const [tab, setTab] = React.useState("schedule");
@@ -286,13 +302,20 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [addOpen, setAddOpen] = React.useState(false);
     const seeded = React.useRef(false);
 
-    // 花名册到位后，按默认频率生成初始排期（一次）。
+    // 排期表数据源 = 已保存的真实排期（与组会日历同源）；只有在一场都没有时（学期初），
+    // 才用默认参数生成一份草稿供管理员在「排期设置」里调整后保存。
     React.useEffect(() => {
-      if (seeded.current || !roster.length) return;
-      seeded.current = true;
-      const g = genSchedule("2026-06-14", 7, 2, "2027-01-16", roster, 0);
-      setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
-    }, [roster]);
+      if (seeded.current) return;
+      if (meetings.length) {
+        seeded.current = true;
+        const g = meetingsToSchedule(meetings);
+        setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
+      } else if (roster.length) {
+        seeded.current = true;
+        const g = genSchedule("2026-06-14", 7, 2, "2027-01-16", roster, 0);
+        setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
+      }
+    }, [meetings, roster]);
 
     const regenerate = () => { const g = genSchedule(start, interval, perSession, end, roster, freq === "custom" ? null : weekday); setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id); };
     const patchGroup = (gid, fn) => setGroups((gs) => gs.map((g) => (g.id === gid ? fn(g) : g)));
