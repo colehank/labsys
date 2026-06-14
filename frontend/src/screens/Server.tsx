@@ -29,11 +29,26 @@ const NET = {
 type Conn = "idle" | "connecting" | "connected" | "closed";
 
 // 真实终端：xterm.js ↔ WebSocket(/ws/ssh/{id}) ↔ 后端 PTY。
-function Terminal({ host, creds, token, onState }: any) {
+function Terminal({ host, creds, token, onState, active }: any) {
   const isMobile = useIsMobile();
   const wrapRef = React.useRef<HTMLDivElement | null>(null);
   const fitRef = React.useRef<FitAddon | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
+  const termRef = React.useRef<XTerm | null>(null);
+
+  // 从隐藏切回显示时重新 fit 并通知后端 PTY 新尺寸（隐藏期间容器为 0 尺寸）
+  React.useEffect(() => {
+    if (!active) return;
+    const t = setTimeout(() => {
+      try { fitRef.current?.fit(); } catch { /* 尚未布局 */ }
+      const term = termRef.current, ws = wsRef.current;
+      if (term && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      }
+      termRef.current?.focus();
+    }, 30);
+    return () => clearTimeout(t);
+  }, [active]);
 
   React.useEffect(() => {
     if (!wrapRef.current || !creds) return;
@@ -47,6 +62,7 @@ function Terminal({ host, creds, token, onState }: any) {
         cursor: "#7FB069",
       },
     });
+    termRef.current = term;
     const fit = new FitAddon();
     fitRef.current = fit;
     term.loadAddon(fit);
@@ -204,15 +220,26 @@ function Server() {
   const [username, setUsername] = React.useState(() => localStorage.getItem("cibol.ssh.user") || "");
   const [password, setPassword] = React.useState("");
   const [remember, setRemember] = React.useState(true);
-  const [creds, setCreds] = React.useState<{ username: string; password: string; useSaved?: boolean; remember?: boolean } | null>(null);
+  // 每台连过的主机各自一个常驻会话（隐藏非当前的、不卸载 → 切换主机不断连）。
+  type Sess = { username: string; password: string; useSaved?: boolean; remember?: boolean; nonce: number };
+  const [sessions, setSessions] = React.useState<Record<string, Sess>>({});
+  const [connByHost, setConnByHost] = React.useState<Record<string, Conn>>({});
+  const suppressAuto = React.useRef<Set<string>>(new Set()); // 用户主动断开/忘记过的 host，不再自动连
   const [credsOpen, setCredsOpen] = React.useState(false);
   const [reqOpen, setReqOpen] = React.useState(false);
   const [reqReason, setReqReason] = React.useState("");
-  const [conn, setConn] = React.useState<Conn>("idle");
-  const [nonce, setNonce] = React.useState(0); // 重连：强制重挂终端
-  const autoTried = React.useRef<Set<string>>(new Set()); // 已自动连过/已手动断开的 host，不再自动连
   const qc = useQueryClient();
   const delCred = useDeleteServerCredential();
+
+  const startSession = (hid: string, c: { username: string; password: string; useSaved?: boolean; remember?: boolean }) => {
+    suppressAuto.current.delete(hid);
+    setSessions((s) => ({ ...s, [hid]: { ...c, nonce: (s[hid]?.nonce || 0) + 1 } }));
+  };
+  const endSession = (hid: string) => {
+    suppressAuto.current.add(hid);
+    setSessions((s) => { const n = { ...s }; delete n[hid]; return n; });
+    setConnByHost((c) => { const n = { ...c }; delete n[hid]; return n; });
+  };
 
   React.useEffect(() => {
     if (!hostName && HOSTS.length) setHostName((HOSTS.find((x) => x.status !== "offline") || HOSTS[0]).name);
@@ -221,37 +248,34 @@ function Server() {
 
   const { data: credStatus } = useServerCredential(host?.id);
 
-  // 已保存凭据 → 自动一键连接（每个 host 仅自动连一次，手动断开后不再自动连）
+  // 已保存凭据 → 自动连接（当前主机还没有会话、且未被用户主动断开过时）
   React.useEffect(() => {
-    if (host && credStatus?.saved && !creds && !autoTried.current.has(host.id)) {
-      autoTried.current.add(host.id);
-      setCreds({ username: credStatus.username, password: "", useSaved: true });
-      setNonce((n) => n + 1);
+    if (host && credStatus?.saved && !sessions[host.id] && !suppressAuto.current.has(host.id)) {
+      startSession(host.id, { username: credStatus.username, password: "", useSaved: true });
     }
-  }, [host?.id, credStatus?.saved, creds]);
+  }, [host?.id, credStatus?.saved, sessions]);
 
   // 勾了「记住」且连上后，刷新凭据状态（让 UI 反映已保存）
   React.useEffect(() => {
-    if (conn === "connected" && creds?.remember && host) {
+    if (host && connByHost[host.id] === "connected" && sessions[host.id]?.remember) {
       qc.invalidateQueries({ queryKey: ["server-credential", host.id] });
     }
-  }, [conn]);
+  }, [host?.id, connByHost]);
 
   if (!HOSTS.length || !host) return null;
 
   const doConnect = () => {
     if (!username.trim()) { toast("请填写账号", { tone: "error" }); return; }
+    if (!host) return;
     localStorage.setItem("cibol.ssh.user", username.trim());
-    setCreds({ username: username.trim(), password, remember: remember && !!credStatus?.feature });
+    startSession(host.id, { username: username.trim(), password, remember: remember && !!credStatus?.feature });
     setCredsOpen(false);
-    setNonce((n) => n + 1);
   };
 
-  const disconnect = () => { if (host) autoTried.current.add(host.id); setCreds(null); setConn("idle"); };
+  const disconnect = () => { if (host) endSession(host.id); };
   const forgetCred = () => {
     if (!host) return;
-    autoTried.current.add(host.id);
-    delCred.mutate(host.id, { onSuccess: () => { setCreds(null); setConn("idle"); toast("已清除保存的账号"); } });
+    delCred.mutate(host.id, { onSuccess: () => { endSession(host.id); toast("已清除保存的账号"); } });
   };
 
   const submitRequest = () => {
@@ -264,6 +288,8 @@ function Server() {
     );
   };
 
+  const conn: Conn = (host && connByHost[host.id]) || "idle";
+  const hasSession = !!(host && sessions[host.id]);
   const connState = {
     idle: { c: "var(--text-faint)", t: "未连接" },
     connecting: { c: "var(--term-amber, #E0B04A)", t: "连接中…" },
@@ -277,8 +303,8 @@ function Server() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
           {HOSTS.map((hh) => (
             <HostCard key={hh.id || hh.name} hh={hh} on={hh.name === hostName}
-              onSelect={() => { setHostName(hh.name); setCreds(null); setConn("idle"); }}
-              onReconnect={() => { setHostName(hh.name); if (creds) setNonce((n) => n + 1); else setCredsOpen(true); }} />
+              onSelect={() => setHostName(hh.name)}
+              onReconnect={() => { setHostName(hh.name); const s = sessions[hh.id]; if (s) startSession(hh.id, s); else setCredsOpen(true); }} />
           ))}
         </div>
 
@@ -297,18 +323,27 @@ function Server() {
                 <button onClick={forgetCred} title="清除保存的账号" style={{ border: "none", background: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, textDecoration: "underline", padding: 0 }}>忘记</button>
               </span>
             )}
-            {creds && <Button variant="ghost" onClick={disconnect}>断开</Button>}
+            {hasSession && <Button variant="ghost" onClick={disconnect}>断开</Button>}
             <Button variant="ghost" onClick={() => setReqOpen(true)}>申请账号</Button>
             <Button variant="primary" onClick={() => setCredsOpen(true)}>
-              {creds ? "用别的账号" : "连接"}
+              {hasSession ? "用别的账号" : "连接"}
             </Button>
           </div>
         </div>
 
-        {/* 终端：有凭据(手输或已保存自动)才挂载真实 WebSSH */}
-        {creds
-          ? <Terminal key={`${host.id}-${nonce}`} host={host} creds={creds} token={token} onState={setConn} />
-          : (
+        {/* 终端：每台连过的主机各自常驻会话，仅显示当前主机；切换不卸载 → 会话不断 */}
+        <div>
+          {HOSTS.filter((h) => sessions[h.id]).map((h) => {
+            const sess = sessions[h.id];
+            return (
+              <div key={h.id} style={{ display: h.id === host.id ? "block" : "none" }}>
+                <Terminal key={`${h.id}-${sess.nonce}`} host={h} active={h.id === host.id}
+                  creds={sess} token={token}
+                  onState={(s: Conn) => setConnByHost((c) => ({ ...c, [h.id]: s }))} />
+              </div>
+            );
+          })}
+          {!hasSession && (
             <div style={{
               background: "#1a1b1e", borderRadius: "var(--radius-lg)", border: "1px solid #000",
               minHeight: 420, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12,
@@ -319,6 +354,7 @@ function Server() {
               <Button variant="primary" onClick={() => setCredsOpen(true)}>连接到 {host.name}</Button>
             </div>
           )}
+        </div>
       </div>
 
       {/* 输入自己的 SSH 账号密码 */}
