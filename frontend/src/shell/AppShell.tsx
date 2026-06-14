@@ -159,7 +159,7 @@ function MobileTabBar({ active, onNavigate, admin, onOpenMore, badge }: any) {
   );
 }
 
-function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOpenPanel, onLogout, me, dark, onToggleDark, reqCount, unread }: any) {
+function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOpenPanel, onLogout, me, reqCount, unread }: any) {
   if (!open) return null;
   const adminItems = [
     { id: "approvals", label: "审批中心", icon: I("clipboard-check"), badge: reqCount },
@@ -208,7 +208,6 @@ function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOp
           )}
           {row(I("bell"), "消息", () => onOpenPanel("inbox"), unread)}
           {row(I("settings"), "设置", () => onOpenPanel("settings"))}
-          {row(I(dark ? "moon" : "sun"), dark ? "深色模式" : "浅色模式", onToggleDark)}
           {row(I(admin ? "shield-check" : "shield"), admin ? "管理员视图（点击切换为成员）" : "成员视图（点击切换为管理员）", onToggleAdmin)}
           <div style={{ height: 1, background: "var(--border-subtle)", margin: "6px 12px" }} />
           {row(I("log-out"), "退出登录", () => onLogout && onLogout(), null, true)}
@@ -225,8 +224,6 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
   const unreadNotif = 2; // 未读通知（演示）
   const badgeCount = reqCount + unreadNotif;
   const [collapsed, setCollapsed] = React.useState(true);
-  const [dark, setDark] = React.useState(() => document.documentElement.getAttribute("data-theme") === "dark");
-  React.useEffect(() => { document.documentElement.setAttribute("data-theme", dark ? "dark" : "light"); }, [dark]);
   const isMobile = useIsMobile();
   const [moreOpen, setMoreOpen] = React.useState(false);
 
@@ -241,7 +238,7 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
         <MobileMoreSheet
           open={moreOpen} onClose={() => setMoreOpen(false)} admin={admin}
           onNavigate={onNavigate} onToggleAdmin={onToggleAdmin} onOpenPanel={onOpenPanel} onLogout={onLogout}
-          me={me} dark={dark} onToggleDark={() => setDark((v) => !v)} reqCount={reqCount} unread={badgeCount}
+          me={me} reqCount={reqCount} unread={badgeCount}
         />
       </div>
     );
@@ -249,7 +246,6 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
 
   const bottomActions = (
     <>
-      <BottomAction icon={I(dark ? "moon" : "sun")} label={dark ? "深色模式" : "浅色模式"} collapsed={collapsed} onClick={() => setDark((v) => !v)} />
       <BottomAction icon={I(admin ? "shield-check" : "shield")} label={admin ? "管理员视图" : "成员视图"} collapsed={collapsed} active={admin} onClick={onToggleAdmin} />
     </>
   );
