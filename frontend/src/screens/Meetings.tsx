@@ -92,19 +92,36 @@ import type { Me } from "../auth";
     };
 
     // 整学期排期（真实数据）—— 每场是一个 月/日 块。
-    const MEETINGS = meetings;
-    const [selId, setSelId] = React.useState<string | null>(null);
-    React.useEffect(() => { if (!selId && MEETINGS[0]) setSelId(MEETINGS[0].id); }, [MEETINGS]);
-    const sel = MEETINGS.find((x) => x.id === selId) || MEETINGS[0] || null;
-
-    // 距今还有几天（学期内“今天”锰定为下一场前两天，与首页“还有 2 天”一致）
-    const TODAY = new Date(2026, 5, 14);
-    const dateOf = (mt) => {
+    // “今天”取真实当前日期（归零到 0 点）；过去/未来与距今天数据此判定。
+    const TODAY = (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
+    const dateOf = (mt: any) => {
       if (mt.y != null && mt.mo != null && mt.day != null) return new Date(mt.y, mt.mo, mt.day);
       const [mm, dd] = (mt.mdLabel || "").split("/").map(Number);
       return new Date(mm >= 6 ? 2026 : 2027, (mm || 1) - 1, dd || 1);
     };
-    const daysLabel = (mt) => { const n = Math.round((+dateOf(mt) - +TODAY) / 86400000); return n <= 0 ? "今天" : n === 1 ? "明天" : n + "天后"; };
+    const dayDiff = (mt: any) => Math.round((+dateOf(mt) - +TODAY) / 86400000);
+    const isPast = (mt: any) => dayDiff(mt) < 0;
+    const daysLabel = (mt: any) => {
+      const n = dayDiff(mt);
+      if (n === 0) return "今天";
+      if (n === 1) return "明天";
+      if (n > 1) return n + "天后";
+      if (n === -1) return "昨天";
+      return -n + "天前";
+    };
+    // 按“离今天的距离”排序：今天与未来在前（升序）；已开过的排其后（离今天近的在前）。
+    const MEETINGS = React.useMemo(() => {
+      return [...meetings].sort((a, b) => {
+        const da = dayDiff(a), db = dayDiff(b);
+        const fa = da >= 0, fb = db >= 0;
+        if (fa !== fb) return fa ? -1 : 1;
+        return fa ? da - db : db - da;
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [meetings]);
+    const [selId, setSelId] = React.useState<string | null>(null);
+    React.useEffect(() => { if (!selId && MEETINGS[0]) setSelId(MEETINGS[0].id); }, [MEETINGS]);
+    const sel = MEETINGS.find((x) => x.id === selId) || MEETINGS[0] || null;
 
     if (!md || !MEETINGS.length) return null;
 
@@ -122,17 +139,19 @@ import type { Me } from "../auth";
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, maxHeight: 240, overflowY: "auto", paddingRight: 4 }}>
                 {MEETINGS.map((mt) => {
                   const on = mt.id === selId;
+                  const past = isPast(mt) && !on;   // 已开过且非当前选中 → 灰显
                   return (
                     <button key={mt.id} onClick={() => setSelId(mt.id)}
                       style={{
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
                         width: 64, height: 60, padding: 0, cursor: "pointer", flexShrink: 0,
                         border: `1px solid ${on ? "var(--accent)" : "var(--border-default)"}`,
-                        background: on ? "var(--accent)" : "var(--surface)",
+                        background: on ? "var(--accent)" : past ? "var(--surface-sunken)" : "var(--surface)",
                         borderRadius: "var(--radius-md)",
+                        opacity: past ? 0.5 : 1,
                         transition: "all var(--dur-fast) var(--ease-out)",
                       }}>
-                      <span className="cibol-numeral" style={{ fontSize: 17, fontWeight: 600, lineHeight: 1, color: on ? "#fff" : "var(--text-strong)" }}>{mt.mdLabel}</span>
+                      <span className="cibol-numeral" style={{ fontSize: 17, fontWeight: 600, lineHeight: 1, color: on ? "#fff" : past ? "var(--text-faint)" : "var(--text-strong)" }}>{mt.mdLabel}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", color: on ? "rgba(255,255,255,0.82)" : "var(--text-faint)" }}>{daysLabel(mt)}</span>
                     </button>
                   );
