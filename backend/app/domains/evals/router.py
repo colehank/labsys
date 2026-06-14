@@ -22,6 +22,7 @@ from app.schemas.eval import (
     RankSeriesOut,
     RatingSubmit,
     ReportOut,
+    SpeaksSet,
 )
 
 router = APIRouter(prefix="/eval", tags=["eval"])
@@ -80,6 +81,7 @@ async def list_reports(_: CurrentUser, db: DbSession) -> list[ReportOut]:
             dateLabel=f"{m.date.month}月{m.date.day}日 周{_WD[m.date.weekday()]}",
             type=m.type.value, presenters=[p.name for p in m.presenters],
             attendance=data["attendance"].get(m.id, {}),
+            speaks=data["speaks"].get(m.id, {}),
         ))
     return out
 
@@ -154,6 +156,23 @@ async def set_attendance(key: str, body: AttendanceSet, _: AdminUser, db: DbSess
         ).scalar_one_or_none()
         if d is not None:
             d.points = 0
+            d.speaks = 0
+    await db.commit()
+
+
+# ── 管理员：录入发言次数（讨论得分由成员匿名评分得出，此处只录发言次数）──
+@router.post("/reports/{key}/speaks", status_code=status.HTTP_204_NO_CONTENT)
+async def set_speaks(key: str, body: SpeaksSet, _: AdminUser, db: DbSession) -> None:
+    meeting = await _meeting_by_id(db, key)
+    d = (
+        await db.execute(
+            select(Discussion).where(Discussion.meeting_id == meeting.id, Discussion.name == body.name)
+        )
+    ).scalar_one_or_none()
+    if d is None:
+        db.add(Discussion(meeting_id=meeting.id, name=body.name, points=0, speaks=max(0, body.count)))
+    else:
+        d.speaks = max(0, body.count)
     await db.commit()
 
 

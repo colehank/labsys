@@ -63,6 +63,7 @@ class ReportOut(BaseModel):
     type: str
     presenters: list[str]
     attendance: dict   # name -> present|leave|absent
+    speaks: dict = {}  # name -> 发言次数（管理员录入）
 
 
 class RatingSubmit(BaseModel):
@@ -75,6 +76,11 @@ class RatingSubmit(BaseModel):
 class AttendanceSet(BaseModel):
     name: str
     status: str        # present | leave | absent
+
+
+class SpeaksSet(BaseModel):
+    name: str
+    count: int         # 发言次数（管理员录入）
 
 
 class EvalConfigIO(BaseModel):

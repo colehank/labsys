@@ -81,6 +81,7 @@ async def load_eval_data(db: AsyncSession) -> dict:
 
     attendance: dict = {m.id: {} for m in meetings}
     discussion: dict = {m.id: {} for m in meetings}
+    speaks: dict = {m.id: {} for m in meetings}
     ratings: dict = {m.id: {} for m in meetings}
 
     for a in (await db.execute(select(Attendance))).scalars():
@@ -89,6 +90,7 @@ async def load_eval_data(db: AsyncSession) -> dict:
     for d in (await db.execute(select(Discussion))).scalars():
         if d.meeting_id in ids:
             discussion[d.meeting_id][d.name] = d.points
+            speaks[d.meeting_id][d.name] = d.speaks
     for rt in (await db.execute(select(Rating))).scalars():
         if rt.meeting_id in ids:
             ratings[rt.meeting_id][rt.presenter] = {
@@ -104,7 +106,7 @@ async def load_eval_data(db: AsyncSession) -> dict:
     return {
         "members": await _member_names(db),
         "reports": reports, "attendance": attendance, "discussion": discussion,
-        "ratings": ratings, "peer_baseline": peer_baseline,
+        "speaks": speaks, "ratings": ratings, "peer_baseline": peer_baseline,
         "weights": cfg.weights if cfg else dict(DEFAULT_WEIGHTS),
         "filters": cfg.filters if cfg else dict(DEFAULT_FILTERS),
         "rng": cfg.range_ if cfg else dict(DEFAULT_RANGE),

@@ -27,7 +27,8 @@ class Discussion(UUIDMixin, Base):
     __tablename__ = "eval_discussion"
     meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(64), index=True)
-    points: Mapped[int] = mapped_column(Integer, default=0)
+    points: Mapped[int] = mapped_column(Integer, default=0)            # 讨论得分（成员匿名评价 Top5）
+    speaks: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # 发言次数（管理员录入）
 
 
 class Rating(UUIDMixin, Base):

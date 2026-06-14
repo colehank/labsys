@@ -318,6 +318,18 @@ export function useSetAttendance() {
   });
 }
 
+export function useSetSpeaks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { key: string; name: string; count: number }) =>
+      unwrap(api.POST("/api/eval/reports/{key}/speaks", {
+        params: { path: { key: vars.key } },
+        body: { name: vars.name, count: vars.count },
+      })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["eval"] }),
+  });
+}
+
 export function usePublishExcellence() {
   const qc = useQueryClient();
   return useMutation({

@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useEvalCompute, useEvalReports, useSetAttendance } from "../api/hooks";
+import { useEvalCompute, useEvalReports, useSetAttendance, useSetSpeaks } from "../api/hooks";
 import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -46,6 +46,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const { data: reportData } = useEvalReports();
     const { data: meUser } = useMe();
     const setAtt = useSetAttendance();
+    const setSpk = useSetSpeaks();
 
     const rows = compute?.rows ?? [];
     const reports = reportData ?? [];
@@ -54,31 +55,38 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [sel, setSel] = React.useState(0); // 默认最近一次（末位），加载后校正
     React.useEffect(() => { setSel(Math.max(0, reports.length - 1)); }, [reports.length]);
 
-    // 出勤本地态：以各会次后端值为种子，管理员可逐人核对。
+    // 出勤 / 发言次数本地态：以各会次后端值为种子，管理员可逐人核对 / 录入。
     const [attEdits, setAttEdits] = React.useState<Record<string, Record<string, string>>>({});
+    const [spkEdits, setSpkEdits] = React.useState<Record<string, Record<string, number>>>({});
     const setAttendance = (key: string, name: string, status: string) =>
       setAttEdits((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: status } }));
+    const setSpeak = (key: string, name: string, count: number) =>
+      setSpkEdits((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: count } }));
 
     const attendanceOf = (key: string): Record<string, string> => {
       const seed = (reports.find((rr) => rr.key === key)?.attendance || {}) as Record<string, string>;
       return { ...seed, ...(attEdits[key] || {}) };
+    };
+    const speaksOf = (key: string): Record<string, number> => {
+      const seed = (reports.find((rr) => rr.key === key)?.speaks || {}) as Record<string, number>;
+      return { ...seed, ...(spkEdits[key] || {}) };
     };
 
     const mdLabelOf = (rr: { mo: number; day: number }) => `${rr.mo + 1}/${String(rr.day).padStart(2, "0")}`;
 
     const r = reports[sel];
 
-    // 评分 / 讨论得分由成员匿名提交，此处只读；后端暂未下发明细，缺省为空。
+    // 报告人评分（态度/精良）由成员匿名提交，此处只读；后端暂未下发明细，缺省为空。
     const ratings: Record<string, { attitude: number; polish: number; raters: number }> = {};
-    const disc: Record<string, number> = {};
     const cancelled = false;
 
     // 当前报告汇总
     const att = r ? attendanceOf(r.key) : {};
+    const spk = r ? speaksOf(r.key) : {};
     const present = members.filter((n) => att[n] === "present").length;
     const leave = members.filter((n) => att[n] === "leave").length;
     const absent = members.filter((n) => att[n] === "absent").length;
-    const totalDisc = members.reduce((s, n) => s + (disc[n] || 0), 0);
+    const totalSpeak = members.reduce((s, n) => s + (spk[n] || 0), 0);
 
     const Stat = ({ label, value, tone }: any) => (
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -101,19 +109,23 @@ import { useIsMobile } from "../lib/useIsMobile";
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 6, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>组会统计</h2>
-            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>核对每次组会出勤 · 评分由成员提交</p>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>核对每次组会出勤、录入发言次数 · 报告评分由成员提交</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <Button size="sm" variant="primary" iconLeft={I("check")} disabled={cancelled}
+            <Button size="sm" variant="primary" iconLeft={I("check")} disabled={cancelled || setAtt.isPending || setSpk.isPending}
               onClick={() => {
                 const key = reports[sel]?.key;
-                const edits = key ? (attEdits[key] || {}) : {};
-                const entries = Object.entries(edits);
-                if (!key || entries.length === 0) { toast("出勤无改动"); return; }
-                Promise.all(entries.map(([name, status]) => setAtt.mutateAsync({ key, name, status })))
-                  .then(() => toast("已保存 · 本次组会出勤"))
+                if (!key) return;
+                const attE = Object.entries(attEdits[key] || {});
+                const spkE = Object.entries(spkEdits[key] || {});
+                if (attE.length === 0 && spkE.length === 0) { toast("无改动"); return; }
+                Promise.all([
+                  ...attE.map(([name, status]) => setAtt.mutateAsync({ key, name, status: status as string })),
+                  ...spkE.map(([name, count]) => setSpk.mutateAsync({ key, name, count: count as number })),
+                ])
+                  .then(() => toast("已保存 · 本次组会出勤与发言次数"))
                   .catch(() => toast("保存失败", { tone: "error" }));
-              }}>保存出勤</Button>
+              }}>保存</Button>
           </div>
         </div>
 
@@ -159,7 +171,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               <Stat label="请假" value={leave} tone="amber" />
               <Stat label="缺席" value={absent} tone="danger" />
               <div style={{ width: 1, height: 30, background: "var(--border-subtle)" }} />
-              <Stat label="讨论得分" value={totalDisc} />
+              <Stat label="发言次数" value={totalSpeak} />
             </div>
           </div>
           {cancelled && (
@@ -199,19 +211,19 @@ import { useIsMobile } from "../lib/useIsMobile";
           </Card>
         )}
 
-        {/* 逐人出勤核对 + 讨论得分(只读) */}
+        {/* 逐人出勤核对 + 发言次数(管理员录入) */}
         <Card padding="none" style={{ opacity: cancelled ? 0.5 : 1, pointerEvents: cancelled ? "none" : "auto" }}>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto", gap: 16, padding: "11px 20px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center" }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)" }}>成员</span>
             <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", textAlign: "center" }}>出勤情况</span>
-            <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", textAlign: "right", minWidth: 96 }}>讨论得分</span>
+            <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)", textAlign: "right", minWidth: 96 }}>发言次数</span>
           </div>
           <div>
             {members.map((name, i) => {
               const status = att[name] || "present";
               const isPresenter = r.presenters.includes(name);
               const me = !!meUser && name === meUser.name;
-              const dv = disc[name] || 0;
+              const sv = spk[name] || 0;
               return (
                 <div key={name} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto", gap: isMobile ? 8 : 16, padding: "10px 20px", alignItems: "center", borderBottom: i < members.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : "transparent" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -222,8 +234,14 @@ import { useIsMobile } from "../lib/useIsMobile";
                   <div style={{ display: "flex", justifyContent: "center" }}>
                     <AttendSeg value={status} onChange={(v) => setAttendance(r.key, name, v)} />
                   </div>
-                  <div style={{ minWidth: 96, textAlign: "right" }}>
-                    <span className="cibol-mono" style={{ fontSize: 14, fontWeight: 600, color: status === "present" ? "var(--text-strong)" : "var(--text-faint)", fontVariantNumeric: "tabular-nums" }}>{status === "present" ? dv : "—"}</span>
+                  <div style={{ minWidth: 96, display: "flex", justifyContent: "flex-end" }}>
+                    {status === "present" ? (
+                      <input type="number" min={0} value={sv}
+                        onChange={(e) => setSpeak(r.key, name, Math.max(0, parseInt(e.target.value || "0", 10) || 0))}
+                        style={{ width: 64, textAlign: "right", fontFamily: "var(--font-mono, monospace)", fontSize: 14, fontWeight: 600, color: "var(--text-strong)", padding: "5px 9px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", background: "var(--surface)" }} />
+                    ) : (
+                      <span className="cibol-mono" style={{ fontSize: 14, color: "var(--text-faint)" }}>—</span>
+                    )}
                   </div>
                 </div>
               );
@@ -233,7 +251,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 12.5, color: "var(--text-faint)" }}>
           <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>
-          <span>请假 / 缺席 均计作未出勤。报告评分与讨论得分由成员提交，管理员只核对出勤。</span>
+          <span>请假 / 缺席 均计作未出勤、发言次数自动清零。报告态度/精良评分与讨论得分由成员匿名提交；发言次数由管理员在此逐人录入。</span>
         </div>
       </div>
     );

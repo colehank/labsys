@@ -605,6 +605,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eval/reports/{key}/speaks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set Speaks */
+        post: operations["set_speaks_api_eval_reports__key__speaks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/eval/config": {
         parameters: {
             query?: never;
@@ -1253,6 +1270,13 @@ export interface components {
             attendance: {
                 [key: string]: unknown;
             };
+            /**
+             * Speaks
+             * @default {}
+             */
+            speaks: {
+                [key: string]: unknown;
+            };
         };
         /** RequestEventOut */
         RequestEventOut: {
@@ -1431,6 +1455,13 @@ export interface components {
             net?: string | null;
             /** Desc */
             desc?: string | null;
+        };
+        /** SpeaksSet */
+        SpeaksSet: {
+            /** Name */
+            name: string;
+            /** Count */
+            count: number;
         };
         /** TokenPair */
         TokenPair: {
@@ -2646,6 +2677,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AttendanceSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_speaks_api_eval_reports__key__speaks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeaksSet"];
             };
         };
         responses: {
