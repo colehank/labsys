@@ -1,6 +1,6 @@
 import React from "react";
 import { AppShell } from "./shell/AppShell";
-import { useFeel, useTweaks, FeelTweaks, TWEAK_DEFAULTS } from "./feel";
+import { useFeel, useTweaks, TWEAK_DEFAULTS } from "./feel";
 import { useMe, useLogout, isAdmin } from "./auth";
 
 import { Login } from "./screens/Login";
@@ -19,7 +19,7 @@ import { AdminPeople } from "./screens/AdminPeople";
 const LINKS = { mark: "/assets/mark-stone.svg" };
 
 export function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [t] = useTweaks(TWEAK_DEFAULTS);
   const { data: me, isLoading: meLoading } = useMe();
   const logout = useLogout();
   const [view, setView] = React.useState("home");
@@ -44,15 +44,10 @@ export function App() {
   useFeel(t);
 
   // 有 token 但仍在拉取当前用户：短暂留白，避免闪现登录页。
-  if (meLoading) return <FeelTweaks t={t} setTweak={setTweak} />;
+  if (meLoading) return null;
 
   if (!me) {
-    return (
-      <>
-        <Login mark="/assets/mark-stone.svg" />
-        <FeelTweaks t={t} setTweak={setTweak} />
-      </>
-    );
+    return <Login mark="/assets/mark-stone.svg" />;
   }
 
   const screen = (() => {
@@ -93,7 +88,6 @@ export function App() {
           </div>
         )}
       </AppShell>
-      <FeelTweaks t={t} setTweak={setTweak} />
     </>
   );
 }
