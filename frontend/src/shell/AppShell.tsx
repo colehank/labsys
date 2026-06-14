@@ -4,7 +4,7 @@
 import React from "react";
 import { Sidebar, Avatar } from "../ds";
 import { I } from "../lib/icons";
-import { useMyRequests, usePendingRequests } from "../api/hooks";
+import { useMyRequests, usePendingRequests, useNotifications } from "../api/hooks";
 import { DATA } from "../data";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -225,7 +225,10 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
   const reqCount = admin
     ? (pendingReqs as any[]).length
     : (mineReqs as any[]).filter((r) => ["pending", "submitted"].includes(r.status)).length;
-  const unreadNotif = 2; // 未读通知（演示）
+  // 未读通知 = 真实站内通知未读数 + 需我确认的对调请求（与「消息·通知」tab 一致）
+  const { data: notifFeed = [] } = useNotifications();
+  const incomingSwaps = (mineReqs as any[]).filter((r) => r.incoming && r.kind === "swap" && r.status === "pending").length;
+  const unreadNotif = (notifFeed as any[]).filter((n) => !n.read).length + incomingSwaps;
   const badgeCount = reqCount + unreadNotif;
   const [collapsed, setCollapsed] = React.useState(true);
   const isMobile = useIsMobile();

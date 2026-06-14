@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useMyRequests, useAdvanceRequest } from "../api/hooks";
+import { useMyRequests, useAdvanceRequest, useNotifications, useMarkAllRead, useMarkRead } from "../api/hooks";
 import { RequestTracker } from "./RequestTracker";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -14,23 +14,40 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   const ACTIVE = ["pending", "submitted"];
 
-  // 通知 = 不属于「我发起的申请」的提醒。申请结果不在此处。
+  // 通知图标/配色按 type 映射。type 与后端 Notification.type 对齐（approval/info/…），
+  // 外加前端合成的 swap_in（来自实时对调请求）。
   const N_META = {
-    swap_in: { icon: "repeat", tone: "accent" },
-    rating:  { icon: "star", tone: "warning" },
-    meeting: { icon: "calendar-clock", tone: "accent" },
+    swap_in:  { icon: "repeat", tone: "accent" },
+    approval: { icon: "clipboard-check", tone: "success" },
+    rating:   { icon: "star", tone: "warning" },
+    meeting:  { icon: "calendar-clock", tone: "accent" },
+    info:     { icon: "info", tone: "accent" },
   };
-  // 静态提醒（非申请类）。收到的对调请求从 store 实时读取，带真实接受/拒绝。
-  const STATIC_FEED = [
-    { id: "n2", type: "rating", unread: true, title: "今日组会评分开放", body: "请在 6 小时内完成评分，逾期不计入。", time: "1 小时前", actions: ["去评分"] },
-    { id: "n3", type: "meeting", unread: false, title: "下周轮到你报告", body: "6/21 组会 · 记得提前准备并上传材料。", time: "昨天", actions: [] },
-  ];
 
-  function NotifItem({ n, onNavigate, advance }: any) {
-    const meta = N_META[n.type] || N_META.meeting;
+  // created_at → 相对时间（刚刚 / X 分钟前 / X 小时前 / X 天前 / 月日）。
+  function relTime(iso) {
+    if (!iso) return "";
+    const t = new Date(iso).getTime();
+    if (Number.isNaN(t)) return "";
+    const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    if (s < 60) return "刚刚";
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} 分钟前`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} 小时前`;
+    const d = Math.floor(h / 24);
+    if (d < 30) return `${d} 天前`;
+    const dt = new Date(iso);
+    return `${dt.getMonth() + 1} 月 ${dt.getDate()} 日`;
+  }
+
+  function NotifItem({ n, onNavigate, advance, markRead }: any) {
+    const meta = N_META[n.type] || N_META.info;
     const map = { "去评分": () => onNavigate("meetings", { tab: "rating" }) };
+    // 真实站内通知（带 dbId）：未读时点击整条标记已读。对调请求用按钮处理，不在此处标记。
+    const clickRead = n.dbId && n.unread ? () => markRead && markRead.mutate(n.dbId) : undefined;
     return (
-      <div style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "15px 18px", borderBottom: "1px solid var(--border-subtle)", background: n.unread ? "var(--accent-soft)" : "transparent", position: "relative" }}>
+      <div onClick={clickRead} style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "15px 18px", borderBottom: "1px solid var(--border-subtle)", background: n.unread ? "var(--accent-soft)" : "transparent", position: "relative", cursor: clickRead ? "pointer" : "default" }}>
         {n.unread && <span style={{ position: "absolute", left: 7, top: 21, width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }}></span>}
         <span style={{ width: 36, height: 36, flexShrink: 0, borderRadius: "var(--radius-md)", background: `var(--${meta.tone}-soft)`, color: `var(--${meta.tone}-text)`, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name={meta.icon} style={{ width: 17, height: 17 }} />
@@ -79,7 +96,11 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [tab, setTab] = React.useState("notif");
     const advance = useAdvanceRequest();
     const allRequests = useMyRequests().data ?? [];
+    const { data: feed = [] } = useNotifications();
+    const markAll = useMarkAllRead();
+    const markRead = useMarkRead();
 
+    // ① 实时对调请求 —— 需你确认，带接受/拒绝按钮（来自 requests，可操作）。
     const incoming = allRequests.filter((r) => r.incoming && r.kind === "swap" && r.status === "pending");
     const incomingNotifs = incoming.map((q) => ({
       id: q.id, type: "swap_in", unread: true, req: q,
@@ -87,8 +108,14 @@ import { useIsMobile } from "../lib/useIsMobile";
       body: `${q.fromDate} ⇄ ${q.toDate} · ${q.reason || "需要你确认。"}`,
       time: "刚刚", actions: [],
     }));
-    const notifs = [...incomingNotifs, ...STATIC_FEED];
+    // ② 真实站内通知 —— 审批结果、组会提醒等（来自 /api/notifications）。
+    const feedNotifs = (feed as any[]).map((f) => ({
+      id: "notif-" + f.id, dbId: f.id, type: f.type, unread: !f.read,
+      title: f.title, body: f.body, time: relTime(f.created_at), actions: [],
+    }));
+    const notifs = [...incomingNotifs, ...feedNotifs];
     const unread = notifs.filter((n) => n.unread).length;
+    const hasUnreadFeed = feedNotifs.some((n) => n.unread);
     const reqs = allRequests.filter((r) => !r.incoming);
     const active = reqs.filter((r) => ACTIVE.includes(r.status));
     const closed = reqs.filter((r) => !ACTIVE.includes(r.status));
@@ -104,7 +131,12 @@ import { useIsMobile } from "../lib/useIsMobile";
 
         {tab === "notif" ? (
           <Card padding="none">
-            {notifs.length ? notifs.map((n) => <NotifItem key={n.id} n={n} onNavigate={onNavigate} advance={advance} />)
+            {hasUnreadFeed && (
+              <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 14px", borderBottom: "1px solid var(--border-subtle)" }}>
+                <Button size="sm" variant="ghost" loading={markAll.isPending} onClick={() => markAll.mutate()}>全部已读</Button>
+              </div>
+            )}
+            {notifs.length ? notifs.map((n) => <NotifItem key={n.id} n={n} onNavigate={onNavigate} advance={advance} markRead={markRead} />)
               : <EmptyState compact title="没有新通知" description="与你相关的提醒会出现在这里。" />}
           </Card>
         ) : (

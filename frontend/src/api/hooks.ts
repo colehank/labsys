@@ -179,6 +179,15 @@ export function useMarkAllRead() {
   });
 }
 
+export function useMarkRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (notifId: string) =>
+      unwrap(api.POST("/api/notifications/{notif_id}/read", { params: { path: { notif_id: notifId } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+}
+
 // ── 公告（管理员）──
 export function usePublishAnnouncement() {
   const qc = useQueryClient();
