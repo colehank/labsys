@@ -8,7 +8,7 @@ import type { Me } from "../auth";
 
 // Meetings — 组会: schedule (unified panel: recent + month calendar + leave),
 // rating, rank (date-range). 对调 = peer handshake (no admin); 缺席 = needs admin.
-  const { Card, Button, Badge, Avatar, Tabs, Dialog, Input, Select, Textarea, ScoreDots, RankRow, IconButton } = NS;
+  const { Card, Button, Badge, Avatar, Tabs, Dialog, Input, Select, Textarea, ScoreDots, RankRow, IconButton, ScreenState, EmptyState } = NS;
 
   const WEEK = ["一", "二", "三", "四", "五", "六", "日"];
 
@@ -55,8 +55,10 @@ import type { Me } from "../auth";
   function Schedule({ onLeave, admin, me }: any) {
     const isMobile = useIsMobile();
     const { data: myRequests = [] } = useMyRequests();
-    const { data: cfg } = useConfig();
-    const { data: meetings = [] } = useMeetings();
+    const cfgQ = useConfig();
+    const meetingsQ = useMeetings();
+    const cfg = cfgQ.data;
+    const meetings = meetingsQ.data ?? [];
     const bookMeeting = useBookMeeting();
     const { data: booking } = useBookingSettings(admin); // 仅管理员查
     const md = cfg?.meetingDefault;
@@ -102,7 +104,9 @@ import type { Me } from "../auth";
     React.useEffect(() => { if (!selId && MEETINGS[0]) setSelId(MEETINGS[0].id); }, [MEETINGS]);
     const sel = MEETINGS.find((x) => x.id === selId) || MEETINGS[0] || null;
 
-    if (!md || !MEETINGS.length) return null;
+    if (cfgQ.isLoading || meetingsQ.isLoading) return <ScreenState loading />;
+    if (cfgQ.isError || meetingsQ.isError) return <ScreenState error onRetry={() => { cfgQ.refetch(); meetingsQ.refetch(); }} />;
+    if (!md || !MEETINGS.length) return <EmptyState title="本学期暂无排期" description="管理员在“组会中心”完成排期后，这里会显示组会日历与你的报告安排。" style={{ padding: "64px 20px" }} />;
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -607,8 +611,10 @@ import type { Me } from "../auth";
     const applyPreset = (p) => { setPreset(p); setFrom(PRESETS[p][0]); setTo(PRESETS[p][1]); };
 
     // 真实评选数据：来自后端引擎（与 demo 对拍一致）。
-    const { data: ev } = useEvalCompute();
-    const { data: exc } = useExcellence();
+    const evQ = useEvalCompute();
+    const excQ = useExcellence();
+    const ev = evQ.data;
+    const exc = excQ.data;
     const { data: series } = useRankSeries(me.name, from, to, metric);
     const total = ev?.rows.length ?? 20;
     const hasData = !!series && series.ranks.length > 0;
@@ -617,6 +623,8 @@ import type { Me } from "../auth";
     const evByName: any = {}; (ev?.rows || []).forEach((r) => { evByName[r.name] = r; });
     const mergedByName: any = {}; (ev?.merged || []).forEach((m) => { mergedByName[m.name] = m; });
     const awardRows = (exc?.names || []).map((n) => evByName[n]).filter(Boolean);
+    if (evQ.isLoading || excQ.isLoading) return <ScreenState loading />;
+    if (evQ.isError || excQ.isError) return <ScreenState error onRetry={() => { evQ.refetch(); excQ.refetch(); }} />;
     if (!ev || !exc) return null;
 
     const current = ranks[ranks.length - 1];

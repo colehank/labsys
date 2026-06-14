@@ -8,7 +8,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminMeetingStats — 组会统计: 管理员逐次组会核对「出勤」。
 // 报告评分（态度/精良）与讨论参与来自成员匿名评分，此处只读 —— 单一数据源，不重复录入。
-  const { Card, Avatar, Badge, Button } = NS;
+  const { Card, Avatar, Badge, Button, ScreenState, EmptyState } = NS;
 
   const ATT = [
     { key: "present", label: "出勤", tone: "success", icon: "check" },
@@ -43,7 +43,8 @@ import { useIsMobile } from "../lib/useIsMobile";
   function AdminMeetingStats() {
     const isMobile = useIsMobile();
     const { data: compute } = useEvalCompute();
-    const { data: reportData } = useEvalReports();
+    const reportQ = useEvalReports();
+    const reportData = reportQ.data;
     const { data: meUser } = useMe();
     const setAtt = useSetAttendance();
     const setSpk = useSetSpeaks();
@@ -102,7 +103,10 @@ import { useIsMobile } from "../lib/useIsMobile";
       return (
         <div style={{ maxWidth: 1080, margin: "0 auto", padding: isMobile ? "16px 14px 48px" : "24px 32px 48px" }}>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: "var(--text-strong)" }}>组会统计</h2>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>核对每次组会出勤 · 评分由成员提交</p>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>核对每次组会出勤、录入发言次数 · 报告评分由成员提交</p>
+          {reportQ.isLoading ? <ScreenState loading />
+            : reportQ.isError ? <ScreenState error onRetry={() => reportQ.refetch()} />
+            : <EmptyState compact title="暂无组会" description="本学期还没有组会记录。排期后即可在此核对出勤与发言。" style={{ marginTop: 24 }} />}
         </div>
       );
     }

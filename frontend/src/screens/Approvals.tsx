@@ -10,7 +10,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 //  · API 密钥申请 — 填入密钥后通过
 //  · 服务器账号申请 — 填入账号+密码后通过
 // 处理结果回写 store，申请人在「消息 · 申请」里实时看到。对调为对方确认，不在此出现。
-  const { Card, Button, Badge, Avatar, Tabs, Dialog, Input, Textarea, IconButton } = NS;
+  const { Card, Button, Badge, Avatar, Tabs, Dialog, Input, Textarea, IconButton, ScreenState } = NS;
 
   // 请求 kind → 审批卡片展示。
   const KIND_UI = {
@@ -199,8 +199,10 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   function Approvals() {
     const isMobile = useIsMobile();
-    const { data: pending = [] } = usePendingRequests();
-    const { data: processed = [] } = useProcessedRequests();
+    const pendingQ = usePendingRequests();
+    const processedQ = useProcessedRequests();
+    const pending = pendingQ.data ?? [];
+    const processed = processedQ.data ?? [];
     const advance = useAdvanceRequest();
     const issueKey = useIssueKey();
     const issueCred = useIssueCredential();
@@ -246,14 +248,18 @@ import { useIsMobile } from "../lib/useIsMobile";
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {tab === "pending" && (
-            pendingItems.length === 0
+            pendingQ.isLoading ? <ScreenState loading />
+            : pendingQ.isError ? <ScreenState error onRetry={() => pendingQ.refetch()} />
+            : pendingItems.length === 0
               ? <EmptyState icon="check-check" text="没有待审批的申请，都处理完了。" />
               : pendingItems.map((card) => (
                   <ApprovalCard key={card.id} q={card} onAccept={() => onAccept(card)} onReject={() => setReject(card)} />
                 ))
           )}
           {tab === "history" && (
-            historyItems.length === 0
+            processedQ.isLoading ? <ScreenState loading />
+            : processedQ.isError ? <ScreenState error onRetry={() => processedQ.refetch()} />
+            : historyItems.length === 0
               ? <EmptyState icon="history" text="暂无历史记录。" />
               : historyItems.map((h, k) => (
                   <ApprovalCard key={"h" + k} q={h.q} state={h.state} when={h.when} />

@@ -8,7 +8,9 @@ from __future__ import annotations
 import math
 from datetime import date, timedelta
 
-# 与 frontend/src/data.ts members 顺序一致
+# ⚠️ DEMO 花名册——仅供 tests/test_eval.py 对拍 JS 原版使用，切勿在生产路径引用。
+# 真实评选成员一律来自 users 表（见 store._member_names）。下方 seed_eval /
+# build_past_reports 同理：均为测试夹具，已无运行时引用，勿接回业务代码。
 MEMBERS: list[str] = [
     "林知远", "Wei Chen", "苏沐", "顾长川", "陈屿", "Mei Lin", "周野", "沈书瑶",
     "Hao Zhang", "唐辒", "罗一帆", "Priya Nair", "钱牧之", "叶承", "白露",

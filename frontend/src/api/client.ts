@@ -1,5 +1,5 @@
 // 类型化 API client —— openapi-fetch + 自动鉴权中间件。
-// 类型来自 schema.d.ts（由后端 OpenAPI 生成，勿手改）。
+// 类型来自 schema.ts（openapi-typescript 由后端 OpenAPI 生成，勿手改）。
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./schema";
 

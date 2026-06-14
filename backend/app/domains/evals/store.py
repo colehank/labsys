@@ -19,7 +19,6 @@ from app.models import (
     Discussion,
     EvalConfig,
     Meeting,
-    PeerBaseline,
     Rating,
     User,
 )
@@ -99,10 +98,9 @@ async def load_eval_data(db: AsyncSession) -> dict:
                 "attitude": rt.attitude, "polish": rt.polish, "raters": rt.raters,
             }
 
-    peer_baseline = {
-        pb.name: {"attitude": pb.attitude, "polish": pb.polish}
-        for pb in (await db.execute(select(PeerBaseline))).scalars()
-    }
+    # PeerBaseline 已无任何写入方（历史遗留的同行基线维度）；保持空 dict——
+    # 引擎对未被评分的成员回退为 0，行为不变，但省掉一次无意义的查询。
+    peer_baseline: dict = {}
     cfg = (await db.execute(select(EvalConfig).limit(1))).scalar_one_or_none()
 
     return {

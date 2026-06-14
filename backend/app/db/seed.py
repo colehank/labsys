@@ -6,14 +6,29 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
 
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.db import SessionLocal
 from app.core.security import hash_password
 from app.models import Role, User
 
 DEFAULT_PASSWORD = "cibol1234"
+
+
+def _guard_production() -> None:
+    """生产环境拒绝运行 demo 种子——避免 ROSTER/苏沐 等假数据覆盖真实成员与排期。
+
+    确需在 prod 跑（如全新空库初始化）时显式设 LABSYS_SEED_FORCE=1。
+    """
+    if settings.is_prod and os.getenv("LABSYS_SEED_FORCE") != "1":
+        sys.exit(
+            "⛔ 拒绝在生产环境（env=prod）运行 demo 种子：会用假名册覆盖真实数据。\n"
+            "   如确属全新空库初始化，请显式：LABSYS_SEED_FORCE=1 uv run python -m app.db.seed"
+        )
 
 # (name, title) —— 取自 frontend/src/data.ts 的 members；苏沐为当前登录演示成员
 ROSTER: list[tuple[str, str]] = [
@@ -74,4 +89,5 @@ async def seed() -> None:
 
 
 if __name__ == "__main__":
+    _guard_production()
     asyncio.run(seed())

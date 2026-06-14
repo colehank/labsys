@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.core.security import hash_password
-from app.models import User
+from app.models import Attendance, Discussion, Presenter, Rating, User
 from app.schemas.user import (
     UserAdminUpdate,
     UserCreate,
@@ -17,6 +17,19 @@ from app.schemas.user import (
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+async def _cascade_rename(db: DbSession, user_id: str, old_name: str, new_name: str) -> None:
+    """成员改名后，同步组会/评估表里去规范化的姓名快照，避免历史记录脱钩。
+
+    组会报告人按 user_id 精确匹配；评估表（出勤/发言/评分）只存姓名字符串，按旧名匹配。
+    """
+    if not new_name or old_name == new_name:
+        return
+    await db.execute(update(Presenter).where(Presenter.user_id == user_id).values(name=new_name))
+    await db.execute(update(Attendance).where(Attendance.name == old_name).values(name=new_name))
+    await db.execute(update(Discussion).where(Discussion.name == old_name).values(name=new_name))
+    await db.execute(update(Rating).where(Rating.presenter == old_name).values(presenter=new_name))
 
 
 @router.get("", response_model=list[UserOut])
@@ -56,9 +69,11 @@ async def admin_update_user(user_id: str, body: UserAdminUpdate, _: AdminUser, d
         dup = (await db.execute(select(User).where(User.email == str(new_email)))).scalar_one_or_none()
         if dup is not None:
             raise HTTPException(status.HTTP_409_CONFLICT, detail="该邮箱已被注册")
+    old_name = u.name
     for k, v in data.items():
         if v is not None:
             setattr(u, k, str(v) if k == "email" else v)
+    await _cascade_rename(db, u.id, old_name, u.name)
     await db.commit()
     await db.refresh(u)
     return u
@@ -100,9 +115,11 @@ async def update_me(body: UserSettingsUpdate, user: CurrentUser, db: DbSession) 
     data = body.model_dump(exclude_unset=True)
     if "settings" in data and data["settings"] is not None:
         user.settings = {**(user.settings or {}), **data.pop("settings")}
+    old_name = user.name
     for field, value in data.items():
         if value is not None:
             setattr(user, field, value)
+    await _cascade_rename(db, user.id, old_name, user.name)
     await db.commit()
     await db.refresh(user)
     return user

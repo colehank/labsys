@@ -431,6 +431,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/credentials/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Credential
+         * @description 管理员下发：把服务器账密写入某成员的「我的 · SSH 账密」（审批 ssh 申请后调用）。
+         *
+         *     同名即更新密码。绝不返回密码本身；密码加密落库。
+         */
+        post: operations["issue_credential_api_credentials_issue_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/credentials/{cred_id}": {
         parameters: {
             query?: never;
@@ -948,6 +970,15 @@ export interface components {
         };
         /** CredCreate */
         CredCreate: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
+        /** CredIssue */
+        CredIssue: {
+            /** User Name */
+            user_name: string;
             /** Username */
             username: string;
             /** Password */
@@ -2375,6 +2406,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CredCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_credential_api_credentials_issue_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredIssue"];
             };
         };
         responses: {
