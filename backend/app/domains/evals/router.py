@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
-from app.domains.evals.engine import MEMBERS, compute_eval, rank_series_for
+from app.domains.evals.engine import compute_eval, rank_series_for
 from app.domains.evals.store import load_eval_data
 from app.models import Attendance, Discussion, Excellence, Meeting, Rating
 from app.schemas.eval import (
@@ -31,7 +31,7 @@ _WD = ["一", "二", "三", "四", "五", "六", "日"]
 
 def _compute(data: dict) -> dict:
     return compute_eval(
-        MEMBERS, data["reports"], data["attendance"], data["discussion"], data["ratings"],
+        data["members"], data["reports"], data["attendance"], data["discussion"], data["ratings"],
         data["peer_baseline"], data["weights"], data["filters"], data["rng"],
         progress_order=data["progress_order"],
     )
@@ -57,7 +57,7 @@ async def rank_series(
     from_: str = "2026-04-19", to: str = "2026-06-07", metric: str = "total",
 ) -> RankSeriesOut:
     data = await load_eval_data(db)
-    s = rank_series_for(name, from_, to, metric, MEMBERS, data["reports"], data["attendance"],
+    s = rank_series_for(name, from_, to, metric, data["members"], data["reports"], data["attendance"],
                         data["discussion"], data["ratings"], data["peer_baseline"],
                         data["weights"], data["filters"])
     return RankSeriesOut(**s)

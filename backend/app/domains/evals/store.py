@@ -13,7 +13,6 @@ from app.domains.evals.engine import (
     DEFAULT_FILTERS,
     DEFAULT_RANGE,
     DEFAULT_WEIGHTS,
-    seed_eval,
 )
 from app.models import (
     Attendance,
@@ -22,7 +21,18 @@ from app.models import (
     Meeting,
     PeerBaseline,
     Rating,
+    User,
 )
+
+
+async def _member_names(db: AsyncSession) -> list[str]:
+    """真实评选花名册 = 全体学生（排除老师），顺序按建号顺序。"""
+    rows = (
+        await db.execute(
+            select(User).where(User.title != "老师").order_by(User.created_at)
+        )
+    ).scalars()
+    return [u.name for u in rows]
 
 
 def _iso(d) -> str:
@@ -51,44 +61,16 @@ def _report_dict(m: Meeting) -> dict:
 
 
 async def seed_eval_db(db: AsyncSession) -> None:
-    """首次：对评选期内的 meetings 用确定性引擎种子填充出勤/发言/评分。幂等。
+    """仅初始化评选配置（权重/阈值/评选期）。幂等。
 
-    meetings 由 seed_lab 先建好；本层只往组会上挂评估数据，不再单独建组会表。
+    出勤、发言次数、报告评分一律由真实使用累积——不再用假成员种子回填。
     """
     cfg = (await db.execute(select(EvalConfig).limit(1))).scalar_one_or_none()
-    has_att = (await db.execute(select(Attendance.id))).first()
-    if has_att and cfg:
-        return
-
-    meetings = await _load_meetings(db)
-    rng = cfg.range_ if cfg else dict(DEFAULT_RANGE)
-    period = [
-        m for m in meetings
-        if (not rng.get("from") or _iso(m.date) >= rng["from"])
-        and (not rng.get("to") or _iso(m.date) <= rng["to"])
-    ]
-    reports = [_report_dict(m) for m in period]
-    seed = seed_eval(reports)
-
-    if not has_att:
-        for mid, names in seed["attendance"].items():
-            for name, status in names.items():
-                db.add(Attendance(meeting_id=mid, name=name, status=status))
-        for mid, names in seed["discussion"].items():
-            for name, pts in names.items():
-                db.add(Discussion(meeting_id=mid, name=name, points=pts))
-        for mid, pres in seed["ratings"].items():
-            for pn, rt in pres.items():
-                db.add(Rating(meeting_id=mid, presenter=pn,
-                              attitude=rt["attitude"], polish=rt["polish"], raters=rt["raters"]))
-    if not (await db.execute(select(PeerBaseline.id))).first():
-        for name, base in seed["peer_baseline"].items():
-            db.add(PeerBaseline(name=name, attitude=base["attitude"], polish=base["polish"]))
     if cfg is None:
         db.add(EvalConfig(weights=dict(DEFAULT_WEIGHTS), filters=dict(DEFAULT_FILTERS),
                           range_=dict(DEFAULT_RANGE), progress_order=None))
-    await db.commit()
-    print(f"eval DB seed 完成：{len(period)} 场评选期组会挂 attendance/discussion/ratings + baseline/config")
+        await db.commit()
+        print("eval DB seed：已初始化评选配置（出勤/发言/评分由真实使用累积）")
 
 
 async def load_eval_data(db: AsyncSession) -> dict:
@@ -120,6 +102,7 @@ async def load_eval_data(db: AsyncSession) -> dict:
     cfg = (await db.execute(select(EvalConfig).limit(1))).scalar_one_or_none()
 
     return {
+        "members": await _member_names(db),
         "reports": reports, "attendance": attendance, "discussion": discussion,
         "ratings": ratings, "peer_baseline": peer_baseline,
         "weights": cfg.weights if cfg else dict(DEFAULT_WEIGHTS),
