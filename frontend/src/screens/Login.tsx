@@ -21,15 +21,15 @@ import { useLogin } from "../auth";
       -webkit-mask: radial-gradient(closest-side at 50% 44%, transparent 24%, #000 82%);
       mask: radial-gradient(closest-side at 50% 44%, transparent 24%, #000 82%); }
     /* 整体极轻漂移：仅平移、无缩放，幅度极小、周期很长 → 几乎察觉不到的灵动 */
-    .cibol-net g { animation: netFloat 64s cubic-bezier(.45,0,.55,1) infinite alternate; }
+    .cibol-net g { animation: netFloat 50s cubic-bezier(.45,0,.55,1) infinite alternate; }
     .cibol-net .edge { stroke: var(--accent); stroke-width: .16; opacity: .14;
-      animation: edgeBreath 11s ease-in-out infinite; }
-    .cibol-net .node { fill: var(--accent); animation: nodeGlow 7s ease-in-out infinite; }
+      animation: edgeBreath 8s ease-in-out infinite; }
+    .cibol-net .node { fill: var(--accent); animation: nodeGlow 5s ease-in-out infinite; }
     .cibol-net .node.dim { fill: var(--stone-400); }
     @keyframes netIn { to { opacity: .82; } }
-    @keyframes netFloat { from { transform: translate(-0.5%, -0.4%); } to { transform: translate(0.5%, 0.4%); } }
-    @keyframes nodeGlow { 0%, 100% { opacity: .34; } 50% { opacity: .82; } }
-    @keyframes edgeBreath { 0%, 100% { opacity: .08; } 50% { opacity: .20; } }
+    @keyframes netFloat { from { transform: translate(-0.8%, -0.6%); } to { transform: translate(0.8%, 0.6%); } }
+    @keyframes nodeGlow { 0%, 100% { opacity: .30; } 50% { opacity: .9; } }
+    @keyframes edgeBreath { 0%, 100% { opacity: .07; } 50% { opacity: .24; } }
 
     .cibol-login-inner { position: relative; width: 100%; max-width: 350px;
       display: flex; flex-direction: column; align-items: center; }
