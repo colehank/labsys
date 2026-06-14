@@ -43,10 +43,9 @@ FIRST_PRESENTERS = [
     ("林知远", "前额叶皮层在工作记忆中的门控机制", "进展汇报", 40),
     ("顾长川", "扩散模型在 fMRI 解码中的应用综述", "文献精读", 30),
 ]
-ONLINE_0 = ("https://meet.cibol.lab/grp/0614-prefrontal", "腾讯会议", "938 217 460", "ok")
-ONLINE_1 = ("https://meet.cibol.lab/grp/0621-decode", "腾讯会议", "204 668 391", "ok")
-# 在线会议（按日期）：今天起几场挂腾讯会议演示
-ONLINE_BY_DATE = {date(2026, 6, 14): ONLINE_0, date(2026, 6, 21): ONLINE_1}
+# 在线会议链接不再用假占位 seed —— 一律由管理员在组会页真实预约腾讯会议
+# （Playwright 自动化 vc.bnu.edu.cn）写入 online_url，避免首页出现打不开的死链。
+ONLINE_BY_DATE: dict = {}
 # 预置主题（按日期）：今天起几场给好看的主题
 SEEDED_TOPICS_BY_DATE = {
     date(2026, 6, 21): [("苏沐", "基于扩散模型的神经表征解码")],

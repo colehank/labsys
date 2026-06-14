@@ -95,9 +95,11 @@ import type { Me } from "../auth";
     const isMobile = useIsMobile();
     const { data: cfg } = useConfig();
     const { data: meetings = [] } = useMeetings();
-    // 今天（6/14）组会刚结束 → 首页展示下一场上阶的组会。
-    const today = new Date(2026, 5, 14);
-    const up = meetings.find((s) => new Date(s.y, s.mo, s.day) > today) || meetings[1];
+    // 取真实今天（归一化到 0 点）→ 首页展示下一场即将到来的组会。
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const up = meetings.find((s) => new Date(s.y, s.mo, s.day) >= today)
+      || meetings[meetings.length - 1];
     const m = up && cfg
       ? { date: up.dateLabel, time: up.time || cfg.meetingDefault.time, place: up.place || cfg.meetingDefault.place, online: up.online, presenters: up.presenters }
       : null;
