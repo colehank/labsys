@@ -15,26 +15,15 @@ import { useLogin } from "../auth";
     s.textContent = `
     .cibol-login { position: fixed; inset: 0; overflow: hidden; background: var(--canvas);
       display: flex; align-items: center; justify-content: center; padding: 32px; }
-    /* warm radial wash */
-    .cibol-login::before { content: ""; position: absolute; inset: -20%;
-      background:
-        radial-gradient(46% 40% at 50% 30%, color-mix(in oklch, var(--accent) 11%, transparent), transparent 70%),
-        radial-gradient(40% 50% at 78% 80%, color-mix(in oklch, var(--accent) 7%, transparent), transparent 72%);
-      pointer-events: none; }
-    /* neural constellation */
+    /* neural constellation — static, no drift */
     .cibol-net { position: absolute; inset: 0; width: 100%; height: 100%;
       pointer-events: none; opacity: 0; animation: netIn 2.2s var(--ease-out) .2s forwards;
-      transform-origin: 50% 45%;
       -webkit-mask: radial-gradient(closest-side at 50% 44%, transparent 24%, #000 82%);
       mask: radial-gradient(closest-side at 50% 44%, transparent 24%, #000 82%); }
-    .cibol-net g { animation: netDrift 32s ease-in-out infinite alternate; transform-origin: 50% 45%; }
     .cibol-net .edge { stroke: var(--accent); stroke-width: .16; opacity: .16; }
     .cibol-net .node { fill: var(--accent); }
     .cibol-net .node.dim { fill: var(--stone-400); }
-    .cibol-net .twinkle { animation: twinkle 5.5s ease-in-out infinite; }
     @keyframes netIn { to { opacity: .82; } }
-    @keyframes netDrift { from { transform: translate(0,0) scale(1); } to { transform: translate(-1.4%, 1.1%) scale(1.04); } }
-    @keyframes twinkle { 0%,100% { opacity: .2; } 50% { opacity: .6; } }
 
     .cibol-login-inner { position: relative; width: 100%; max-width: 350px;
       display: flex; flex-direction: column; align-items: center; }
@@ -62,7 +51,7 @@ import { useLogin } from "../auth";
     .cibol-login-cta:active button { transform: translateY(0); }
 
     @media (prefers-reduced-motion: reduce) {
-      .cibol-net, .cibol-net g, .cibol-login-tile, .cibol-login-tile .arc, .cibol-login-tile .dot, .cibol-rise, .twinkle { animation: none !important; }
+      .cibol-net, .cibol-login-tile, .cibol-login-tile .arc, .cibol-login-tile .dot, .cibol-rise { animation: none !important; }
       .cibol-net { opacity: 1; } .cibol-login-tile { opacity: 1; transform: none; }
       .cibol-login-tile .arc { stroke-dashoffset: 0; } .cibol-login-tile .dot { opacity: 1; }
       .cibol-rise { opacity: 1; transform: none; }
@@ -85,9 +74,8 @@ import { useLogin } from "../auth";
             <line key={i} className="edge" x1={NODES[a][0]} y1={NODES[a][1]} x2={NODES[b][0]} y2={NODES[b][1]} />
           ))}
           {NODES.map(([x, y], i) => (
-            <circle key={i} className={"node twinkle" + (i % 3 === 0 ? " dim" : "")}
-              cx={x} cy={y} r={i % 4 === 0 ? 0.7 : 0.48}
-              style={{ animationDelay: (i * 0.4) + "s" }} />
+            <circle key={i} className={"node" + (i % 3 === 0 ? " dim" : "")}
+              cx={x} cy={y} r={i % 4 === 0 ? 0.7 : 0.48} />
           ))}
         </g>
       </svg>
