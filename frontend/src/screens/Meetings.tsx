@@ -1,9 +1,9 @@
 import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
-import { STORE, toast } from "../store";
+import { toast } from "../store";
 import { DATA } from "../data";
-import { useConfig, useMeetings, useEvalCompute, useExcellence, useRankSeries, useCreateRequest, useEvalReports, useSubmitRating, useBookMeeting, useBookingSettings, type Meeting } from "../api/hooks";
+import { useConfig, useMeetings, useEvalCompute, useExcellence, useRankSeries, useCreateRequest, useEvalReports, useSubmitRating, useBookMeeting, useBookingSettings, useMyRequests, type Meeting } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 import type { Me } from "../auth";
 
@@ -75,7 +75,7 @@ import type { Me } from "../auth";
 
   function Schedule({ onLeave, admin, me }: any) {
     const isMobile = useIsMobile();
-    STORE.use();
+    const { data: myRequests = [] } = useMyRequests();
     const { data: cfg } = useConfig();
     const { data: meetings = [] } = useMeetings();
     const bookMeeting = useBookMeeting();
@@ -159,7 +159,7 @@ import type { Me } from "../auth";
               </div>
 
               {sel && (() => {
-                const myReq = STORE.requestForDate(sel.dateLabel);
+                const myReq = (myRequests as any[]).find((r) => r.fromDate === sel.dateLabel) || null;
                 const reqActive = myReq && ["pending", "submitted"].includes(myReq.status);
                 const iPresent = sel.presenters.some((p) => p.name === me.name);
                 return (

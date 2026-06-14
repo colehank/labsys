@@ -1,7 +1,7 @@
 import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
-import { STORE, toast } from "../store";
+import { toast } from "../store";
 import { useEvalCompute, useBookingSettings, useUpdateBookingSettings, useSaveSchedule, useConfig, useSaveConfig } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -214,15 +214,14 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   function SemesterDialog({ open, onClose }: any) {
     const isMobile = useIsMobile();
-    const store = STORE.use();
     const { data: cfg } = useConfig();
     const saveCfg = useSaveConfig();
-    const [sem, setSem] = React.useState(store.semester);
-    const [md, setMd] = React.useState(store.meetingDefault);
+    const [sem, setSem] = React.useState<any>({ name: "", short: "", start: "", end: "" });
+    const [md, setMd] = React.useState<any>({ weekday: "周日", time: "", place: "" });
     React.useEffect(() => {
-      if (open) {
-        setSem(cfg?.semester ? { ...cfg.semester } : store.semester);
-        setMd(cfg?.meetingDefault ? { ...cfg.meetingDefault } : store.meetingDefault);
+      if (open && cfg) {
+        setSem({ ...cfg.semester });
+        setMd({ ...cfg.meetingDefault });
       }
     }, [open, cfg]);
     const ds = { height: 38, padding: "0 11px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 14, colorScheme: "light dark", width: "100%" };
@@ -230,8 +229,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       saveCfg.mutate(
         { semester: sem, meetingDefault: { weekday: md.weekday || "周日", time: md.time || "", place: md.place || "" } },
         {
-          onSuccess: (data) => {
-            STORE.set({ semester: data.semester, meetingDefault: data.meetingDefault });
+          onSuccess: () => {
             toast("学期与地点已保存", { tone: "success" });
             onClose();
           },
@@ -265,7 +263,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   function AdminMeetings() {
     const isMobile = useIsMobile();
-    const store = STORE.use();
+    const { data: cfg } = useConfig();
     const { data: compute } = useEvalCompute();
     const roster = React.useMemo(() => (compute?.rows ?? []).map((row) => ({ name: row.name, role: "" })), [compute]);
     const [semOpen, setSemOpen] = React.useState(false);
@@ -275,7 +273,8 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [countMode, setCountMode] = React.useState("2");
     const [customCount, setCustomCount] = React.useState(4);
     const [start, setStart] = React.useState("2026-06-14");
-    const [end, setEnd] = React.useState(store.semester.end);
+    const [end, setEnd] = React.useState("");
+    React.useEffect(() => { if (cfg?.semester?.end) setEnd((e) => e || cfg.semester.end); }, [cfg]);
     const [weekday, setWeekday] = React.useState(() => new Date("2026-06-14T00:00:00").getDay()); // 0=周日，默认与 start 同星期
     const interval = freq === "custom" ? Math.max(1, Number(customDays)) : Number(freq);
     const perSession = countMode === "custom" ? Math.max(1, Number(customCount)) : Number(countMode);
@@ -513,9 +512,9 @@ import { useIsMobile } from "../lib/useIsMobile";
                         </div>
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
-                        <Input size="sm" label="本场时间（留空 = 默认）" value={g.time || ""} placeholder={store.meetingDefault?.time || "全局默认"} iconLeft={I("clock")}
+                        <Input size="sm" label="本场时间（留空 = 默认）" value={g.time || ""} placeholder={cfg?.meetingDefault?.time || "全局默认"} iconLeft={I("clock")}
                           onChange={(e) => setMeta(g.id, "time", e.target.value)} />
-                        <Input size="sm" label="本场地点（留空 = 默认）" value={g.place || ""} placeholder={store.meetingDefault?.place || "全局默认"} iconLeft={I("map-pin")}
+                        <Input size="sm" label="本场地点（留空 = 默认）" value={g.place || ""} placeholder={cfg?.meetingDefault?.place || "全局默认"} iconLeft={I("map-pin")}
                           onChange={(e) => setMeta(g.id, "place", e.target.value)} />
                       </div>
                     </div>

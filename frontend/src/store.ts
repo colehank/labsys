@@ -17,16 +17,10 @@
 // ─────────────────────────────────────────────────────────────────────────
 import React from "react";
 import { DATA } from "./data";
+import { REQ_FLOW } from "./lib/reqFlow";
 
 const d = DATA;
 
-// 状态机定义：每个 kind 的初始态与合法迁移。
-const REQ_FLOW: Record<string, { initial: string; transitions: Record<string, string[]> }> = {
-  swap: { initial: "pending", transitions: { pending: ["accepted", "declined", "cancelled"], accepted: [], declined: [], cancelled: [] } },
-  absence: { initial: "submitted", transitions: { submitted: ["approved", "rejected", "cancelled"], approved: [], rejected: [], cancelled: [] } },
-  api: { initial: "submitted", transitions: { submitted: ["approved", "rejected", "cancelled"], approved: [], rejected: [], cancelled: [] } },
-  ssh: { initial: "submitted", transitions: { submitted: ["approved", "rejected", "cancelled"], approved: [], rejected: [], cancelled: [] } },
-};
 const nowISO = () => new Date().toISOString();
 
 // ── 评选 / 组会统计 种子构建 ──

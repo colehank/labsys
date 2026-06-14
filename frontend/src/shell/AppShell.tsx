@@ -4,7 +4,7 @@
 import React from "react";
 import { Sidebar, Avatar } from "../ds";
 import { I } from "../lib/icons";
-import { STORE } from "../store";
+import { useMyRequests, usePendingRequests } from "../api/hooks";
 import { DATA } from "../data";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -219,8 +219,12 @@ function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOp
 
 export function AppShell({ active, onNavigate, links, children, admin, onToggleAdmin, onOpenPanel, onLogout, me }: any) {
   const data = DATA;
-  STORE.use(); // re-render when requests change so the badge stays current
-  const reqCount = (STORE.myRequests() || []).filter((r: any) => ["pending", "submitted"].includes(r.status)).length;
+  // badge：管理员看「待我审批」数，成员看「我发起的进行中」数（均来自真后端）
+  const { data: mineReqs = [] } = useMyRequests();
+  const { data: pendingReqs = [] } = usePendingRequests(admin);
+  const reqCount = admin
+    ? (pendingReqs as any[]).length
+    : (mineReqs as any[]).filter((r) => ["pending", "submitted"].includes(r.status)).length;
   const unreadNotif = 2; // 未读通知（演示）
   const badgeCount = reqCount + unreadNotif;
   const [collapsed, setCollapsed] = React.useState(true);
