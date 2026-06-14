@@ -106,8 +106,8 @@ import { useLogin } from "../auth";
   function Login(_: any) {
     ensureStyle();
     const login = useLogin();
-    const [email, setEmail] = React.useState("admin@cibol.lab");
-    const [password, setPassword] = React.useState("cibol1234");
+    const [email, setEmail] = React.useState("");
+    const [password, setPassword] = React.useState("");
 
     const submit = (e?: any) => {
       if (e) e.preventDefault();
@@ -133,14 +133,14 @@ import { useLogin } from "../auth";
           </div>
 
           <div className="cibol-rise" style={{ animationDelay: ".64s", width: "100%", display: "flex", flexDirection: "column", gap: 13, marginTop: 32 }}>
-            <Input label="邮箱" type="email" value={email} onChange={(e: any) => setEmail(e.target.value)} iconLeft={I("at-sign")} autoComplete="username" />
-            <Input label="密码" type="password" value={password} onChange={(e: any) => setPassword(e.target.value)} iconLeft={I("lock")} autoComplete="current-password" error={login.isError ? "邮箱或密码错误" : undefined} />
+            <Input label="邮箱" type="email" placeholder="name@example.com" value={email} onChange={(e: any) => setEmail(e.target.value)} iconLeft={I("at-sign")} autoComplete="username" />
+            <Input label="密码" type="password" placeholder="请输入密码" value={password} onChange={(e: any) => setPassword(e.target.value)} iconLeft={I("lock")} autoComplete="current-password" error={login.isError ? "邮箱或密码错误" : undefined} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
               <Checkbox label="记住此设备" defaultChecked />
               <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 13 }}>忘记密码</a>
             </div>
             <div className="cibol-login-cta" style={{ marginTop: 8 }}>
-              <Button type="submit" variant="primary" fullWidth size="lg" iconRight={I("arrow-right")} disabled={login.isPending} onClick={submit}>{login.isPending ? "登录中…" : "进入系统"}</Button>
+              <Button type="submit" variant="primary" fullWidth size="lg" iconRight={I("arrow-right")} disabled={login.isPending || !email.trim() || !password} onClick={submit}>{login.isPending ? "登录中…" : "进入系统"}</Button>
             </div>
           </div>
 
