@@ -161,8 +161,8 @@ import type { Me } from "../auth";
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("clock", { size: 14 })}{md.time}</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("map-pin", { size: 14 })}{md.place}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("clock", { size: 14 })}{sel.time || md.time}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("map-pin", { size: 14 })}{sel.place || md.place}</span>
                   </div>
                   {sel.presenters.map((p, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 0" }}>

@@ -76,5 +76,7 @@ class MeetingOut(BaseModel):
     type: str
     tone: str        # accent | info
     status: str
+    time: str = ""   # 本场时间；空串 = 沿用全局默认（meetingDefault.time）
+    place: str = ""  # 本场地点；空串 = 沿用全局默认（meetingDefault.place）
     online: OnlineMeetingOut | None = None
     presenters: list[PresenterOut]

@@ -2581,6 +2581,16 @@
             "type": "string",
             "title": "Status"
           },
+          "time": {
+            "type": "string",
+            "title": "Time",
+            "default": ""
+          },
+          "place": {
+            "type": "string",
+            "title": "Place",
+            "default": ""
+          },
           "online": {
             "anyOf": [
               {

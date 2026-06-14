@@ -1075,6 +1075,16 @@ export interface components {
             tone: string;
             /** Status */
             status: string;
+            /**
+             * Time
+             * @default
+             */
+            time: string;
+            /**
+             * Place
+             * @default
+             */
+            place: string;
             online?: components["schemas"]["OnlineMeetingOut"] | null;
             /** Presenters */
             presenters: components["schemas"]["PresenterOut"][];

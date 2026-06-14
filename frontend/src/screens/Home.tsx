@@ -99,7 +99,7 @@ import type { Me } from "../auth";
     const today = new Date(2026, 5, 14);
     const up = meetings.find((s) => new Date(s.y, s.mo, s.day) > today) || meetings[1];
     const m = up && cfg
-      ? { date: up.dateLabel, time: cfg.meetingDefault.time, place: cfg.meetingDefault.place, online: up.online, presenters: up.presenters }
+      ? { date: up.dateLabel, time: up.time || cfg.meetingDefault.time, place: up.place || cfg.meetingDefault.place, online: up.online, presenters: up.presenters }
       : null;
     const iPresentNext = !!up && up.presenters.some((p) => p.name === me.name);
     const { data: myReqs = [] } = useMyRequests();

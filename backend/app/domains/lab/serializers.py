@@ -26,7 +26,8 @@ def meeting_out(m: Meeting) -> MeetingOut:
         )
     return MeetingOut(
         id=m.id, y=d.year, mo=mo0, day=d.day, mdLabel=md, dateLabel=label,
-        type=m.type.value, tone=tone, status=m.status.value, online=online,
+        type=m.type.value, tone=tone, status=m.status.value,
+        time=m.time or "", place=m.place or "", online=online,
         presenters=[
             PresenterOut(name=p.name, topic=p.topic, kind=p.kind, minutes=p.minutes)
             for p in m.presenters

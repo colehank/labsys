@@ -299,6 +299,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       return { ...g, presenters: arr };
     });
     const addP = (gid, name) => patchGroup(gid, (g) => ({ ...g, presenters: [...g.presenters, { name, topic: "", skipped: false }] }));
+    const setMeta = (gid, key, v) => patchGroup(gid, (g) => ({ ...g, [key]: v }));
     // 取消 / 恢复某个日期 → 报告人队列顺延，必要时末尾追加补开日期。
     const cancelSlot = (slotId) => setSlots((s) => rebalance(s.map((x) => (x.id === slotId ? { ...x, cancelled: true } : x)), groups.length, interval));
     const restoreSlot = (slotId) => setSlots((s) => rebalance(s.map((x) => (x.id === slotId ? { ...x, cancelled: false } : x)), groups.length, interval));
@@ -325,8 +326,8 @@ import { useIsMobile } from "../lib/useIsMobile";
           return {
             date: c.slot.iso,
             type: kind,
-            time: store.meetingDefault?.time || "",
-            place: store.meetingDefault?.place || "",
+            time: c.group.time || "",   // 空 = 沿用全局默认（成员端回退渲染）
+            place: c.group.place || "",
             presenters: (c.group.presenters || [])
               .filter((p: any) => !p.skipped)
               .map((p: any) => ({ name: p.name, topic: p.topic || "", kind })),
@@ -491,6 +492,12 @@ import { useIsMobile } from "../lib/useIsMobile";
                             onChange={(e) => { if (e.target.value) addP(g.id, e.target.value); }}
                             options={roster.filter((m) => !g.presenters.some((p) => p.name === m.name)).map((m) => ({ value: m.name, label: m.role ? `${m.name} · ${m.role}` : m.name }))} />
                         </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
+                        <Input size="sm" label="本场时间（留空 = 默认）" value={g.time || ""} placeholder={store.meetingDefault?.time || "全局默认"} iconLeft={I("clock")}
+                          onChange={(e) => setMeta(g.id, "time", e.target.value)} />
+                        <Input size="sm" label="本场地点（留空 = 默认）" value={g.place || ""} placeholder={store.meetingDefault?.place || "全局默认"} iconLeft={I("map-pin")}
+                          onChange={(e) => setMeta(g.id, "place", e.target.value)} />
                       </div>
                     </div>
                   )}
