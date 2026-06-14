@@ -125,7 +125,11 @@ export interface paths {
         post?: never;
         /**
          * Delete User
-         * @description 管理员删除用户。不能删自己；有历史关联（组会/请求等）的用户会被拒。
+         * @description 管理员删除用户。不能删自己。
+         *
+         *     纯净账号（无任何历史关联）直接物理删除；有组会 / 请求 / 通知 / 密钥等历史
+         *     关联的用户无法物理删除（外键约束），自动改为「停用」（软删除）——禁止登录、
+         *     名册标灰，但历史记录全部保留。
          */
         delete: operations["delete_user_api_users__user_id__delete"];
         options?: never;
@@ -1442,7 +1446,7 @@ export interface components {
         };
         /**
          * UserAdminUpdate
-         * @description 管理员改用户资料 / 权限 / 密码（password 留空则不改）。
+         * @description 管理员改用户资料 / 权限 / 密码 / 停用状态（password 留空则不改）。
          */
         UserAdminUpdate: {
             /** Name */
@@ -1454,6 +1458,8 @@ export interface components {
             role?: components["schemas"]["Role"] | null;
             /** Password */
             password?: string | null;
+            /** Disabled */
+            disabled?: boolean | null;
         };
         /**
          * UserCreate
@@ -1477,6 +1483,16 @@ export interface components {
             /** @default member */
             role: components["schemas"]["Role"];
         };
+        /**
+         * UserDeleteResult
+         * @description 删除用户的结果：纯净账号物理删除，有历史记录的改为停用。
+         */
+        UserDeleteResult: {
+            /** Action */
+            action: string;
+            /** Detail */
+            detail: string;
+        };
         /** UserOut */
         UserOut: {
             /** Id */
@@ -1491,6 +1507,11 @@ export interface components {
             role: components["schemas"]["Role"];
             /** Title */
             title: string;
+            /**
+             * Disabled
+             * @default false
+             */
+            disabled: boolean;
             /** Ssh Pubkey */
             ssh_pubkey?: string | null;
             /** Settings */
@@ -1742,11 +1763,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["UserDeleteResult"];
+                };
             };
             /** @description Validation Error */
             422: {

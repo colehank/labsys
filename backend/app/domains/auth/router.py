@@ -31,6 +31,8 @@ async def login(body: LoginRequest, db: DbSession) -> TokenPair:
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="邮箱或密码错误")
+    if user.disabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="该账号已停用，请联系管理员")
     return TokenPair(
         access_token=create_access_token(user.id, user.role.value),
         refresh_token=create_refresh_token(user.id),
@@ -46,6 +48,8 @@ async def refresh(body: RefreshRequest, db: DbSession) -> AccessToken:
     user = await db.get(User, payload.get("sub"))
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="用户不存在")
+    if user.disabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="该账号已停用")
     return AccessToken(access_token=create_access_token(user.id, user.role.value))
 
 

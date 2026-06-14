@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     email: EmailStr
     role: Role
     title: str
+    disabled: bool = False
     ssh_pubkey: str | None = None
     settings: dict
     created_at: datetime
@@ -38,9 +39,16 @@ class UserCreate(BaseModel):
 
 
 class UserAdminUpdate(BaseModel):
-    """管理员改用户资料 / 权限 / 密码（password 留空则不改）。"""
+    """管理员改用户资料 / 权限 / 密码 / 停用状态（password 留空则不改）。"""
     name: str | None = None
     email: EmailStr | None = None
     title: str | None = None
     role: Role | None = None
     password: str | None = None
+    disabled: bool | None = None
+
+
+class UserDeleteResult(BaseModel):
+    """删除用户的结果：纯净账号物理删除，有历史记录的改为停用。"""
+    action: str  # "deleted" | "disabled"
+    detail: str

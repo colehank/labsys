@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import JSON, Enum, String, Text
+from sqlalchemy import JSON, Boolean, Enum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -27,3 +27,5 @@ class User(UUIDMixin, TimestampMixin, Base):
     ssh_pubkey: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 个人设置（通知偏好等），对应前端「我的」页
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
+    # 停用（软删除）：有历史记录的用户无法物理删除，改为停用——禁止登录、名册标灰，历史保留
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)

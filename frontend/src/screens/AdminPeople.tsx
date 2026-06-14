@@ -11,6 +11,14 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   const ROLES = ["老师", "科研助理", "博士生", "硕士生", "本科生"]; // 身份（title）建议项
 
+  // 后端 HTTPException 的 {detail} 经 openapi-fetch 落在 error 对象上（非 Error 实例），
+  // 直接 e?.message 取不到——这里优先取 detail，让用户看到真实原因。
+  function errMsg(e: any, fallback: string) {
+    const d = e?.detail;
+    if (typeof d === "string") return d;
+    return e?.message || fallback;
+  }
+
   // 权限选择（用户 / 管理员）。值对齐后端 Role：member / admin。
   function PermPicker({ perm, setPerm }: any) {
     return (
@@ -107,6 +115,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const { data: users = [] } = useUsers();
     const { data: me } = useMe();
     const del = useDeleteUser();
+    const update = useAdminUpdateUser();
     const [q, setQ] = React.useState("");
     const [adding, setAdding] = React.useState(false);
     const [editing, setEditing] = React.useState<any>(null);
@@ -120,8 +129,19 @@ import { useIsMobile } from "../lib/useIsMobile";
 
     const onDelete = (u: any) => {
       del.mutate(u.id, {
-        onSuccess: () => { toast("已删除 · " + u.name, { tone: "success" }); setConfirm(null); },
-        onError: (e: any) => { toast(e?.message || "删除失败", { tone: "error" }); setConfirm(null); },
+        onSuccess: (res: any) => {
+          // res.action: "deleted"（纯净账号物理删除）| "disabled"（有历史→停用）
+          toast(res?.detail || "已删除 · " + u.name, { tone: res?.action === "disabled" ? "warning" : "success" });
+          setConfirm(null);
+        },
+        onError: (e: any) => { toast(errMsg(e, "删除失败"), { tone: "error" }); setConfirm(null); },
+      });
+    };
+
+    const onRestore = (u: any) => {
+      update.mutate({ id: u.id, patch: { disabled: false } }, {
+        onSuccess: () => toast("已恢复 · " + u.name, { tone: "success" }),
+        onError: (e: any) => toast(errMsg(e, "恢复失败"), { tone: "error" }),
       });
     };
 
@@ -147,14 +167,16 @@ import { useIsMobile } from "../lib/useIsMobile";
           {list.map((u: any, i: number) => {
             const adminRow = u.role === "admin";
             const isMe = !!(me && u.id === me.id);
+            const off = !!u.disabled;
             return (
-              <div key={u.id} style={{ display: "grid", gridTemplateColumns: peopleCols, gap: isMobile ? 8 : 12, padding: "12px 20px", alignItems: "center", borderBottom: i < list.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
+              <div key={u.id} style={{ display: "grid", gridTemplateColumns: peopleCols, gap: isMobile ? 8 : 12, padding: "12px 20px", alignItems: "center", borderBottom: i < list.length - 1 ? "1px solid var(--border-subtle)" : "none", opacity: off ? 0.5 : 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                   <Avatar name={u.name} size="sm" />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", whiteSpace: "nowrap" }}>{u.name}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", whiteSpace: "nowrap", textDecoration: off ? "line-through" : "none" }}>{u.name}</span>
                       {isMe && <Badge tone="neutral" size="sm">我</Badge>}
+                      {off && <Badge tone="warning" size="sm">已停用</Badge>}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.email}</div>
                   </div>
@@ -163,7 +185,11 @@ import { useIsMobile } from "../lib/useIsMobile";
                 <span>{adminRow ? <Badge tone="accent" size="sm" dot>管理员</Badge> : <Badge tone="neutral" size="sm">用户</Badge>}</span>
                 <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
                   <IconButton icon={I("user-pen")} label="编辑" size="sm" onClick={() => setEditing(u)} />
-                  <IconButton icon={I("trash-2")} label={isMe ? "不能删除自己" : "删除"} size="sm" disabled={isMe} onClick={() => !isMe && setConfirm(u)} />
+                  {off ? (
+                    <IconButton icon={I("rotate-ccw")} label="恢复账号" size="sm" onClick={() => onRestore(u)} />
+                  ) : (
+                    <IconButton icon={I("trash-2")} label={isMe ? "不能删除自己" : "删除"} size="sm" disabled={isMe} onClick={() => !isMe && setConfirm(u)} />
+                  )}
                 </div>
               </div>
             );
@@ -175,7 +201,10 @@ import { useIsMobile } from "../lib/useIsMobile";
         <Dialog open={!!confirm} onClose={() => setConfirm(null)} title="删除用户" subtitle={confirm?.name}
           icon={I("trash-2")} tone="danger" width={400}
           footer={<><Button variant="ghost" onClick={() => setConfirm(null)}>取消</Button><Button variant="primary" loading={del.isPending} onClick={() => confirm && onDelete(confirm)}>确认删除</Button></>}>
-          <p style={{ fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.6 }}>删除后该用户将无法登录，且无法恢复。若该用户有历史记录（组会报告 / 请求等）将无法删除。</p>
+          <p style={{ fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.6 }}>
+            从未产生任何数据的账号将被<b>彻底删除</b>；若该用户有历史记录（组会报告 / 评分 / 申请 / 通知等），
+            为保留这些记录会自动转为<b>停用</b>——无法登录、名册标灰，之后可随时「恢复」。
+          </p>
         </Dialog>
       </div>
     );

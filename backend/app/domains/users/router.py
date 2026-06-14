@@ -8,7 +8,13 @@ from sqlalchemy.exc import IntegrityError
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.core.security import hash_password
 from app.models import User
-from app.schemas.user import UserAdminUpdate, UserCreate, UserOut, UserSettingsUpdate
+from app.schemas.user import (
+    UserAdminUpdate,
+    UserCreate,
+    UserDeleteResult,
+    UserOut,
+    UserSettingsUpdate,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -58,22 +64,33 @@ async def admin_update_user(user_id: str, body: UserAdminUpdate, _: AdminUser, d
     return u
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: str, me: AdminUser, db: DbSession) -> None:
-    """管理员删除用户。不能删自己；有历史关联（组会/请求等）的用户会被拒。"""
+@router.delete("/{user_id}", response_model=UserDeleteResult)
+async def delete_user(user_id: str, me: AdminUser, db: DbSession) -> UserDeleteResult:
+    """管理员删除用户。不能删自己。
+
+    纯净账号（无任何历史关联）直接物理删除；有组会 / 请求 / 通知 / 密钥等历史
+    关联的用户无法物理删除（外键约束），自动改为「停用」（软删除）——禁止登录、
+    名册标灰，但历史记录全部保留。
+    """
     if user_id == me.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="不能删除当前登录的自己")
     u = await db.get(User, user_id)
     if u is None:
-        return
+        return UserDeleteResult(action="deleted", detail="用户不存在")
+    name = u.name
     try:
         await db.delete(u)
         await db.commit()
+        return UserDeleteResult(action="deleted", detail=f"已删除 {name}")
     except IntegrityError:
         await db.rollback()
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            detail="该用户存在关联记录（组会报告 / 请求 / 密钥等），无法删除",
+        u = await db.get(User, user_id)
+        if u is not None:
+            u.disabled = True
+            await db.commit()
+        return UserDeleteResult(
+            action="disabled",
+            detail=f"{name} 有历史记录无法删除，已停用（无法登录，历史保留）",
         )
 
 
