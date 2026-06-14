@@ -5,7 +5,6 @@ import React from "react";
 import { Sidebar, Avatar } from "../ds";
 import { I } from "../lib/icons";
 import { useMyRequests, usePendingRequests, useNotifications } from "../api/hooks";
-import { DATA } from "../data";
 import { useIsMobile } from "../lib/useIsMobile";
 
 const NAV = [
@@ -18,7 +17,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { section: "管理" },
-  { id: "approvals", label: "审批中心", icon: I("clipboard-check"), badge: 3 },
+  { id: "approvals", label: "审批中心", icon: I("clipboard-check") },
   { id: "meeting-hub", label: "组会中心", icon: I("presentation") },
   { id: "people-admin", label: "人员管理", icon: I("users-round") },
   { id: "server-admin", label: "服务器管理", icon: I("server-cog") },
@@ -218,7 +217,6 @@ function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOp
 }
 
 export function AppShell({ active, onNavigate, links, children, admin, onToggleAdmin, onOpenPanel, onLogout, me }: any) {
-  const data = DATA;
   // badge：管理员看「待我审批」数，成员看「我发起的进行中」数（均来自真后端）
   const { data: mineReqs = [] } = useMyRequests();
   const { data: pendingReqs = [] } = usePendingRequests(admin);
@@ -234,7 +232,10 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
   const isMobile = useIsMobile();
   const [moreOpen, setMoreOpen] = React.useState(false);
 
-  const nav = admin ? [...NAV, ...ADMIN_NAV] : NAV;
+  // 桌面侧栏审批项徽标用真实待审批数（与移动端一致），不再写死。
+  const nav = admin
+    ? [...NAV, ...ADMIN_NAV.map((it) => (it.id === "approvals" ? { ...it, badge: reqCount || undefined } : it))]
+    : NAV;
 
   // ── 移动端布局：内容全宽 + 底部 Tab 栏 ──
   if (isMobile) {

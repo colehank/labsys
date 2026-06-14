@@ -2,7 +2,6 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { DATA } from "../data";
 import { useConfig, useMeetings, useEvalCompute, useExcellence, useRankSeries, useCreateRequest, useEvalReports, useSubmitRating, useBookMeeting, useBookingSettings, useMyRequests, type Meeting } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 import type { Me } from "../auth";
@@ -51,26 +50,6 @@ import type { Me } from "../auth";
         {I("arrow-up-right", { size: 18, style: { color: hover ? "#fff" : "var(--accent-text)" } })}
       </a>
     );
-  }
-
-  // Fallback: build the full-semester schedule if shared data.js is stale/cached.
-  function buildSchedule(d) {
-    const WD = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-    const members = (d.members || []).length ? d.members : [{ name: "成员" }];
-    const seeded = { 1: [{ name: "陈屿", topic: "海马体记忆重放的计算模型" }], 2: [{ name: "Mei Lin", topic: "生成式神经解码综述" }, { name: "顾长川", topic: "" }] };
-    const out = [];
-    let dt = new Date(2026, 5, 14), n = 0, ri = 0;
-    const end = new Date(2027, 0, 16);
-    while (dt <= end && out.length < 30) {
-      const mo = dt.getMonth(), day = dt.getDate(), isP = n % 2 === 0, per = n % 3 === 0 ? 2 : 1;
-      let presenters = [];
-      for (let k = 0; k < per; k++) { presenters.push({ name: members[ri % members.length].name, topic: "" }); ri++; }
-      if (seeded[n]) presenters = seeded[n];
-      out.push({ id: `${mo + 1}-${day}`, y: dt.getFullYear(), mo, day, mdLabel: `${mo + 1}/${String(day).padStart(2, "0")}`, dateLabel: `${mo + 1}月${day}日 ${WD[dt.getDay()]}`, type: isP ? "进展汇报" : "文献精读", tone: isP ? "accent" : "info", presenters, online: null });
-      dt = new Date(dt.getTime() + 7 * 86400000); n++;
-    }
-    if (out[0] && d.nextMeeting) { out[0].presenters = d.nextMeeting.presenters.map((p) => ({ name: p.name, topic: p.topic })); out[0].online = d.nextMeeting.online; }
-    return out;
   }
 
   function Schedule({ onLeave, admin, me }: any) {
@@ -455,44 +434,6 @@ import type { Me } from "../auth";
         </div>
       </div>
     );
-  }
-
-  // ——— 我的排行走势：只统计当前用户(苏沐)在所选区间内的名次变化，折线呈现 ———
-  const rankHash = (s, salt) => { let h = salt >>> 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
-
-  // 在 [from,to] 内生成均匀的组会时间点（4–9 个），返回 {label} 列表。
-  function buildTimePoints(fromISO, toISO) {
-    const a = new Date(fromISO + "T00:00:00"), b = new Date(toISO + "T00:00:00");
-    if (isNaN(+a) || isNaN(+b) || b <= a) return [{ label: "—" }];
-    const spanDays = (+b - +a) / 86400000;
-    const count = Math.max(4, Math.min(9, Math.round(spanDays / 14) + 1));
-    const pts = [];
-    for (let i = 0; i < count; i++) {
-      const dt = new Date(a.getTime() + (spanDays * i / (count - 1)) * 86400000);
-      pts.push({ label: `${dt.getMonth() + 1}/${String(dt.getDate()).padStart(2, "0")}` });
-    }
-    return pts;
-  }
-
-  // 确定性名次游走（1 = 最好）。salt 区分维度，使三条线各不相同。
-  function buildRankSeries(salt, count, total) {
-    let r = 4 + (rankHash("苏沐", salt) % 7); // 起点 4–10
-    const out = [];
-    for (let i = 0; i < count; i++) {
-      const delta = (rankHash("苏沐|" + salt + "|" + i, 91) % 5) - 2; // -2..+2
-      r = Math.max(1, Math.min(total, r + delta));
-      out.push(r);
-    }
-    return out;
-  }
-
-  // 区间内前 5 名：按成员 + 维度 + 区间确定性打分，降序取 5。
-  function buildTop5(salt, max, fromISO, toISO) {
-    const roster = DATA.members;
-    return roster
-      .map((m): [string, number] => [m.name, 20 + (rankHash(m.name + "|" + fromISO + "|" + toISO, salt) % (max - 19))])
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
   }
 
   function MetricToggle({ value, onChange }: any) {

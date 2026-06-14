@@ -33,6 +33,9 @@ async def get_current_user(
     user = await db.get(User, payload.get("sub"))
     if user is None:
         raise _credentials_error
+    if user.disabled:
+        # 停用（软删除）即时全站失效——即便 access token 未过期也拒绝。
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该账号已停用")
     return user
 
 

@@ -60,8 +60,14 @@ import { useIsMobile } from "../lib/useIsMobile";
           <p style={{ fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.5 }}>{n.body}</p>
           {n.req ? (
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <Button size="sm" variant="primary" onClick={() => { advance.mutate({ id: n.req.id, next: "accepted", note: `已接受 ${n.req.from} 的对调` }); toast("已接受对调"); }}>接受</Button>
-              <Button size="sm" variant="ghost" onClick={() => { advance.mutate({ id: n.req.id, next: "declined", note: `已拒绝 ${n.req.from} 的对调` }); toast("已拒绝对调"); }}>拒绝</Button>
+              <Button size="sm" variant="primary" disabled={advance.isPending}
+                onClick={() => advance.mutate(
+                  { id: n.req.id, next: "accepted", note: `已接受 ${n.req.from} 的对调` },
+                  { onSuccess: () => toast("已接受对调"), onError: (e: any) => toast(e?.error?.detail || e?.detail || e?.message || "操作失败，请重试") })}>接受</Button>
+              <Button size="sm" variant="ghost" disabled={advance.isPending}
+                onClick={() => advance.mutate(
+                  { id: n.req.id, next: "declined", note: `已拒绝 ${n.req.from} 的对调` },
+                  { onSuccess: () => toast("已拒绝对调"), onError: (e: any) => toast(e?.error?.detail || e?.detail || e?.message || "操作失败，请重试") })}>拒绝</Button>
             </div>
           ) : n.actions.length > 0 && (
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>

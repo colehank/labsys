@@ -3,7 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import type { Me } from "../auth";
-import { useUpdateMe, useMyCredentials, useSaveCredential, useDeleteCredential } from "../api/hooks";
+import { useUpdateMe, useMyCredentials, useSaveCredential, useDeleteCredential, useEvalCompute, useChangePassword } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // My — 我的: a mature settings experience.
@@ -147,13 +147,24 @@ import { useIsMobile } from "../lib/useIsMobile";
   function Security({ open, setOpen, embedded }: any) {
     const { data: credData } = useMyCredentials();
     const n = credData?.items?.length || 0;
+    const changePw = useChangePassword();
+    const [oldPw, setOldPw] = React.useState("");
+    const [newPw, setNewPw] = React.useState("");
+    const canSubmit = oldPw.length > 0 && newPw.length >= 6 && !changePw.isPending;
+    const submitPw = () => {
+      if (!canSubmit) return;
+      changePw.mutate({ old_password: oldPw, new_password: newPw }, {
+        onSuccess: () => { toast("登录密码已更新"); setOldPw(""); setNewPw(""); setOpen(null); },
+        onError: (e: any) => toast(e?.message || "密码修改失败"),
+      });
+    };
     return (
       <Pane title="安全" desc="登录密码与服务器账密。" embedded={embedded}>
-        <Row icon="lock" label="登录密码" value="上次更新 · 30 天前" open={open === "pw"} onToggle={() => setOpen(open === "pw" ? null : "pw")}>
+        <Row icon="lock" label="登录密码" value="点击修改" open={open === "pw"} onToggle={() => setOpen(open === "pw" ? null : "pw")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 380 }}>
-            <Input label="当前密码" type="password" />
-            <Input label="新密码" type="password" hint="至少 8 位，再长一点更稳。" />
-            <Button variant="primary" style={{ alignSelf: "flex-start" }} onClick={() => setOpen(null)}>更新密码</Button>
+            <Input label="当前密码" type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
+            <Input label="新密码" type="password" hint="至少 6 位，再长一点更稳。" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+            <Button variant="primary" style={{ alignSelf: "flex-start" }} disabled={!canSubmit} onClick={submitPw}>{changePw.isPending ? "更新中…" : "更新密码"}</Button>
           </div>
         </Row>
         <Row icon="server" label="服务器账密"
@@ -328,6 +339,11 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [group, setGroup] = React.useState("account");
     const [open, setOpen] = React.useState(null);
     const go = (g) => { setGroup(g); setOpen(null); };
+    // 真实总分排名：按组会总分降序，找到本人名次（无数据时不显示）。
+    const { data: ev } = useEvalCompute();
+    const ranked = React.useMemo(() => [...(ev?.rows || [])].sort((a, b) => b.meeting - a.meeting), [ev]);
+    const myRank = ranked.findIndex((r) => r.name === me.name) + 1;
+    const rankTotal = ranked.length;
 
     return (
       <div style={{ maxWidth: embedded ? "none" : 940, margin: "0 auto", padding: embedded ? (isMobile ? "16px 14px 24px" : "22px 24px 32px") : (isMobile ? "16px 14px 40px" : "24px 32px 56px") }}>
@@ -339,19 +355,21 @@ import { useIsMobile } from "../lib/useIsMobile";
             <h2 style={{ fontFamily: "var(--font-serif)", fontSize: 26, fontWeight: 600, color: "var(--text-strong)" }}>{me.name}</h2>
             <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 2 }}>{me.title} · {me.email}</p>
           </div>
+          {myRank > 0 && (
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 18 }}>
             <button onClick={() => onNavigate("meetings", { tab: "rank" })}
               style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 16px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--surface)", cursor: "pointer" }}>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-faint)" }}>总分排名</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4, justifyContent: "flex-end" }}>
-                  <span className="cibol-numeral" style={{ fontSize: 24, fontWeight: 600, color: "var(--text-strong)" }}>3</span>
-                  <span style={{ fontSize: 13, color: "var(--text-muted)" }}>/ 14</span>
+                  <span className="cibol-numeral" style={{ fontSize: 24, fontWeight: 600, color: "var(--text-strong)" }}>{myRank}</span>
+                  <span style={{ fontSize: 13, color: "var(--text-muted)" }}>/ {rankTotal}</span>
                 </div>
               </div>
               <Icon name="chevron-right" style={{ width: 16, height: 16, color: "var(--text-faint)" }} />
             </button>
           </div>
+          )}
         </div>
         )}
 

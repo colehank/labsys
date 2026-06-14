@@ -2,7 +2,6 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { DATA } from "../data";
 import { AdminMeetings } from "./AdminMeetings";
 import { AdminMeetingStats } from "./AdminMeetingStats";
 import { AdminStats } from "./AdminStats";

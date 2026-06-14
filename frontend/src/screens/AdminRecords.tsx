@@ -2,8 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { DATA } from "../data";
-import { useEvalCompute, useExcellence } from "../api/hooks";
+import { useEvalCompute, useExcellence, useUsers } from "../api/hooks";
 import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -30,6 +29,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 
     const evalQ = useEvalCompute();
     const excQ = useExcellence();
+    const { data: users = [] } = useUsers();
     const { data: meUser } = useMe();
     const ev = evalQ.data || { rows: [], merged: [], total: 0 };
     const exc = excQ.data;
@@ -37,8 +37,9 @@ import { useIsMobile } from "../lib/useIsMobile";
     // 后端当前仅暴露最新一次优秀名单（非多评选期历史），渲染为长度为 1 的数组。
     const excellence = exc ? [exc] : [];
 
+    // 身份映射来自真实用户表（按姓名 → 身份/title），不再用假花名册。
     const roleByName: any = {};
-    (DATA.members || []).forEach((m) => { roleByName[m.name] = m.role; });
+    (users as any[]).forEach((u) => { roleByName[u.name] = u.title; });
 
     // 优秀奖获奖次数（当前已发布名单）
     const awardCount: Record<string, number> = {};

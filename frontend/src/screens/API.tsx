@@ -3,7 +3,6 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import { useMyKeys, useMyRequests, useCreateRequest, useMyCredentials } from "../api/hooks";
-import { DATA } from "../data";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // API — 申请 + 我的密钥 + 用量

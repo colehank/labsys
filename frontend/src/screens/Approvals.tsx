@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { usePendingRequests, useProcessedRequests, useAdvanceRequest } from "../api/hooks";
+import { usePendingRequests, useProcessedRequests, useAdvanceRequest, useIssueKey, useIssueCredential } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // Approvals — 管理员审批中心. 从 store 读取成员提交的申请，需管理员动作的项:
@@ -23,19 +23,25 @@ import { useIsMobile } from "../lib/useIsMobile";
   const randKey = () => "sk-cibol-" + Math.random().toString(36).slice(2, 10) + "…" + Math.random().toString(36).slice(2, 4);
   const randPw = () => Math.random().toString(36).slice(2, 11) + "A7";
 
-  function ProvisionDialog({ item, onClose, onConfirm }: any) {
+  function ProvisionDialog({ item, busy, onClose, onConfirm }: any) {
     const isApi = item && item.type === "api";
     const [key, setKey] = React.useState("");
     const [user, setUser] = React.useState(item && item.wantUser || "");
     const [host, setHost] = React.useState("lab-gpu-03.cibol.lab");
     const [pw, setPw] = React.useState("");
+    const [budget, setBudget] = React.useState("");
     React.useEffect(() => {
       if (!item) return;
       setKey(""); setPw(""); setUser(item.wantUser || ""); setHost("lab-gpu-03.cibol.lab");
+      setBudget(String(item.budget ?? 100));
     }, [item]);
 
     if (!item) return null;
     const ready = isApi ? key.trim().length > 4 : (user.trim() && pw.trim());
+    // 把管理员填写的内容回传给审批处理（真实下发用）。
+    const submit = () => onConfirm(item, isApi
+      ? { upstream_key: key.trim(), budget: Number(budget) || 0 }
+      : { username: user.trim(), password: pw });
 
     return (
       <Dialog open={!!item} onClose={onClose}
@@ -44,7 +50,7 @@ import { useIsMobile } from "../lib/useIsMobile";
         icon={I(isApi ? "key-round" : "server-cog")} tone="accent" width={480}
         footer={<>
           <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button variant="primary" disabled={!ready} onClick={() => onConfirm(item)}>确认通过</Button>
+          <Button variant="primary" disabled={!ready || busy} onClick={submit}>{busy ? "下发中…" : "确认通过"}</Button>
         </>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {isApi ? (
@@ -58,7 +64,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                 </div>
                 <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="粘贴或生成密钥" iconLeft={I("key-round")} />
               </div>
-              <Input label="预算上限" defaultValue={String(item.budget)} suffix="¥" iconLeft={I("wallet")} />
+              <Input label="预算上限" type="number" value={budget} onChange={(e) => setBudget(e.target.value)} suffix="¥" iconLeft={I("wallet")} />
               <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "10px 12px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
                 {I("info", { size: 15, style: { color: "var(--text-muted)", marginTop: 1 } })}
                 <span style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>通过后密钥会出现在 {item.who} 的「我的 · API 密钥」中。</span>
@@ -143,13 +149,6 @@ import { useIsMobile } from "../lib/useIsMobile";
     );
   }
 
-  // 已归档的历史审批种子（更早、不在 store 中的归档件）。
-  const HISTORY_SEED = [
-    { who: "苏沐", icon: "key-round", tone: "info", title: "API 密钥申请", detail: "情感分类基线 · 预算 ¥50", state: "approve", when: "6月5日" },
-    { who: "林知远", icon: "calendar-x", tone: "danger", title: "轮空请假", detail: "5/31 组会 · 理由：身体不适", state: "approve", when: "5月30日" },
-    { who: "周野", icon: "server-cog", tone: "warning", title: "服务器账号申请", detail: "希望用户名 zhouy · 重复申请", state: "reject", when: "5月22日" },
-  ];
-
   // 单条审批卡：actions=true 显示通过/拒绝按钮；否则显示结果徽标 + 处理时间
   function ApprovalCard({ q, state, when, onAccept, onReject }: any) {
     return (
@@ -203,20 +202,42 @@ import { useIsMobile } from "../lib/useIsMobile";
     const { data: pending = [] } = usePendingRequests();
     const { data: processed = [] } = useProcessedRequests();
     const advance = useAdvanceRequest();
+    const issueKey = useIssueKey();
+    const issueCred = useIssueCredential();
     const [tab, setTab] = React.useState("pending");
     const [prov, setProv] = React.useState(null); // 填写式通过 (api/ssh)
     const [confirm, setConfirm] = React.useState(null); // 简单通过 (leave)
     const [reject, setReject] = React.useState(null);
+    const provBusy = issueKey.isPending || issueCred.isPending || advance.isPending;
 
     const onAccept = (card) => { if (card.type === "leave") setConfirm(card); else setProv(card); };
-    const approve = (card) => { advance.mutate({ id: card.reqId, next: "approved", note: "管理员已通过" }, { onSuccess: () => toast("已通过 · " + card.who + " 的" + card.title) }); };
-    const doReject = (card) => { advance.mutate({ id: card.reqId, next: "rejected", note: "管理员已驳回" }, { onSuccess: () => toast("已拒绝 · " + card.who + " 的" + card.title) }); };
+    const errMsg = (e) => e?.error?.detail || e?.detail || e?.message || "操作失败，请重试";
+    const approve = (card) => { advance.mutate({ id: card.reqId, next: "approved", note: "管理员已通过" }, { onSuccess: () => toast("已通过 · " + card.who + " 的" + card.title), onError: (e) => toast(errMsg(e)) }); };
+    const doReject = (card) => { advance.mutate({ id: card.reqId, next: "rejected", note: "管理员已驳回" }, { onSuccess: () => toast("已拒绝 · " + card.who + " 的" + card.title), onError: (e) => toast(errMsg(e)) }); };
 
-    // 真实数据：待审批 = /requests/pending；历史 = /requests/processed + 归档种子。
+    // 审批通过 api/ssh：先真实下发（写入申请人的密钥库 / 账密库），成功后再推进为「已通过」。
+    // 下发失败则不推进——避免“标记通过却没真正下发”的假象。
+    const provisionApprove = async (card, payload) => {
+      try {
+        if (card.type === "api") {
+          await issueKey.mutateAsync({ user_name: card.who, label: card.title, upstream_key: payload.upstream_key, budget: payload.budget });
+        } else {
+          await issueCred.mutateAsync({ user_name: card.who, username: payload.username, password: payload.password });
+        }
+        await advance.mutateAsync({ id: card.reqId, next: "approved", note: card.type === "api" ? "管理员已下发 API 密钥" : "管理员已配置服务器账号" });
+        toast((card.type === "api" ? "已下发密钥 · " : "已配置账号 · ") + card.who);
+        return true;
+      } catch (e) {
+        toast(errMsg(e));
+        return false;
+      }
+    };
+
+    // 真实数据：待审批 = /requests/pending；历史 = /requests/processed。
     const fmtWhen = (r) => { const h = r.history[r.history.length - 1]; const x = new Date(h.at); return `${x.getMonth() + 1}月${x.getDate()}日`; };
     const pendingItems = pending.map(toCard);
     const resolved = processed.map((r) => ({ q: toCard(r), state: r.status === "approved" ? "approve" : "reject", when: fmtWhen(r) }));
-    const historyItems = [...resolved, ...HISTORY_SEED.map((q) => ({ q, state: q.state, when: q.when }))];
+    const historyItems = resolved;
 
     return (
       <div style={{ maxWidth: 880, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "20px 32px 48px" }}>
@@ -243,8 +264,8 @@ import { useIsMobile } from "../lib/useIsMobile";
         <ApproveDialog item={confirm} onClose={() => setConfirm(null)}
           onConfirm={(item) => { approve(item); setConfirm(null); }} />
 
-        <ProvisionDialog item={prov} onClose={() => setProv(null)}
-          onConfirm={(item) => { approve(item); setProv(null); }} />
+        <ProvisionDialog item={prov} busy={provBusy} onClose={() => setProv(null)}
+          onConfirm={async (item, payload) => { const ok = await provisionApprove(item, payload); if (ok) setProv(null); }} />
 
         <RejectDialog item={reject} onClose={() => setReject(null)}
           onConfirm={(item) => { doReject(item); setReject(null); }} />

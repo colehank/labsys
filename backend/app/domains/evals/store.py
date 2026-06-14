@@ -26,10 +26,12 @@ from app.models import (
 
 
 async def _member_names(db: AsyncSession) -> list[str]:
-    """真实评选花名册 = 全体学生（排除老师），顺序按建号顺序。"""
+    """真实评选花名册 = 在册学生（排除老师与停用账号），顺序按建号顺序。"""
     rows = (
         await db.execute(
-            select(User).where(User.title != "老师").order_by(User.created_at)
+            select(User)
+            .where(User.title != "老师", User.disabled.is_(False))
+            .order_by(User.created_at)
         )
     ).scalars()
     return [u.name for u in rows]

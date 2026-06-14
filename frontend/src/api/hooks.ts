@@ -166,6 +166,20 @@ export function useDeleteCredential() {
   });
 }
 
+// 管理员把服务器账密下发到某成员的账密库（审批 ssh 申请后调用）。端点未在 openapi schema 里，走原生 fetch。
+export function useIssueCredential() {
+  return useMutation({
+    mutationFn: async (v: { user_name: string; username: string; password: string }) => {
+      const r = await fetch(`/api/credentials/issue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens.access}` },
+        body: JSON.stringify(v),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "账号下发失败");
+    },
+  });
+}
+
 // ── 通知 ──
 export function useNotifications() {
   return useQuery({ queryKey: ["notifications"], queryFn: () => unwrap(api.GET("/api/notifications")) });
@@ -250,6 +264,20 @@ export function useUpdateMe() {
   return useMutation({
     mutationFn: (body: components["schemas"]["UserSettingsUpdate"]) => unwrap(api.PATCH("/api/users/me", { body })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+  });
+}
+
+// 修改登录密码（端点未在 openapi schema 里，走原生 fetch）。
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (v: { old_password: string; new_password: string }) => {
+      const r = await fetch(`/api/auth/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens.access}` },
+        body: JSON.stringify(v),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "密码修改失败");
+    },
   });
 }
 
@@ -397,6 +425,11 @@ export function useAdvanceRequest() {
         params: { path: { req_id: vars.id } },
         body: { next: vars.next, note: vars.note ?? "" },
       })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["requests"] }),
+    onSuccess: () => {
+      // 推进请求会改 requests，且对调通过会改组会排期、审批结果会生成站内通知。
+      qc.invalidateQueries({ queryKey: ["requests"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["meetings"] });
+    },
   });
 }

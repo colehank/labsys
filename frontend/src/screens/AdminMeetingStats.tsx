@@ -58,8 +58,11 @@ import { useIsMobile } from "../lib/useIsMobile";
     // 出勤 / 发言次数本地态：以各会次后端值为种子，管理员可逐人核对 / 录入。
     const [attEdits, setAttEdits] = React.useState<Record<string, Record<string, string>>>({});
     const [spkEdits, setSpkEdits] = React.useState<Record<string, Record<string, number>>>({});
-    const setAttendance = (key: string, name: string, status: string) =>
+    const setAttendance = (key: string, name: string, status: string) => {
       setAttEdits((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: status } }));
+      // 请假/缺席即未出勤 → 发言次数清零（与后端一致、汇总即时更新）。
+      if (status !== "present") setSpeak(key, name, 0);
+    };
     const setSpeak = (key: string, name: string, count: number) =>
       setSpkEdits((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [name]: count } }));
 

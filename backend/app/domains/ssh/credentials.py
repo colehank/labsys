@@ -10,8 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.core.crypto import cred_enabled, encrypt
-from app.core.deps import CurrentUser, DbSession
-from app.models import SshCredential
+from app.core.deps import AdminUser, CurrentUser, DbSession
+from app.models import SshCredential, User
 
 router = APIRouter(prefix="/credentials", tags=["credentials"])
 
@@ -22,6 +22,12 @@ class CredOut(BaseModel):
 
 
 class CredCreate(BaseModel):
+    username: str
+    password: str
+
+
+class CredIssue(BaseModel):
+    user_name: str
     username: str
     password: str
 
@@ -54,6 +60,35 @@ async def upsert_credential(body: CredCreate, me: CurrentUser, db: DbSession) ->
     )).scalars().first()
     if cred is None:
         cred = SshCredential(user_id=me.id, username=username, password_enc=encrypt(body.password))
+        db.add(cred)
+    else:
+        cred.password_enc = encrypt(body.password)
+    await db.commit()
+    await db.refresh(cred)
+    return CredOut(id=cred.id, username=cred.username)
+
+
+@router.post("/issue", response_model=CredOut, status_code=status.HTTP_201_CREATED)
+async def issue_credential(body: CredIssue, _: AdminUser, db: DbSession) -> CredOut:
+    """管理员下发：把服务器账密写入某成员的「我的 · SSH 账密」（审批 ssh 申请后调用）。
+
+    同名即更新密码。绝不返回密码本身；密码加密落库。
+    """
+    if not cred_enabled():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail="未配置凭据加密密钥")
+    user = (await db.execute(select(User).where(User.name == body.user_name))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="成员不存在")
+    username = body.username.strip()
+    if not username:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="账号不能为空")
+    cred = (await db.execute(
+        select(SshCredential).where(
+            SshCredential.user_id == user.id, SshCredential.username == username
+        )
+    )).scalars().first()
+    if cred is None:
+        cred = SshCredential(user_id=user.id, username=username, password_enc=encrypt(body.password))
         db.add(cred)
     else:
         cred.password_enc = encrypt(body.password)

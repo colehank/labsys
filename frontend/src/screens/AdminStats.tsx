@@ -85,9 +85,23 @@ import { useIsMobile } from "../lib/useIsMobile";
   }
 
   const RANGE_PRESETS = {
-    recent: { label: "近一个月", from: "2026-05-10", to: "2026-06-07" },
-    term: { label: "本学期", from: "2026-02-24", to: "2026-06-07" },
+    recent: { label: "近一个月" },
+    term: { label: "本学期" },
   };
+
+  // 预设区间按“今天”动态推导，避免写死过期日期。
+  const fmtISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  function presetRange(k: string) {
+    const now = new Date();
+    const to = fmtISO(now);
+    if (k === "recent") { const f = new Date(now); f.setDate(f.getDate() - 30); return { from: fmtISO(f), to }; }
+    // 本学期起始：春季学期(2–7 月)≈2/24；秋季学期(8 月–次年 1 月)≈9/1
+    const m = now.getMonth();
+    const start = (m >= 1 && m <= 6)
+      ? new Date(now.getFullYear(), 1, 24)
+      : new Date(m === 0 ? now.getFullYear() - 1 : now.getFullYear(), 8, 1);
+    return { from: fmtISO(start), to };
+  }
 
   function RangeControl({ range, onPreset, onFrom, onTo, onCustom }: any) {
     const ds = { height: 30, padding: "0 9px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-mono)", fontSize: 12.5, colorScheme: "light dark" };
@@ -197,7 +211,7 @@ import { useIsMobile } from "../lib/useIsMobile";
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <RangeControl range={range}
-              onPreset={(k) => setEvalRange({ preset: k, from: RANGE_PRESETS[k].from, to: RANGE_PRESETS[k].to })}
+              onPreset={(k) => { const r = presetRange(k); setEvalRange({ preset: k, from: r.from, to: r.to }); }}
               onCustom={() => setEvalRange({ preset: "custom" })}
               onFrom={(v) => setEvalRange({ from: v, preset: "custom" })}
               onTo={(v) => setEvalRange({ to: v, preset: "custom" })} />
