@@ -5,7 +5,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models import ServerStatus
+# status 不再由管理员设置：服务器状态改由前端按「当前连接状态」实时呈现，
+# 故 DTO 不含 status（model 仍保留该列以兼容历史，但不暴露/不可写）。
 
 
 class ServerOut(BaseModel):
@@ -16,7 +17,6 @@ class ServerOut(BaseModel):
     ip: str
     ssh_port: int
     gpu: str
-    status: ServerStatus
     net: str
     desc: str
 
@@ -26,7 +26,6 @@ class ServerCreate(BaseModel):
     ip: str = ""
     ssh_port: int = 22
     gpu: str = ""
-    status: ServerStatus = ServerStatus.online
     net: str = "intranet"
     desc: str = ""
 
@@ -36,7 +35,6 @@ class ServerUpdate(BaseModel):
     ip: str | None = None
     ssh_port: int | None = None
     gpu: str | None = None
-    status: ServerStatus | None = None
     net: str | None = None
     desc: str | None = None
 

@@ -508,7 +508,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Reports */
+        /**
+         * List Reports
+         * @description 评选期内的组会（直接来自 meetings 表，与组会日历同源），供管理员录入。
+         */
         get: operations["list_reports_api_eval_reports_get"];
         put?: never;
         post?: never;
@@ -1354,8 +1357,6 @@ export interface components {
              * @default
              */
             gpu: string;
-            /** @default online */
-            status: components["schemas"]["ServerStatus"];
             /**
              * Net
              * @default intranet
@@ -1379,17 +1380,11 @@ export interface components {
             ssh_port: number;
             /** Gpu */
             gpu: string;
-            status: components["schemas"]["ServerStatus"];
             /** Net */
             net: string;
             /** Desc */
             desc: string;
         };
-        /**
-         * ServerStatus
-         * @enum {string}
-         */
-        ServerStatus: "online" | "busy" | "offline";
         /** ServerUpdate */
         ServerUpdate: {
             /** Name */
@@ -1400,7 +1395,6 @@ export interface components {
             ssh_port?: number | null;
             /** Gpu */
             gpu?: string | null;
-            status?: components["schemas"]["ServerStatus"] | null;
             /** Net */
             net?: string | null;
             /** Desc */

@@ -15,18 +15,19 @@ import { useIsMobile } from "../lib/useIsMobile";
 // 后端只做 PTY↔WebSocket 透传，绝不持有 root 凭据（见 webssh.py）。
 const { Button, Badge, Input, Dialog, Textarea } = NS;
 
-const STATUS = {
-  online: { c: "var(--success)", t: "在线" },
-  busy: { c: "var(--warning)", t: "高负载" },
-  offline: { c: "var(--stone-400)", t: "离线" },
-};
-
 const NET = {
   intranet: { tone: "info", label: "内网" },
   public: { tone: "accent", label: "公网" },
 };
 
-type Conn = "idle" | "connecting" | "connected" | "closed";
+// 连接状态：服务器卡片状态点据此实时呈现（不再由管理员手设）。
+type Conn = "idle" | "connecting" | "connected" | "closed" | "failed";
+
+// 卡片状态点颜色：connected→绿；connecting/failed（连不上）→黄；其余（未连/已断开）→灰
+const connDot = (conn?: Conn) =>
+  conn === "connected" ? "var(--term-green, #7FB069)"
+    : conn === "connecting" || conn === "failed" ? "var(--term-amber, #E0B04A)"
+      : "var(--text-faint)";
 
 // 真实终端：xterm.js ↔ WebSocket(/ws/ssh/{id}) ↔ 后端 PTY。
 function Terminal({ host, creds, token, onState, active }: any) {
@@ -82,16 +83,17 @@ function Terminal({ host, creds, token, onState, active }: any) {
           : { username: creds.username, password: creds.password, remember: !!creds.remember, cols: term.cols, rows: term.rows },
       ));
     };
+    let connectedOnce = false;
     ws.onmessage = (ev) => {
       if (typeof ev.data === "string") term.write(ev.data);
       else (ev.data as Blob).text().then((t) => term.write(t));
-      onState?.("connected");
+      if (!connectedOnce) { connectedOnce = true; onState?.("connected"); }
     };
     ws.onclose = () => {
       term.write("\r\n\x1b[2m[连接已关闭]\x1b[0m\r\n");
-      onState?.("closed");
+      onState?.(connectedOnce ? "closed" : "failed");  // 从未连上就关 = 连不上（黄）
     };
-    ws.onerror = () => onState?.("closed");
+    ws.onerror = () => onState?.("failed");
 
     // 键盘输入透传
     const onData = term.onData((d) => {
@@ -141,12 +143,13 @@ function Terminal({ host, creds, token, onState, active }: any) {
 }
 
 // 服务器卡片：名+IP+重连。鼠标悬停弹出说明。点击卡片选中。
-function HostCard({ hh, on, onSelect, onReconnect }: any) {
+function HostCard({ hh, on, conn, onSelect, onReconnect }: any) {
   const isMobile = useIsMobile();
   const [hover, setHover] = React.useState(false);
   const [spin, setSpin] = React.useState(false);
-  const s = STATUS[hh.status];
-  const disabled = hh.status === "offline";
+  const dot = connDot(conn);
+  const connText = conn === "connected" ? "已连接" : conn === "connecting" ? "连接中…" : conn === "failed" ? "连不上" : "未连接";
+  const disabled = false;  // 状态不再禁用卡片：任何服务器都可尝试连接
   const reconnect = (e) => {
     e.stopPropagation();
     if (disabled || spin) return;
@@ -172,7 +175,7 @@ function HostCard({ hh, on, onSelect, onReconnect }: any) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span className="cibol-mono" style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)" }}>{hh.name}</span>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: s.c, flexShrink: 0, boxShadow: hh.status === "online" ? `0 0 5px ${s.c}` : "none" }} />
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, flexShrink: 0, boxShadow: conn === "connected" ? `0 0 5px ${dot}` : "none" }} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
             <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-faint)" }}>{hh.ip}</span>
@@ -197,8 +200,8 @@ function HostCard({ hh, on, onSelect, onReconnect }: any) {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 6 }}>
             <span className="cibol-mono" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{hh.name}</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: s.c }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.c }} />{s.t}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: dot }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot }} />{connText}
             </span>
             {hh.gpu && <span className="cibol-mono" style={{ fontSize: 11.5, color: "var(--text-muted)", marginLeft: "auto" }}>{hh.gpu}</span>}
           </div>
@@ -255,9 +258,9 @@ function Server() {
   };
 
   React.useEffect(() => {
-    if (!hostName && HOSTS.length) setHostName((HOSTS.find((x) => x.status !== "offline") || HOSTS[0]).name);
+    if (!hostName && HOSTS.length) setHostName(HOSTS[0].name);
   }, [HOSTS, hostName]);
-  const host = HOSTS.find((x) => x.name === hostName) || HOSTS.find((x) => x.status !== "offline") || HOSTS[0];
+  const host = HOSTS.find((x) => x.name === hostName) || HOSTS[0];
 
   // 有账密 → 自动用当前账号连接（当前主机无会话、且未被主动断开过时）
   React.useEffect(() => {
@@ -301,7 +304,8 @@ function Server() {
     idle: { c: "var(--text-faint)", t: "未连接" },
     connecting: { c: "var(--term-amber, #E0B04A)", t: "连接中…" },
     connected: { c: "var(--term-green, #7FB069)", t: "已连接" },
-    closed: { c: "var(--danger, #E06C57)", t: "已断开" },
+    closed: { c: "var(--text-faint)", t: "已断开" },
+    failed: { c: "var(--term-amber, #E0B04A)", t: "连接失败" },
   }[conn];
 
   return (
@@ -309,7 +313,7 @@ function Server() {
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
           {HOSTS.map((hh) => (
-            <HostCard key={hh.id || hh.name} hh={hh} on={hh.name === hostName}
+            <HostCard key={hh.id || hh.name} hh={hh} on={hh.name === hostName} conn={connByHost[hh.id]}
               onSelect={() => setHostName(hh.name)}
               onReconnect={() => { setHostName(hh.name); const s = sessions[hh.id]; if (s) startSession(hh.id, s); else if (activeCred) connectSaved(hh.id, activeCred); else setCredsOpen(true); }} />
           ))}
