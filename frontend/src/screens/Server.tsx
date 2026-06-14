@@ -6,7 +6,7 @@ import "@xterm/xterm/css/xterm.css";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useServers, useCreateRequest, useServerCredential, useDeleteServerCredential } from "../api/hooks";
+import { useServers, useCreateRequest, useServerCredential } from "../api/hooks";
 import { useAccessToken } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -229,7 +229,6 @@ function Server() {
   const [reqOpen, setReqOpen] = React.useState(false);
   const [reqReason, setReqReason] = React.useState("");
   const qc = useQueryClient();
-  const delCred = useDeleteServerCredential();
 
   const startSession = (hid: string, c: { username: string; password: string; useSaved?: boolean; remember?: boolean }) => {
     suppressAuto.current.delete(hid);
@@ -255,10 +254,11 @@ function Server() {
     }
   }, [host?.id, credStatus?.saved, sessions]);
 
-  // 勾了「记住」且连上后，刷新凭据状态（让 UI 反映已保存）
+  // 勾了「记住」且连上后，刷新凭据状态（服务器页单条 + 设置页列表 → 双向同步）
   React.useEffect(() => {
     if (host && connByHost[host.id] === "connected" && sessions[host.id]?.remember) {
       qc.invalidateQueries({ queryKey: ["server-credential", host.id] });
+      qc.invalidateQueries({ queryKey: ["my-credentials"] });
     }
   }, [host?.id, connByHost]);
 
@@ -273,10 +273,6 @@ function Server() {
   };
 
   const disconnect = () => { if (host) endSession(host.id); };
-  const forgetCred = () => {
-    if (!host) return;
-    delCred.mutate(host.id, { onSuccess: () => { endSession(host.id); toast("已清除保存的账号"); } });
-  };
 
   const submitRequest = () => {
     createReq.mutate(
@@ -320,14 +316,16 @@ function Server() {
             {credStatus?.saved && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--success-text)" }}>
                 {I("lock", { size: 13 })} 已保存 {credStatus.username}
-                <button onClick={forgetCred} title="清除保存的账号" style={{ border: "none", background: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, textDecoration: "underline", padding: 0 }}>忘记</button>
               </span>
             )}
             {hasSession && <Button variant="ghost" onClick={disconnect}>断开</Button>}
-            <Button variant="ghost" onClick={() => setReqOpen(true)}>申请账号</Button>
-            <Button variant="primary" onClick={() => setCredsOpen(true)}>
-              {hasSession ? "用别的账号" : "连接"}
-            </Button>
+            {/* 已保存凭据：只保留运行时操作(断开/重连)，账号变更去「设置 → 安全」 */}
+            {credStatus?.saved
+              ? (!hasSession && <Button variant="primary" onClick={() => host && startSession(host.id, { username: credStatus.username, password: "", useSaved: true })}>连接</Button>)
+              : (<>
+                  <Button variant="ghost" onClick={() => setReqOpen(true)}>申请账号</Button>
+                  <Button variant="primary" onClick={() => setCredsOpen(true)}>{hasSession ? "用别的账号" : "连接"}</Button>
+                </>)}
           </div>
         </div>
 

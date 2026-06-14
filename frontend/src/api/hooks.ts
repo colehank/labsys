@@ -109,6 +109,41 @@ export function useServerCredential(serverId?: string) {
   });
 }
 
+export type CredItem = { server_id: string; server_name: string; username: string };
+
+// 列出「我」已保存登录凭据的服务器（设置页用；与服务器页同一份存储）
+export function useMyCredentials() {
+  return useQuery({
+    queryKey: ["my-credentials"],
+    queryFn: async (): Promise<CredItem[]> => {
+      const r = await fetch(`/api/servers/credentials`, { headers: { Authorization: `Bearer ${tokens.access}` } });
+      if (!r.ok) throw new Error("凭据列表查询失败");
+      return r.json();
+    },
+  });
+}
+
+// 失效两端查询（服务器页的单条状态 + 设置页的列表）→ 双向同步
+function invalidateCreds(qc: ReturnType<typeof useQueryClient>, serverId: string) {
+  qc.invalidateQueries({ queryKey: ["server-credential", serverId] });
+  qc.invalidateQueries({ queryKey: ["my-credentials"] });
+}
+
+export function useSetServerCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { serverId: string; username: string; password: string }) => {
+      const r = await fetch(`/api/servers/${v.serverId}/credential`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens.access}` },
+        body: JSON.stringify({ username: v.username, password: v.password }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "保存失败");
+    },
+    onSuccess: (_d, v) => invalidateCreds(qc, v.serverId),
+  });
+}
+
 export function useDeleteServerCredential() {
   const qc = useQueryClient();
   return useMutation({
@@ -118,7 +153,7 @@ export function useDeleteServerCredential() {
         headers: { Authorization: `Bearer ${tokens.access}` },
       });
     },
-    onSuccess: (_d, serverId) => qc.invalidateQueries({ queryKey: ["server-credential", serverId] }),
+    onSuccess: (_d, serverId) => invalidateCreds(qc, serverId),
   });
 }
 

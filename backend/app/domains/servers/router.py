@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.core.crypto import cred_enabled
+from app.core.crypto import cred_enabled, encrypt
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.models import Server, ServerCredential
 from app.schemas.server import ServerCreate, ServerOut, ServerUpdate
@@ -19,9 +19,35 @@ class CredentialStatus(BaseModel):
     feature: bool        # 后端是否启用了凭据加密（未配密钥则不能保存）
 
 
+class CredentialItem(BaseModel):
+    server_id: str
+    server_name: str
+    username: str
+
+
+class SetCredential(BaseModel):
+    username: str
+    password: str
+
+
 @router.get("", response_model=list[ServerOut])
 async def list_servers(_: CurrentUser, db: DbSession) -> list[Server]:
     return list((await db.execute(select(Server).order_by(Server.name))).scalars())
+
+
+@router.get("/credentials", response_model=list[CredentialItem])
+async def my_credentials(me: CurrentUser, db: DbSession) -> list[CredentialItem]:
+    """列出「我」已保存登录凭据的服务器（服务器名 + 账号；绝不返回密码）。"""
+    rows = (await db.execute(
+        select(ServerCredential, Server.name)
+        .join(Server, Server.id == ServerCredential.server_id)
+        .where(ServerCredential.user_id == me.id)
+        .order_by(Server.name)
+    )).all()
+    return [
+        CredentialItem(server_id=c.server_id, server_name=name, username=c.username)
+        for c, name in rows
+    ]
 
 
 @router.get("/{server_id}/credential", response_model=CredentialStatus)
@@ -38,6 +64,35 @@ async def get_credential(server_id: str, me: CurrentUser, db: DbSession) -> Cred
         username=cred.username if cred else "",
         feature=cred_enabled(),
     )
+
+
+@router.put("/{server_id}/credential", response_model=CredentialStatus)
+async def set_credential(server_id: str, body: SetCredential, me: CurrentUser, db: DbSession) -> CredentialStatus:
+    """直接设置「我」在某服务器的登录账号+密码（从「设置 → 服务器账密」用）。
+
+    与服务器页面「记住」保存同一份存储；密码加密落库。未配加密密钥则 503。
+    """
+    if not cred_enabled():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail="未配置凭据加密密钥")
+    if (await db.get(Server, server_id)) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="服务器不存在")
+    username = body.username.strip()
+    if not username:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="账号不能为空")
+    cred = (await db.execute(
+        select(ServerCredential).where(
+            ServerCredential.user_id == me.id,
+            ServerCredential.server_id == server_id,
+        )
+    )).scalars().first()
+    if cred is None:
+        db.add(ServerCredential(user_id=me.id, server_id=server_id,
+                                username=username, password_enc=encrypt(body.password)))
+    else:
+        cred.username = username
+        cred.password_enc = encrypt(body.password)
+    await db.commit()
+    return CredentialStatus(saved=True, username=username, feature=True)
 
 
 @router.delete("/{server_id}/credential", status_code=status.HTTP_204_NO_CONTENT)

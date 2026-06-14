@@ -3,7 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import type { Me } from "../auth";
-import { useUpdateMe } from "../api/hooks";
+import { useUpdateMe, useServers, useMyCredentials, useSetServerCredential, useDeleteServerCredential } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // My — 我的: a mature settings experience.
@@ -83,15 +83,58 @@ import { useIsMobile } from "../lib/useIsMobile";
     );
   }
 
-  function Security({ open, setOpen, me, embedded }: any) {
-    const [sshKey, setSshKey] = React.useState(me.ssh_pubkey || "");
-    const updateMe = useUpdateMe();
-    React.useEffect(() => { setSshKey(me.ssh_pubkey || ""); }, [me.ssh_pubkey]);
-    const saveSsh = () => {
-      updateMe.mutate({ ssh_pubkey: sshKey }, { onSuccess: () => { setOpen(null); toast("已保存"); } });
+  // 服务器账密：每台服务器一组账号+密码，加密保存。与「服务器」页「记住」同一份存储、双向同步。
+  function ServerCredsList() {
+    const { data: servers = [] } = useServers();
+    const { data: saved = [] } = useMyCredentials();
+    const setCred = useSetServerCredential();
+    const delCred = useDeleteServerCredential();
+    const [editing, setEditing] = React.useState<string | null>(null);
+    const [u, setU] = React.useState("");
+    const [p, setP] = React.useState("");
+    const savedMap: Record<string, any> = Object.fromEntries(saved.map((c: any) => [c.server_id, c]));
+    const startEdit = (s: any) => { setEditing(s.id); setU(savedMap[s.id]?.username || ""); setP(""); };
+    const save = (sid: string) => {
+      if (!u.trim()) { toast("请填写账号", { tone: "error" }); return; }
+      setCred.mutate({ serverId: sid, username: u.trim(), password: p },
+        { onSuccess: () => { setEditing(null); toast("已保存"); }, onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }) });
     };
+    const clear = (sid: string) => delCred.mutate(sid, { onSuccess: () => toast("已清除") });
+    if (!servers.length) return <p style={{ fontSize: 13, color: "var(--text-faint)" }}>暂无服务器。</p>;
     return (
-      <Pane title="安全" desc="登录密码与服务器访问凭据。" embedded={embedded}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {servers.map((s: any) => {
+          const c = savedMap[s.id]; const isEdit = editing === s.id;
+          return (
+            <div key={s.id} style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "11px 13px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span className="cibol-mono" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{s.name}</span>
+                <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-faint)" }}>{s.ip}</span>
+                {c ? <Badge tone="success" size="sm" dot>已设置 {c.username}</Badge> : <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>未设置</span>}
+                <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                  {c && !isEdit && <Button size="sm" variant="ghost" onClick={() => clear(s.id)} disabled={delCred.isPending}>清除</Button>}
+                  <Button size="sm" variant={isEdit ? "ghost" : "secondary"} onClick={() => isEdit ? setEditing(null) : startEdit(s)}>{isEdit ? "收起" : (c ? "更改" : "设置")}</Button>
+                </div>
+              </div>
+              {isEdit && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 11, maxWidth: 380 }}>
+                  <Input label="账号" value={u} onChange={(e: any) => setU(e.target.value)} iconLeft={I("user")} placeholder="username" />
+                  <Input label="密码" type="password" value={p} onChange={(e: any) => setP(e.target.value)} iconLeft={I("lock")} placeholder="加密保存，用于网页终端一键登录"
+                    onKeyDown={(e: any) => { if (e.key === "Enter") save(s.id); }} />
+                  <Button variant="primary" style={{ alignSelf: "flex-start" }} onClick={() => save(s.id)} disabled={setCred.isPending}>保存</Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function Security({ open, setOpen, embedded }: any) {
+    const { data: saved = [] } = useMyCredentials();
+    return (
+      <Pane title="安全" desc="登录密码与服务器账号密码。" embedded={embedded}>
         <Row icon="lock" label="登录密码" value="上次更新 · 30 天前" open={open === "pw"} onToggle={() => setOpen(open === "pw" ? null : "pw")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 380 }}>
             <Input label="当前密码" type="password" />
@@ -99,15 +142,12 @@ import { useIsMobile } from "../lib/useIsMobile";
             <Button variant="primary" style={{ alignSelf: "flex-start" }} onClick={() => setOpen(null)}>更新密码</Button>
           </div>
         </Row>
-        <Row icon="server" label="SSH 公钥"
-          valueNode={me.ssh_pubkey
-            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><span className="cibol-mono">{String(me.ssh_pubkey).slice(0, 24)}…</span><Badge tone="success" size="sm" dot>已配置</Badge></span>
-            : <span style={{ color: "var(--text-faint)" }}>未配置</span>}
+        <Row icon="server" label="服务器账密"
+          valueNode={saved.length
+            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Badge tone="success" size="sm" dot>已设置 {saved.length} 台</Badge></span>
+            : <span style={{ color: "var(--text-faint)" }}>服务器账号密码，用于网页终端一键登录</span>}
           open={open === "ssh"} onToggle={() => setOpen(open === "ssh" ? null : "ssh")} last>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 380 }}>
-            <Textarea label="SSH 公钥" value={sshKey} onChange={(e: any) => setSshKey(e.target.value)} rows={3} placeholder="ssh-ed25519 AAAA..." />
-            <Button variant="primary" style={{ alignSelf: "flex-start" }} onClick={saveSsh} disabled={updateMe.isPending}>保存凭据</Button>
-          </div>
+          <ServerCredsList />
         </Row>
       </Pane>
     );
