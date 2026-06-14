@@ -45,10 +45,12 @@ FIRST_PRESENTERS = [
 ]
 ONLINE_0 = ("https://meet.cibol.lab/grp/0614-prefrontal", "腾讯会议", "938 217 460", "ok")
 ONLINE_1 = ("https://meet.cibol.lab/grp/0621-decode", "腾讯会议", "204 668 391", "ok")
-# 轮转中预置主题：n -> [(name, topic)]
-SEEDED_TOPICS = {
-    1: [("苏沐", "基于扩散模型的神经表征解码")],
-    2: [("Mei Lin", "生成式神经解码综述"), ("顾长川", "对比学习在 EEG 表征中的应用")],
+# 在线会议（按日期）：今天起几场挂腾讯会议演示
+ONLINE_BY_DATE = {date(2026, 6, 14): ONLINE_0, date(2026, 6, 21): ONLINE_1}
+# 预置主题（按日期）：今天起几场给好看的主题
+SEEDED_TOPICS_BY_DATE = {
+    date(2026, 6, 21): [("苏沐", "基于扩散模型的神经表征解码")],
+    date(2026, 6, 28): [("Mei Lin", "生成式神经解码综述"), ("顾长川", "对比学习在 EEG 表征中的应用")],
 }
 
 ANNOUNCEMENTS = [
@@ -87,30 +89,31 @@ async def seed_lab(db: AsyncSession) -> None:
             author=author, published_at=datetime.fromisoformat(pub), expires_at=exp,
         ))
 
-    # ── 整学期排期（每周日一次，从 6/14 起，30 场）──
+    # ── 整学期排期（每周日一次，覆盖整学期）──
+    # 从学期内第一个周日 3/1 起到学期末 7/12：3/1~6/7 为已开过的过去组会（供评选录入，
+    # 与组会日历同源），6/14（今天）起为未来排期。评选期 4/19~6/7 自然落在其中。
     has_meetings = (await db.execute(select(Meeting.id))).first()
     if not has_meetings:
-        d = date(2026, 6, 14)
-        end = date(2027, 1, 16)
+        d = date(2026, 3, 1)
+        end = date(2026, 7, 12)
         n = ri = 0
-        created = 0
-        while d <= end and created < 30:
+        while d <= end:
             is_progress = n % 2 == 0
             per = 2 if n % 3 == 0 else 1
             mtype = MeetingType.progress if is_progress else MeetingType.literature
 
             # 报告人
             rows: list[tuple[str, str, str, int | None]] = []
-            if n == 0:
+            if d == date(2026, 6, 14):
                 rows = list(FIRST_PRESENTERS)
-            elif n in SEEDED_TOPICS:
-                rows = [(nm, tp, mtype.value, None) for nm, tp in SEEDED_TOPICS[n]]
+            elif d in SEEDED_TOPICS_BY_DATE:
+                rows = [(nm, tp, mtype.value, None) for nm, tp in SEEDED_TOPICS_BY_DATE[d]]
             else:
                 for k in range(per):
                     rows.append((ROSTER[ri % len(ROSTER)], "", mtype.value, None))
                     ri += 1
 
-            online = ONLINE_0 if n == 0 else ONLINE_1 if n == 1 else None
+            online = ONLINE_BY_DATE.get(d)
             m = Meeting(
                 date=d, type=mtype, place=PLACE, time=TIME,
                 online_url=online[0] if online else None,
@@ -123,7 +126,6 @@ async def seed_lab(db: AsyncSession) -> None:
                 ],
             )
             db.add(m)
-            created += 1
             d += timedelta(days=7)
             n += 1
 

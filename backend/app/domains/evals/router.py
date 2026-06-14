@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.domains.evals.engine import MEMBERS, compute_eval, rank_series_for
 from app.domains.evals.store import load_eval_data
-from app.models import Attendance, Discussion, EvalReport, Excellence, Rating
+from app.models import Attendance, Discussion, Excellence, Meeting, Rating
 from app.schemas.eval import (
     AttendanceSet,
     EvalComputeOut,
@@ -37,11 +37,11 @@ def _compute(data: dict) -> dict:
     )
 
 
-async def _report_by_key(db, key: str) -> EvalReport:
-    r = (await db.execute(select(EvalReport).where(EvalReport.key == key))).scalar_one_or_none()
-    if r is None:
+async def _meeting_by_id(db, mid: str) -> Meeting:
+    m = await db.get(Meeting, mid)
+    if m is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="组会不存在")
-    return r
+    return m
 
 
 @router.get("/compute", response_model=EvalComputeOut)
@@ -65,16 +65,21 @@ async def rank_series(
 
 @router.get("/reports", response_model=list[ReportOut])
 async def list_reports(_: CurrentUser, db: DbSession) -> list[ReportOut]:
+    """评选期内的组会（直接来自 meetings 表，与组会日历同源），供管理员录入。"""
     data = await load_eval_data(db)
+    rng = data["rng"]
     out = []
-    for r in data["reports_rows"]:
-        from datetime import date
-        d = date(2026, r.mo + 1, r.day)
+    for m in data["meetings_rows"]:
+        iso = f"{m.date.year:04d}-{m.date.month:02d}-{m.date.day:02d}"
+        if rng.get("from") and iso < rng["from"]:
+            continue
+        if rng.get("to") and iso > rng["to"]:
+            continue
         out.append(ReportOut(
-            key=r.key, mo=r.mo, day=r.day,
-            dateLabel=f"{r.mo + 1}月{r.day}日 周{_WD[d.weekday()]}",
-            type=r.type, presenters=r.presenters,
-            attendance=data["attendance"].get(r.key, {}),
+            key=m.id, mo=m.date.month - 1, day=m.date.day,
+            dateLabel=f"{m.date.month}月{m.date.day}日 周{_WD[m.date.weekday()]}",
+            type=m.type.value, presenters=[p.name for p in m.presenters],
+            attendance=data["attendance"].get(m.id, {}),
         ))
     return out
 
@@ -98,14 +103,14 @@ async def excellence(_: CurrentUser, db: DbSession, count: int = 5) -> Excellenc
 # ── 成员：提交评分（端口 store.ts submitRating）──
 @router.post("/reports/{key}/rating", status_code=status.HTTP_204_NO_CONTENT)
 async def submit_rating(key: str, body: RatingSubmit, _: CurrentUser, db: DbSession) -> None:
-    report = await _report_by_key(db, key)
+    meeting = await _meeting_by_id(db, key)
     rt = (
         await db.execute(
-            select(Rating).where(Rating.report_id == report.id, Rating.presenter == body.presenter)
+            select(Rating).where(Rating.meeting_id == meeting.id, Rating.presenter == body.presenter)
         )
     ).scalar_one_or_none()
     if rt is None:
-        rt = Rating(report_id=report.id, presenter=body.presenter, attitude=0, polish=0, raters=0)
+        rt = Rating(meeting_id=meeting.id, presenter=body.presenter, attitude=0, polish=0, raters=0)
         db.add(rt)
     n = rt.raters + 1
     rt.attitude = (rt.attitude * rt.raters + body.attitude) / n
@@ -117,11 +122,11 @@ async def submit_rating(key: str, body: RatingSubmit, _: CurrentUser, db: DbSess
             continue
         d = (
             await db.execute(
-                select(Discussion).where(Discussion.report_id == report.id, Discussion.name == name)
+                select(Discussion).where(Discussion.meeting_id == meeting.id, Discussion.name == name)
             )
         ).scalar_one_or_none()
         if d is None:
-            d = Discussion(report_id=report.id, name=name, points=0)
+            d = Discussion(meeting_id=meeting.id, name=name, points=0)
             db.add(d)
         d.points += (5 - i)
     await db.commit()
@@ -130,21 +135,21 @@ async def submit_rating(key: str, body: RatingSubmit, _: CurrentUser, db: DbSess
 # ── 管理员：录入出勤（端口 store.ts setAttendance）──
 @router.post("/reports/{key}/attendance", status_code=status.HTTP_204_NO_CONTENT)
 async def set_attendance(key: str, body: AttendanceSet, _: AdminUser, db: DbSession) -> None:
-    report = await _report_by_key(db, key)
+    meeting = await _meeting_by_id(db, key)
     a = (
         await db.execute(
-            select(Attendance).where(Attendance.report_id == report.id, Attendance.name == body.name)
+            select(Attendance).where(Attendance.meeting_id == meeting.id, Attendance.name == body.name)
         )
     ).scalar_one_or_none()
     if a is None:
-        a = Attendance(report_id=report.id, name=body.name, status=body.status)
+        a = Attendance(meeting_id=meeting.id, name=body.name, status=body.status)
         db.add(a)
     else:
         a.status = body.status
     if body.status != "present":
         d = (
             await db.execute(
-                select(Discussion).where(Discussion.report_id == report.id, Discussion.name == body.name)
+                select(Discussion).where(Discussion.meeting_id == meeting.id, Discussion.name == body.name)
             )
         ).scalar_one_or_none()
         if d is not None:

@@ -12,34 +12,27 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, UUIDMixin
 
 
-class EvalReport(UUIDMixin, Base):
-    """评选期内的一次历史组会（供管理员录入出勤/发言、成员评分）。"""
-    __tablename__ = "eval_reports"
-
-    key: Mapped[str] = mapped_column(String(32), unique=True, index=True)  # r-4-19
-    mo: Mapped[int] = mapped_column(Integer)   # 0-based
-    day: Mapped[int] = mapped_column(Integer)
-    type: Mapped[str] = mapped_column(String(16))
-    presenters: Mapped[list] = mapped_column(JSON, default=list)  # 报告人姓名列表
+# 组会唯一事实源是 meetings 表（app/models/lab.py）。评选不再单独建组会，
+# 出勤/发言/评分通过 meeting_id 直接挂到对应 Meeting，数据录入与组会日历同源。
 
 
 class Attendance(UUIDMixin, Base):
     __tablename__ = "eval_attendance"
-    report_id: Mapped[str] = mapped_column(ForeignKey("eval_reports.id", ondelete="CASCADE"), index=True)
+    meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(64), index=True)
     status: Mapped[str] = mapped_column(String(16))  # present | leave | absent
 
 
 class Discussion(UUIDMixin, Base):
     __tablename__ = "eval_discussion"
-    report_id: Mapped[str] = mapped_column(ForeignKey("eval_reports.id", ondelete="CASCADE"), index=True)
+    meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(64), index=True)
     points: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Rating(UUIDMixin, Base):
     __tablename__ = "eval_ratings"
-    report_id: Mapped[str] = mapped_column(ForeignKey("eval_reports.id", ondelete="CASCADE"), index=True)
+    meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     presenter: Mapped[str] = mapped_column(String(64), index=True)
     attitude: Mapped[float] = mapped_column(Float, default=0.0)
     polish: Mapped[float] = mapped_column(Float, default=0.0)
