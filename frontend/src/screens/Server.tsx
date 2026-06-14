@@ -1,11 +1,12 @@
 import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useServers, useCreateRequest } from "../api/hooks";
+import { useServers, useCreateRequest, useServerCredential, useDeleteServerCredential } from "../api/hooks";
 import { useAccessToken } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 
@@ -58,13 +59,12 @@ function Terminal({ host, creds, token, onState }: any) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      // 首帧握手：把用户自己的账号密码 + 初始窗口大小发给后端
-      ws.send(JSON.stringify({
-        username: creds.username,
-        password: creds.password,
-        cols: term.cols,
-        rows: term.rows,
-      }));
+      // 首帧握手：useSaved=用后端已保存的加密凭据自动连；否则送账号密码(remember 则保存)
+      ws.send(JSON.stringify(
+        creds.useSaved
+          ? { use_saved: true, cols: term.cols, rows: term.rows }
+          : { username: creds.username, password: creds.password, remember: !!creds.remember, cols: term.cols, rows: term.rows },
+      ));
     };
     ws.onmessage = (ev) => {
       if (typeof ev.data === "string") term.write(ev.data);
@@ -200,28 +200,58 @@ function Server() {
   const createReq = useCreateRequest();
 
   const [hostName, setHostName] = React.useState<string | null>(null);
-  // 账号持久化（localStorage），密码仅存内存（安全）。
+  // 账号持久化（localStorage 兜底），密码仅存内存；勾选「记住」则加密存后端。
   const [username, setUsername] = React.useState(() => localStorage.getItem("cibol.ssh.user") || "");
   const [password, setPassword] = React.useState("");
-  const [creds, setCreds] = React.useState<{ username: string; password: string } | null>(null);
+  const [remember, setRemember] = React.useState(true);
+  const [creds, setCreds] = React.useState<{ username: string; password: string; useSaved?: boolean; remember?: boolean } | null>(null);
   const [credsOpen, setCredsOpen] = React.useState(false);
   const [reqOpen, setReqOpen] = React.useState(false);
   const [reqReason, setReqReason] = React.useState("");
   const [conn, setConn] = React.useState<Conn>("idle");
   const [nonce, setNonce] = React.useState(0); // 重连：强制重挂终端
+  const autoTried = React.useRef<Set<string>>(new Set()); // 已自动连过/已手动断开的 host，不再自动连
+  const qc = useQueryClient();
+  const delCred = useDeleteServerCredential();
 
   React.useEffect(() => {
     if (!hostName && HOSTS.length) setHostName((HOSTS.find((x) => x.status !== "offline") || HOSTS[0]).name);
   }, [HOSTS, hostName]);
   const host = HOSTS.find((x) => x.name === hostName) || HOSTS.find((x) => x.status !== "offline") || HOSTS[0];
+
+  const { data: credStatus } = useServerCredential(host?.id);
+
+  // 已保存凭据 → 自动一键连接（每个 host 仅自动连一次，手动断开后不再自动连）
+  React.useEffect(() => {
+    if (host && credStatus?.saved && !creds && !autoTried.current.has(host.id)) {
+      autoTried.current.add(host.id);
+      setCreds({ username: credStatus.username, password: "", useSaved: true });
+      setNonce((n) => n + 1);
+    }
+  }, [host?.id, credStatus?.saved, creds]);
+
+  // 勾了「记住」且连上后，刷新凭据状态（让 UI 反映已保存）
+  React.useEffect(() => {
+    if (conn === "connected" && creds?.remember && host) {
+      qc.invalidateQueries({ queryKey: ["server-credential", host.id] });
+    }
+  }, [conn]);
+
   if (!HOSTS.length || !host) return null;
 
   const doConnect = () => {
     if (!username.trim()) { toast("请填写账号", { tone: "error" }); return; }
     localStorage.setItem("cibol.ssh.user", username.trim());
-    setCreds({ username: username.trim(), password });
+    setCreds({ username: username.trim(), password, remember: remember && !!credStatus?.feature });
     setCredsOpen(false);
     setNonce((n) => n + 1);
+  };
+
+  const disconnect = () => { if (host) autoTried.current.add(host.id); setCreds(null); setConn("idle"); };
+  const forgetCred = () => {
+    if (!host) return;
+    autoTried.current.add(host.id);
+    delCred.mutate(host.id, { onSuccess: () => { setCreds(null); setConn("idle"); toast("已清除保存的账号"); } });
   };
 
   const submitRequest = () => {
@@ -260,15 +290,22 @@ function Server() {
           <span className="cibol-mono" style={{ fontSize: 12.5, color: "var(--text-faint)" }}>
             {host.name} · {host.ip}:{host.ssh_port}
           </span>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            {credStatus?.saved && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--success-text)" }}>
+                {I("lock", { size: 13 })} 已保存 {credStatus.username}
+                <button onClick={forgetCred} title="清除保存的账号" style={{ border: "none", background: "none", color: "var(--text-faint)", cursor: "pointer", fontSize: 12, textDecoration: "underline", padding: 0 }}>忘记</button>
+              </span>
+            )}
+            {creds && <Button variant="ghost" onClick={disconnect}>断开</Button>}
             <Button variant="ghost" onClick={() => setReqOpen(true)}>申请账号</Button>
             <Button variant="primary" onClick={() => setCredsOpen(true)}>
-              {creds ? "重新连接" : "连接"}
+              {creds ? "用别的账号" : "连接"}
             </Button>
           </div>
         </div>
 
-        {/* 终端：填了凭据才挂载真实 WebSSH */}
+        {/* 终端：有凭据(手输或已保存自动)才挂载真实 WebSSH */}
         {creds
           ? <Terminal key={`${host.id}-${nonce}`} host={host} creds={creds} token={token} onState={setConn} />
           : (
@@ -293,8 +330,14 @@ function Server() {
         </>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Input label="账号" placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} iconLeft={I("user")} />
-          <Input label="密码" type="password" placeholder="仅本次会话使用，不会保存" value={password} onChange={(e) => setPassword(e.target.value)} iconLeft={I("lock")}
+          <Input label="密码" type="password" placeholder={remember && credStatus?.feature ? "连接成功后会加密记住" : "仅本次会话使用"} value={password} onChange={(e) => setPassword(e.target.value)} iconLeft={I("lock")}
             onKeyDown={(e) => { if (e.key === "Enter") doConnect(); }} />
+          {credStatus?.feature && (
+            <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--text-body)", cursor: "pointer", userSelect: "none" }}>
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
+              <span>记住账号密码（加密保存，下次自动连接，跨设备）</span>
+            </label>
+          )}
           <button onClick={() => { setCredsOpen(false); setReqOpen(true); }} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 13, cursor: "pointer", textAlign: "center" }}>
             还没有服务器账号？申请开通 →
           </button>

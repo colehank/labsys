@@ -21,10 +21,12 @@ import json
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from jose import JWTError
+from sqlalchemy import select
 
+from app.core.crypto import cred_enabled, decrypt, encrypt
 from app.core.db import SessionLocal
 from app.core.security import decode_token
-from app.models import Server, User
+from app.models import Server, ServerCredential, User
 
 router = APIRouter(tags=["webssh"])
 
@@ -44,23 +46,43 @@ async def webssh(ws: WebSocket, server_id: str, token: str = "") -> None:
     async with SessionLocal() as db:
         user = await db.get(User, payload.get("sub"))
         server = await db.get(Server, server_id)
-    if user is None or server is None:
-        await ws.send_text("\r\n[错误] 用户或服务器不存在。\r\n")
-        await ws.close()
-        return
+        if user is None or server is None:
+            await ws.send_text("\r\n[错误] 用户或服务器不存在。\r\n")
+            await ws.close()
+            return
+        user_id, srv_ip, srv_port, srv_name = user.id, server.ip, server.ssh_port, server.name
 
-    # ── 握手帧：拿到用户自己的 SSH 账号+密码 ──
+    # ── 握手帧：账号+密码，或 use_saved=用已保存的加密凭据自动连 ──
     try:
         raw = await asyncio.wait_for(ws.receive_text(), timeout=120)
         hs = json.loads(raw)
-        ssh_user = str(hs["username"]).strip()
-        ssh_pass = str(hs.get("password", ""))
         cols = int(hs.get("cols", 80))
         rows = int(hs.get("rows", 24))
-    except (asyncio.TimeoutError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        use_saved = bool(hs.get("use_saved", False))
+        remember = bool(hs.get("remember", False))
+        ssh_user = str(hs.get("username", "")).strip()
+        ssh_pass = str(hs.get("password", ""))
+    except (asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError):
         await ws.send_text("\r\n[错误] 握手失败：需先发送 {username,password} 帧。\r\n")
         await ws.close()
         return
+
+    # use_saved：从库里取该用户在该服务器保存的加密凭据
+    if use_saved:
+        async with SessionLocal() as db:
+            cred = (await db.execute(
+                select(ServerCredential).where(
+                    ServerCredential.user_id == user_id,
+                    ServerCredential.server_id == server_id,
+                )
+            )).scalars().first()
+        pw = decrypt(cred.password_enc) if cred else None
+        if cred is None or pw is None:
+            await ws.send_text("\r\n[错误] 没有已保存的凭据，请用账号密码连接。\r\n")
+            await ws.close()
+            return
+        ssh_user, ssh_pass = cred.username, pw
+
     if not ssh_user:
         await ws.send_text("\r\n[错误] 账号不能为空。\r\n")
         await ws.close()
@@ -71,18 +93,40 @@ async def webssh(ws: WebSocket, server_id: str, token: str = "") -> None:
     # ── 第二层：用用户本人凭据连接目标机 ──
     try:
         conn = await asyncssh.connect(
-            server.ip, port=server.ssh_port, username=ssh_user, password=ssh_pass,
+            srv_ip, port=srv_port, username=ssh_user, password=ssh_pass,
             known_hosts=None,   # 内网受信主机；如需校验可改为指定 known_hosts 文件
         )
     except asyncssh.PermissionDenied:
-        await ws.send_text(f"\r\n[认证失败] {ssh_user}@{server.name} 账号或密码错误。\r\n")
+        await ws.send_text(f"\r\n[认证失败] {ssh_user}@{srv_name} 账号或密码错误。\r\n")
         await ws.close()
         return
     except Exception as exc:  # noqa: BLE001 —— 任何连接失败都回送给终端并关闭
-        await ws.send_text(f"\r\n[连接失败] {server.name}({server.ip}:{server.ssh_port}): {exc}\r\n")
+        await ws.send_text(f"\r\n[连接失败] {srv_name}({srv_ip}:{srv_port}): {exc}\r\n")
         await ws.send_text("（请确认应用运行在可直连该目标机的内网主机上）\r\n")
         await ws.close()
         return
+
+    # 连接成功 + 用户勾选「记住」+ 配了加密密钥 → 加密保存凭据（仅保存验证过能连的）
+    if remember and not use_saved and cred_enabled():
+        try:
+            async with SessionLocal() as db:
+                existing = (await db.execute(
+                    select(ServerCredential).where(
+                        ServerCredential.user_id == user_id,
+                        ServerCredential.server_id == server_id,
+                    )
+                )).scalars().first()
+                if existing is None:
+                    db.add(ServerCredential(
+                        user_id=user_id, server_id=server_id,
+                        username=ssh_user, password_enc=encrypt(ssh_pass),
+                    ))
+                else:
+                    existing.username = ssh_user
+                    existing.password_enc = encrypt(ssh_pass)
+                await db.commit()
+        except Exception:  # noqa: BLE001 —— 保存失败不影响本次会话
+            pass
 
     async with conn:
         proc = await conn.create_process(

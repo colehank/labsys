@@ -23,6 +23,7 @@ from app.models.lab import (
 from app.models.notification import Notification
 from app.models.request import Request, RequestEvent, RequestKind
 from app.models.server import Server, ServerStatus
+from app.models.server_credential import ServerCredential
 from app.models.user import Role, User
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "RequestKind",
     "Server",
     "ServerStatus",
+    "ServerCredential",
     "Notification",
     "ApiKey",
     "EvalReport",

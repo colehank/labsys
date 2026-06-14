@@ -1,6 +1,6 @@
 // 业务数据 hooks —— 基于 react-query，消费后端各域端点。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./client";
+import { api, tokens } from "./client";
 import type { components } from "./schema";
 
 export type Config = components["schemas"]["ConfigOut"];
@@ -89,6 +89,36 @@ export function useDeleteServer() {
   return useMutation({
     mutationFn: (id: string) => unwrap(api.DELETE("/api/servers/{server_id}", { params: { path: { server_id: id } } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["servers"] }),
+  });
+}
+
+// 保存的 SSH 凭据（端点未在 openapi schema 里，走原生 fetch）
+export type CredStatus = { saved: boolean; username: string; feature: boolean };
+
+export function useServerCredential(serverId?: string) {
+  return useQuery({
+    queryKey: ["server-credential", serverId],
+    enabled: !!serverId,
+    queryFn: async (): Promise<CredStatus> => {
+      const r = await fetch(`/api/servers/${serverId}/credential`, {
+        headers: { Authorization: `Bearer ${tokens.access}` },
+      });
+      if (!r.ok) throw new Error("凭据查询失败");
+      return r.json();
+    },
+  });
+}
+
+export function useDeleteServerCredential() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (serverId: string) => {
+      await fetch(`/api/servers/${serverId}/credential`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${tokens.access}` },
+      });
+    },
+    onSuccess: (_d, serverId) => qc.invalidateQueries({ queryKey: ["server-credential", serverId] }),
   });
 }
 

@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     # ── SSH 下发 / WebSSH（P3）——内网受信主机上的特权账号 ──
     ssh_admin_user: str = "labadmin"
     ssh_admin_key_path: str = ""    # labadmin 私钥路径（docker secret 挂载）
+    # WebSSH「记住凭据」的对称加密密钥（Fernet key）；留空则禁用保存凭据
+    ssh_cred_key: str = ""
 
     # ── 腾讯会议预约（Playwright 自动化 vc.bnu.edu.cn 校园门户，非腾讯官方 API）──
     booking_url: str = "https://vc.bnu.edu.cn"
