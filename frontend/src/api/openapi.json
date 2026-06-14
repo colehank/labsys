@@ -279,6 +279,51 @@
             "HTTPBearer": []
           }
         ]
+      },
+      "put": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "Update Config",
+        "description": "保存当前学期与组会默认（管理员）。无则建、有则更新。",
+        "operationId": "update_config_api_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/announcements": {
@@ -462,6 +507,57 @@
                   },
                   "type": "array",
                   "title": "Response List Meetings Api Meetings Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/meetings/schedule": {
+      "put": {
+        "tags": [
+          "lab"
+        ],
+        "summary": "Replace Schedule",
+        "description": "整体保存组会排期（管理员）。\n\n按日期 upsert：表里有该日期则更新、没有则新增；表里多出的日期删除。\n匹配到日期的会议**保留其在线会议信息**（online_*），避免重排丢失已预约的腾讯会议。",
+        "operationId": "replace_schedule_api_meetings_schedule_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MeetingOut"
+                  },
+                  "type": "array",
+                  "title": "Response Replace Schedule Api Meetings Schedule Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -819,6 +915,117 @@
             "schema": {
               "type": "string",
               "title": "Server Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/credentials": {
+      "get": {
+        "tags": [
+          "credentials"
+        ],
+        "summary": "List Credentials",
+        "operationId": "list_credentials_api_credentials_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "credentials"
+        ],
+        "summary": "Upsert Credential",
+        "description": "新增或更新一条账密（同名即更新密码）。",
+        "operationId": "upsert_credential_api_credentials_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/credentials/{cred_id}": {
+      "delete": {
+        "tags": [
+          "credentials"
+        ],
+        "summary": "Delete Credential",
+        "operationId": "delete_credential_api_credentials__cred_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cred_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cred Id"
             }
           }
         ],
@@ -1439,6 +1646,154 @@
           }
         }
       }
+    },
+    "/api/booking/settings": {
+      "get": {
+        "tags": [
+          "booking"
+        ],
+        "summary": "Get Settings",
+        "operationId": "get_settings_api_booking_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "booking"
+        ],
+        "summary": "Update Settings",
+        "operationId": "update_settings_api_booking_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoBookUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/booking/meetings/{meeting_id}/book": {
+      "post": {
+        "tags": [
+          "booking"
+        ],
+        "summary": "Book One",
+        "operationId": "book_one_api_booking_meetings__meeting_id__book_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/booking/run-auto": {
+      "post": {
+        "tags": [
+          "booking"
+        ],
+        "summary": "Run Auto",
+        "description": "立即触发一次自动预约扫描（便于管理员手动催一次）。",
+        "operationId": "run_auto_api_booking_run_auto_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Run Auto Api Booking Run Auto Post"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1704,6 +2059,42 @@
         ],
         "title": "AttendanceSet"
       },
+      "AutoBookUpdate": {
+        "properties": {
+          "auto_book": {
+            "type": "boolean",
+            "title": "Auto Book"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auto_book"
+        ],
+        "title": "AutoBookUpdate"
+      },
+      "BookingSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "auto_book": {
+            "type": "boolean",
+            "title": "Auto Book"
+          },
+          "days_ahead": {
+            "type": "integer",
+            "title": "Days Ahead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "auto_book",
+          "days_ahead"
+        ],
+        "title": "BookingSettings"
+      },
       "ChangePasswordRequest": {
         "properties": {
           "old_password": {
@@ -1722,6 +2113,22 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest"
+      },
+      "ConfigIn": {
+        "properties": {
+          "semester": {
+            "$ref": "#/components/schemas/SemesterIn"
+          },
+          "meetingDefault": {
+            "$ref": "#/components/schemas/MeetingDefaultIn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "semester",
+          "meetingDefault"
+        ],
+        "title": "ConfigIn"
       },
       "ConfigOut": {
         "properties": {
@@ -1785,6 +2192,63 @@
           "kind"
         ],
         "title": "CreateRequest"
+      },
+      "CredCreate": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "CredCreate"
+      },
+      "CredList": {
+        "properties": {
+          "feature": {
+            "type": "boolean",
+            "title": "Feature"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CredOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "items"
+        ],
+        "title": "CredList"
+      },
+      "CredOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username"
+        ],
+        "title": "CredOut"
       },
       "EvalComputeOut": {
         "properties": {
@@ -1998,6 +2462,27 @@
         ],
         "title": "LoginRequest"
       },
+      "MeetingDefaultIn": {
+        "properties": {
+          "weekday": {
+            "type": "string",
+            "title": "Weekday",
+            "default": "周日"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time",
+            "default": ""
+          },
+          "place": {
+            "type": "string",
+            "title": "Place",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "MeetingDefaultIn"
+      },
       "MeetingDefaultOut": {
         "properties": {
           "weekday": {
@@ -2020,6 +2505,43 @@
           "place"
         ],
         "title": "MeetingDefaultOut"
+      },
+      "MeetingIn": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "进展汇报"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time",
+            "default": ""
+          },
+          "place": {
+            "type": "string",
+            "title": "Place",
+            "default": ""
+          },
+          "presenters": {
+            "items": {
+              "$ref": "#/components/schemas/PresenterIn"
+            },
+            "type": "array",
+            "title": "Presenters",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "date"
+        ],
+        "title": "MeetingIn"
       },
       "MeetingOut": {
         "properties": {
@@ -2199,6 +2721,17 @@
             ],
             "title": "Id"
           },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
           "status": {
             "anyOf": [
               {
@@ -2213,6 +2746,29 @@
         },
         "type": "object",
         "title": "OnlineMeetingOut"
+      },
+      "PresenterIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PresenterIn"
       },
       "PresenterOut": {
         "properties": {
@@ -2498,6 +3054,52 @@
         ],
         "title": "Role"
       },
+      "ScheduleIn": {
+        "properties": {
+          "meetings": {
+            "items": {
+              "$ref": "#/components/schemas/MeetingIn"
+            },
+            "type": "array",
+            "title": "Meetings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meetings"
+        ],
+        "title": "ScheduleIn"
+      },
+      "SemesterIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "short": {
+            "type": "string",
+            "title": "Short",
+            "default": ""
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "start",
+          "end"
+        ],
+        "title": "SemesterIn"
+      },
       "SemesterOut": {
         "properties": {
           "name": {
@@ -2539,6 +3141,11 @@
             "title": "Ip",
             "default": ""
           },
+          "ssh_port": {
+            "type": "integer",
+            "title": "Ssh Port",
+            "default": 22
+          },
           "gpu": {
             "type": "string",
             "title": "Gpu",
@@ -2579,6 +3186,10 @@
             "type": "string",
             "title": "Ip"
           },
+          "ssh_port": {
+            "type": "integer",
+            "title": "Ssh Port"
+          },
           "gpu": {
             "type": "string",
             "title": "Gpu"
@@ -2600,6 +3211,7 @@
           "id",
           "name",
           "ip",
+          "ssh_port",
           "gpu",
           "status",
           "net",
@@ -2639,6 +3251,17 @@
               }
             ],
             "title": "Ip"
+          },
+          "ssh_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ssh Port"
           },
           "gpu": {
             "anyOf": [

@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { STORE, toast } from "../store";
-import { useEvalCompute, useBookingSettings, useUpdateBookingSettings, useSaveSchedule } from "../api/hooks";
+import { useEvalCompute, useBookingSettings, useUpdateBookingSettings, useSaveSchedule, useConfig, useSaveConfig } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // AdminMeetings — 组会管理: frequency-based auto-scheduler + manual ordering,
@@ -207,15 +207,34 @@ import { useIsMobile } from "../lib/useIsMobile";
   function SemesterDialog({ open, onClose }: any) {
     const isMobile = useIsMobile();
     const store = STORE.use();
+    const { data: cfg } = useConfig();
+    const saveCfg = useSaveConfig();
     const [sem, setSem] = React.useState(store.semester);
     const [md, setMd] = React.useState(store.meetingDefault);
-    React.useEffect(() => { if (open) { setSem(store.semester); setMd(store.meetingDefault); } }, [open]);
+    React.useEffect(() => {
+      if (open) {
+        setSem(cfg?.semester ? { ...cfg.semester } : store.semester);
+        setMd(cfg?.meetingDefault ? { ...cfg.meetingDefault } : store.meetingDefault);
+      }
+    }, [open, cfg]);
     const ds = { height: 38, padding: "0 11px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 14, colorScheme: "light dark", width: "100%" };
-    const save = () => { STORE.set({ semester: sem, meetingDefault: md }); onClose(); };
+    const save = () => {
+      saveCfg.mutate(
+        { semester: sem, meetingDefault: { weekday: md.weekday || "周日", time: md.time || "", place: md.place || "" } },
+        {
+          onSuccess: (data) => {
+            STORE.set({ semester: data.semester, meetingDefault: data.meetingDefault });
+            toast("学期与地点已保存", { tone: "success" });
+            onClose();
+          },
+          onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }),
+        },
+      );
+    };
     return (
       <Dialog open={open} onClose={onClose} title="学期与地点" subtitle="设置当前学期范围与默认组会时间、地点（频率在上方排期设置）"
         icon={I("settings")} tone="accent" width={500}
-        footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" onClick={save}>保存设置</Button></>}>
+        footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" loading={saveCfg.isPending} onClick={save}>保存设置</Button></>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Input label="学期名称" value={sem.name} onChange={(e) => setSem({ ...sem, name: e.target.value, short: e.target.value.replace(/季?学期$/, "").trim() })} iconLeft={I("graduation-cap")} />
           <div>

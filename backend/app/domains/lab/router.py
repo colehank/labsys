@@ -49,6 +49,55 @@ async def get_config(_: CurrentUser, db: DbSession) -> ConfigOut:
     )
 
 
+class SemesterIn(BaseModel):
+    name: str
+    short: str = ""
+    start: date
+    end: date
+
+
+class MeetingDefaultIn(BaseModel):
+    weekday: str = "周日"
+    time: str = ""
+    place: str = ""
+
+
+class ConfigIn(BaseModel):
+    semester: SemesterIn
+    meetingDefault: MeetingDefaultIn
+
+
+@router.put("/config", response_model=ConfigOut)
+async def update_config(body: ConfigIn, _: AdminUser, db: DbSession) -> ConfigOut:
+    """保存当前学期与组会默认（管理员）。无则建、有则更新。"""
+    sem = (
+        await db.execute(select(Semester).where(Semester.is_current).limit(1))
+    ).scalar_one_or_none()
+    if sem is None:
+        sem = Semester(is_current=True)
+        db.add(sem)
+    sem.name = body.semester.name.strip()
+    sem.short = (body.semester.short or body.semester.name).replace("季学期", "").replace("学期", "").strip()
+    sem.start = body.semester.start
+    sem.end = body.semester.end
+
+    cfg = (await db.execute(select(LabConfig).limit(1))).scalar_one_or_none()
+    if cfg is None:
+        cfg = LabConfig()
+        db.add(cfg)
+    cfg.weekday = body.meetingDefault.weekday
+    cfg.time = body.meetingDefault.time
+    cfg.place = body.meetingDefault.place
+
+    await db.commit()
+    await db.refresh(sem)
+    await db.refresh(cfg)
+    return ConfigOut(
+        semester=SemesterOut(name=sem.name, short=sem.short, start=sem.start, end=sem.end),
+        meetingDefault=MeetingDefaultOut(weekday=cfg.weekday, time=cfg.time, place=cfg.place),
+    )
+
+
 @router.get("/announcements", response_model=list[AnnouncementOut])
 async def list_announcements(_: CurrentUser, db: DbSession) -> list[AnnouncementOut]:
     """当前生效的公告（未过期），按 pinned → level → 时间排序。"""

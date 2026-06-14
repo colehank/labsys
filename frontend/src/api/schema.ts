@@ -138,7 +138,11 @@ export interface paths {
         };
         /** Get Config */
         get: operations["get_config_api_config_get"];
-        put?: never;
+        /**
+         * Update Config
+         * @description 保存当前学期与组会默认（管理员）。无则建、有则更新。
+         */
+        put: operations["update_config_api_config_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -214,6 +218,29 @@ export interface paths {
          */
         get: operations["list_meetings_api_meetings_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meetings/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace Schedule
+         * @description 整体保存组会排期（管理员）。
+         *
+         *     按日期 upsert：表里有该日期则更新、没有则新增；表里多出的日期删除。
+         *     匹配到日期的会议**保留其在线会议信息**（online_*），避免重排丢失已预约的腾讯会议。
+         */
+        put: operations["replace_schedule_api_meetings_schedule_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -349,6 +376,44 @@ export interface paths {
         head?: never;
         /** Update Server */
         patch: operations["update_server_api_servers__server_id__patch"];
+        trace?: never;
+    };
+    "/api/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Credentials */
+        get: operations["list_credentials_api_credentials_get"];
+        put?: never;
+        /**
+         * Upsert Credential
+         * @description 新增或更新一条账密（同名即更新密码）。
+         */
+        post: operations["upsert_credential_api_credentials_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/credentials/{cred_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Credential */
+        delete: operations["delete_credential_api_credentials__cred_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/notifications": {
@@ -780,6 +845,11 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** ConfigIn */
+        ConfigIn: {
+            semester: components["schemas"]["SemesterIn"];
+            meetingDefault: components["schemas"]["MeetingDefaultIn"];
+        };
         /** ConfigOut */
         ConfigOut: {
             semester: components["schemas"]["SemesterOut"];
@@ -823,6 +893,27 @@ export interface components {
              * @default
              */
             note: string;
+        };
+        /** CredCreate */
+        CredCreate: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
+        /** CredList */
+        CredList: {
+            /** Feature */
+            feature: boolean;
+            /** Items */
+            items: components["schemas"]["CredOut"][];
+        };
+        /** CredOut */
+        CredOut: {
+            /** Id */
+            id: string;
+            /** Username */
+            username: string;
         };
         /** EvalComputeOut */
         EvalComputeOut: {
@@ -909,6 +1000,24 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** MeetingDefaultIn */
+        MeetingDefaultIn: {
+            /**
+             * Weekday
+             * @default 周日
+             */
+            weekday: string;
+            /**
+             * Time
+             * @default
+             */
+            time: string;
+            /**
+             * Place
+             * @default
+             */
+            place: string;
+        };
         /** MeetingDefaultOut */
         MeetingDefaultOut: {
             /** Weekday */
@@ -917,6 +1026,34 @@ export interface components {
             time: string;
             /** Place */
             place: string;
+        };
+        /** MeetingIn */
+        MeetingIn: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Type
+             * @default 进展汇报
+             */
+            type: string;
+            /**
+             * Time
+             * @default
+             */
+            time: string;
+            /**
+             * Place
+             * @default
+             */
+            place: string;
+            /**
+             * Presenters
+             * @default []
+             */
+            presenters: components["schemas"]["PresenterIn"][];
         };
         /** MeetingOut */
         MeetingOut: {
@@ -985,6 +1122,21 @@ export interface components {
             password?: string | null;
             /** Status */
             status?: string | null;
+        };
+        /** PresenterIn */
+        PresenterIn: {
+            /** Name */
+            name: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+            /**
+             * Kind
+             * @default
+             */
+            kind: string;
         };
         /** PresenterOut */
         PresenterOut: {
@@ -1131,6 +1283,31 @@ export interface components {
          * @enum {string}
          */
         Role: "member" | "admin";
+        /** ScheduleIn */
+        ScheduleIn: {
+            /** Meetings */
+            meetings: components["schemas"]["MeetingIn"][];
+        };
+        /** SemesterIn */
+        SemesterIn: {
+            /** Name */
+            name: string;
+            /**
+             * Short
+             * @default
+             */
+            short: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+        };
         /** SemesterOut */
         SemesterOut: {
             /** Name */
@@ -1504,6 +1681,39 @@ export interface operations {
             };
         };
     };
+    update_config_api_config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_announcements_api_announcements_get: {
         parameters: {
             query?: never;
@@ -1633,6 +1843,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeetingOut"][];
+                };
+            };
+        };
+    };
+    replace_schedule_api_meetings_schedule_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1870,6 +2113,88 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ServerOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_credentials_api_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredList"];
+                };
+            };
+        };
+    };
+    upsert_credential_api_credentials_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_credential_api_credentials__cred_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cred_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

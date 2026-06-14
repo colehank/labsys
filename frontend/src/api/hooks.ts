@@ -22,6 +22,18 @@ export function useConfig() {
   });
 }
 
+export function useSaveConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Config) => unwrap(api.PUT("/api/config", { body })),
+    onSuccess: (data) => {
+      qc.setQueryData(["config"], data);
+      qc.invalidateQueries({ queryKey: ["config"] });
+      qc.invalidateQueries({ queryKey: ["meetings"] });
+    },
+  });
+}
+
 export function useAnnouncements() {
   return useQuery({
     queryKey: ["announcements"],
