@@ -15,6 +15,7 @@ import { AdminMeetingHub } from "./screens/AdminMeetingHub";
 import { AdminServers } from "./screens/AdminServers";
 import { AdminAnnounce } from "./screens/AdminAnnounce";
 import { AdminPeople } from "./screens/AdminPeople";
+import { AdminFeedback } from "./screens/AdminFeedback";
 
 const LINKS = { mark: "/assets/mark-stone.svg" };
 
@@ -38,7 +39,7 @@ export function App() {
   const toggleAdmin = () => {
     if (!isAdmin(me)) return; // 仅真实管理员可切换管理员视图
     setAdmin((a) => !a);
-    if (admin && ["approvals", "meeting-hub", "server-admin", "announce", "people-admin"].includes(view)) setView("home");
+    if (admin && ["approvals", "meeting-hub", "server-admin", "announce", "people-admin", "feedback-admin"].includes(view)) setView("home");
   };
 
   useFeel(t);
@@ -61,6 +62,7 @@ export function App() {
       case "server-admin": return <AdminServers />;
       case "announce": return <AdminAnnounce />;
       case "people-admin": return <AdminPeople />;
+      case "feedback-admin": return <AdminFeedback />;
       default: return <Home onNavigate={navigate} me={me} />;
     }
   })();

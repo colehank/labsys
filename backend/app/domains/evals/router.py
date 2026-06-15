@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.domains.evals.engine import compute_eval, rank_series_for
 from app.domains.evals.store import load_eval_data
-from app.models import Attendance, Discussion, Excellence, Meeting, Rating
+from app.models import Attendance, Discussion, Excellence, Meeting, Rating, RatingVote
 from app.schemas.eval import (
     AttendanceSet,
     EvalComputeOut,
@@ -82,6 +82,7 @@ async def list_reports(_: CurrentUser, db: DbSession) -> list[ReportOut]:
             type=m.type.value, presenters=[p.name for p in m.presenters],
             attendance=data["attendance"].get(m.id, {}),
             speaks=data["speaks"].get(m.id, {}),
+            ratings=data["ratings"].get(m.id, {}),
         ))
     return out
 
@@ -102,35 +103,90 @@ async def excellence(_: CurrentUser, db: DbSession, count: int = 5) -> Excellenc
                          to=rng.get("to", ""), names=names, count=len(names), published=False)
 
 
-# ── 成员：提交评分（端口 store.ts submitRating）──
-@router.post("/reports/{key}/rating", status_code=status.HTTP_204_NO_CONTENT)
-async def submit_rating(key: str, body: RatingSubmit, _: CurrentUser, db: DbSession) -> None:
-    meeting = await _meeting_by_id(db, key)
-    rt = (
-        await db.execute(
-            select(Rating).where(Rating.meeting_id == meeting.id, Rating.presenter == body.presenter)
-        )
-    ).scalar_one_or_none()
-    if rt is None:
-        rt = Rating(meeting_id=meeting.id, presenter=body.presenter, attitude=0, polish=0, raters=0)
-        db.add(rt)
-    n = rt.raters + 1
-    rt.attitude = (rt.attitude * rt.raters + body.attitude) / n
-    rt.polish = (rt.polish * rt.raters + body.polish) / n
-    rt.raters = n
-    # 讨论 Top5：第 i 名 +(5-i) 分
-    for i, name in enumerate(body.top5):
-        if not name:
-            continue
-        d = (
-            await db.execute(
-                select(Discussion).where(Discussion.meeting_id == meeting.id, Discussion.name == name)
-            )
-        ).scalar_one_or_none()
+async def _recompute_meeting_eval(db, meeting_id: str) -> None:
+    """据全部选票重算该组会的报告人评分聚合 + 讨论得分（幂等，可安全重复调用）。
+
+    评分聚合 = 各报告人选票的态度/精良均值与人数。
+    讨论得分 = 按 rater 去重后，每张 Top5 第 i 名 +(5-i) 分，汇总到各姓名。
+    讨论行的 speaks（管理员录入）原样保留，只重写 points。
+    """
+    votes = list((await db.execute(
+        select(RatingVote).where(RatingVote.meeting_id == meeting_id)
+    )).scalars())
+
+    # —— 报告人评分聚合 ——
+    agg: dict[str, list[float]] = {}
+    for v in votes:
+        a = agg.setdefault(v.presenter, [0.0, 0.0, 0])
+        a[0] += v.attitude
+        a[1] += v.polish
+        a[2] += 1
+    existing = {
+        r.presenter: r for r in (await db.execute(
+            select(Rating).where(Rating.meeting_id == meeting_id)
+        )).scalars()
+    }
+    for presenter, (asum, psum, n) in agg.items():
+        rt = existing.get(presenter)
+        if rt is None:
+            rt = Rating(meeting_id=meeting_id, presenter=presenter)
+            db.add(rt)
+        rt.attitude = asum / n if n else 0.0
+        rt.polish = psum / n if n else 0.0
+        rt.raters = n
+    # 已无选票的报告人评分归零（撤回场景）
+    for presenter, rt in existing.items():
+        if presenter not in agg:
+            rt.attitude = rt.polish = 0.0
+            rt.raters = 0
+
+    # —— 讨论得分（每个 rater 的 Top5 只计一次，取其任一张选票的 top5）——
+    by_rater: dict[str, list] = {}
+    for v in votes:
+        by_rater.setdefault(v.rater_id, v.top5 or [])
+    points: dict[str, int] = {}
+    for top5 in by_rater.values():
+        for i, name in enumerate(top5[:5]):
+            if name:
+                points[name] = points.get(name, 0) + (5 - i)
+    disc = {
+        d.name: d for d in (await db.execute(
+            select(Discussion).where(Discussion.meeting_id == meeting_id)
+        )).scalars()
+    }
+    for name, pts in points.items():
+        d = disc.get(name)
         if d is None:
-            d = Discussion(meeting_id=meeting.id, name=name, points=0)
+            d = Discussion(meeting_id=meeting_id, name=name, points=0)
             db.add(d)
-        d.points += (5 - i)
+        d.points = pts
+    for name, d in disc.items():
+        if name not in points:
+            d.points = 0  # 保留 speaks，仅清讨论得分
+
+
+# ── 成员：提交评分（每人对每位报告人只计一次，重复提交即覆盖）──
+@router.post("/reports/{key}/rating", status_code=status.HTTP_204_NO_CONTENT)
+async def submit_rating(key: str, body: RatingSubmit, me: CurrentUser, db: DbSession) -> None:
+    meeting = await _meeting_by_id(db, key)
+    # 不可给自己评分
+    if me.name == body.presenter:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="不能给自己评分")
+    vote = (await db.execute(
+        select(RatingVote).where(
+            RatingVote.meeting_id == meeting.id,
+            RatingVote.rater_id == me.id,
+            RatingVote.presenter == body.presenter,
+        )
+    )).scalar_one_or_none()
+    if vote is None:
+        vote = RatingVote(meeting_id=meeting.id, rater_id=me.id, presenter=body.presenter)
+        db.add(vote)
+    vote.attitude = body.attitude
+    vote.polish = body.polish
+    vote.top5 = [n for n in body.top5 if n]
+    await db.flush()
+    await _recompute_meeting_eval(db, meeting.id)
     await db.commit()
 
 

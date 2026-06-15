@@ -3,7 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import type { Me } from "../auth";
-import { useUpdateMe, useMyCredentials, useSaveCredential, useDeleteCredential, useEvalCompute, useChangePassword } from "../api/hooks";
+import { useUpdateMe, useMyCredentials, useSaveCredential, useDeleteCredential, useEvalCompute, useChangePassword, useSubmitFeedback } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // My — 我的: a mature settings experience.
@@ -319,15 +319,25 @@ import { useIsMobile } from "../lib/useIsMobile";
   }
 
   function Feedback({ embedded }: any) {
+    const [text, setText] = React.useState("");
+    const submitFb = useSubmitFeedback();
+    const send = () => {
+      const body = text.trim();
+      if (!body || submitFb.isPending) return;
+      submitFb.mutate(body, {
+        onSuccess: () => { toast("已匿名提交，谢谢你的反馈"); setText(""); },
+        onError: () => toast("提交失败，请重试", { tone: "error" }),
+      });
+    };
     return (
       <Pane title="匿名意见" desc="完全匿名，PI 看不到是谁提的。" embedded={embedded}>
         <div style={{ padding: "8px 0 4px" }}>
-          <Textarea placeholder="对组会安排、实验室运行有什么想法？" rows={5} maxLength={500} />
+          <Textarea placeholder="对组会安排、实验室运行有什么想法？" rows={5} maxLength={500} value={text} onChange={(e: any) => setText(e.target.value)} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
             <span style={{ fontSize: 12.5, color: "var(--text-faint)", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Icon name="shield-check" style={{ width: 14, height: 14 }} />提交后不记录任何身份信息
             </span>
-            <Button variant="primary" iconLeft={I("send")}>匿名提交</Button>
+            <Button variant="primary" iconLeft={I("send")} disabled={!text.trim() || submitFb.isPending} onClick={send}>匿名提交</Button>
           </div>
         </div>
       </Pane>

@@ -19,6 +19,7 @@ import { useIsMobile } from "../lib/useIsMobile";
   // 取消某个日期 → 该日期不再开会，报告人队列顺延到后续日期（必要时在末尾追加补开日期）。
   function genSchedule(startISO, intervalDays, perSession, endISO, roster, weekday = null) {
     const slots = [], groups = [];
+    if (!roster || !roster.length) return { slots, groups };  // 无成员时不生成，避免 idx % 0 = NaN 崩溃
     let d = new Date(startISO + "T00:00:00");
     // 指定了周几（每周/每两周模式）→ 把起始日对齐到 ≥ start 的第一个该周几，
     // 之后按 interval（7/14 的倍数）累加，所有场次都落在同一周几。
@@ -46,7 +47,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       const iso = `${m.y}-${String(m.mo + 1).padStart(2, "0")}-${String(m.day).padStart(2, "0")}`;
       slots.push({ id: "s" + (UID++), iso, date: m.dateLabel || fmt(new Date(iso + "T00:00:00")), cancelled: false });
       groups.push({
-        id: "g" + (UID++), time: m.time || "", place: m.place || "",
+        id: "g" + (UID++), time: m.time || "", place: m.place || "", type: m.type || "",
         presenters: (m.presenters || []).map((p) => ({ name: p.name, topic: p.topic || "", skipped: false })),
       });
     });
@@ -317,7 +318,11 @@ import { useIsMobile } from "../lib/useIsMobile";
       }
     }, [meetings, roster]);
 
-    const regenerate = () => { const g = genSchedule(start, interval, perSession, end, roster, freq === "custom" ? null : weekday); setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id); };
+    const regenerate = () => {
+      if (!roster.length) { toast("暂无成员，无法生成排期", { tone: "error" }); return; }
+      const g = genSchedule(start, interval, perSession, end, roster, freq === "custom" ? null : weekday);
+      setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
+    };
     const patchGroup = (gid, fn) => setGroups((gs) => gs.map((g) => (g.id === gid ? fn(g) : g)));
     const setTopic = (gid, pi, v) => patchGroup(gid, (g) => ({ ...g, presenters: g.presenters.map((p, i) => (i === pi ? { ...p, topic: v } : p)) }));
     const toggleSkip = (gid, pi) => patchGroup(gid, (g) => ({ ...g, presenters: g.presenters.map((p, i) => (i === pi ? { ...p, skipped: !p.skipped } : p)) }));
@@ -353,7 +358,8 @@ import { useIsMobile } from "../lib/useIsMobile";
       const meetings = timeline
         .filter((c: any) => c.type === "meeting" && c.slot && !c.slot.pending && c.slot.iso && c.slot.iso !== "9999")
         .map((c: any, idx: number) => {
-          const kind = idx % 2 === 0 ? "进展汇报" : "文献精读";
+          // 优先沿用该场已有类型；仅新建草稿（无 type）才按时间线奇偶兜底，避免重排后类型乱跳。
+          const kind = c.group.type || (idx % 2 === 0 ? "进展汇报" : "文献精读");
           return {
             date: c.slot.iso,
             type: kind,

@@ -417,6 +417,25 @@ export function useCreateRequest() {
   });
 }
 
+// ── 匿名意见 ──
+export function useSubmitFeedback() {
+  return useMutation({
+    mutationFn: (body: string) => unwrap(api.POST("/api/feedback", { body: { body } })),
+  });
+}
+
+export function useFeedback(enabled = true) {
+  return useQuery({ queryKey: ["feedback"], queryFn: () => unwrap(api.GET("/api/feedback")), enabled });
+}
+
+export function useMarkFeedbackRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.POST("/api/feedback/{fb_id}/read", { params: { path: { fb_id: id } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["feedback"] }),
+  });
+}
+
 export function useAdvanceRequest() {
   const qc = useQueryClient();
   return useMutation({

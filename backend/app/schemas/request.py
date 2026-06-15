@@ -41,6 +41,9 @@ class CreateRequest(BaseModel):
     detail: str = ""
     reason: str = ""
     note: str = ""
+    # 对调专用：发起人/对方各自所在组会的 id，接受后据此真正互换报告人。
+    fromMeetingId: str | None = None
+    toMeetingId: str | None = None
 
 
 class AdvanceRequest(BaseModel):

@@ -236,7 +236,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     };
 
     // 真实数据：待审批 = /requests/pending；历史 = /requests/processed。
-    const fmtWhen = (r) => { const h = r.history[r.history.length - 1]; const x = new Date(h.at); return `${x.getMonth() + 1}月${x.getDate()}日`; };
+    const fmtWhen = (r) => { const h = r.history?.[r.history.length - 1]; if (!h?.at) return ""; const x = new Date(h.at); return `${x.getMonth() + 1}月${x.getDate()}日`; };
     const pendingItems = pending.map(toCard);
     const resolved = processed.map((r) => ({ q: toCard(r), state: r.status === "approved" ? "approve" : "reject", when: fmtWhen(r) }));
     const historyItems = resolved;

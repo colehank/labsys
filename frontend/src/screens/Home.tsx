@@ -7,7 +7,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 import type { Me } from "../auth";
 
 // Home dashboard — personal overview. Exports to window.CIBOL_Screens.Home
-  const { Card, Button, Badge, Avatar, ScoreDots, EmptyState } = NS;
+  const { Card, Button, Badge, Avatar, ScoreDots, EmptyState, ScreenState } = NS;
 
   const ANN_LEVELS = {
     info: { label: "通知", tone: "info", icon: "info" },
@@ -113,7 +113,8 @@ import type { Me } from "../auth";
     const { data: myReqs = [] } = useMyRequests();
     const advance = useAdvanceRequest();
     const incoming = myReqs.find((r) => r.incoming && r.kind === "swap" && r.status === "pending");
-    if (!cfg || !m) return null;
+    // cfg 未就绪 → 加载态；m 为空（本学期组会已结束/暂未排期）仍渲染首页，仅组会卡显示空态。
+    if (!cfg) return <ScreenState loading />;
     return (
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "16px 14px 28px" : "28px 32px 48px" }}>
         {/* greeting */}
@@ -141,6 +142,13 @@ import type { Me } from "../auth";
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px,1fr))", gap: 20, alignItems: "stretch" }}>
           {/* next meeting */}
+          {!m ? (
+            <Card eyebrow="NEXT MEETING" title="暂无下一场组会"
+              style={{ height: "100%", display: "flex", flexDirection: "column" }}
+              action={<Button size="sm" variant="secondary" onClick={() => onNavigate("meetings")}>查看组会</Button>}>
+              <EmptyState compact title="本学期组会已全部结束" description="管理员排定新一场后将在此显示。" />
+            </Card>
+          ) : (
           <Card eyebrow="NEXT MEETING" title={m.date}
             style={{ height: "100%", display: "flex", flexDirection: "column" }}
             bodyStyle={{ flex: 1, minHeight: 0, maxHeight: 460, overflowY: "auto" }}
@@ -171,6 +179,7 @@ import type { Me } from "../auth";
               ))}
             </div>
           </Card>
+          )}
 
           {/* todo / pending */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20, height: "100%" }}>

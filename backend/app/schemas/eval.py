@@ -64,13 +64,14 @@ class ReportOut(BaseModel):
     presenters: list[str]
     attendance: dict   # name -> present|leave|absent
     speaks: dict = {}  # name -> 发言次数（管理员录入）
+    ratings: dict = {}  # presenter -> {attitude, polish, raters}（成员匿名提交聚合）
 
 
 class RatingSubmit(BaseModel):
     presenter: str
-    attitude: float
-    polish: float
-    top5: list[str] = []
+    attitude: float = Field(ge=0, le=5)  # 评分区间 0~5，拒绝越界刷分
+    polish: float = Field(ge=0, le=5)
+    top5: list[str] = Field(default=[], max_length=5)
 
 
 class AttendanceSet(BaseModel):

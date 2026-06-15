@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UUIDMixin
@@ -32,12 +32,26 @@ class Discussion(UUIDMixin, Base):
 
 
 class Rating(UUIDMixin, Base):
+    """报告人评分聚合（态度/精良/评分人数）—— 由 RatingVote 重算得出，只读快照。"""
     __tablename__ = "eval_ratings"
     meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     presenter: Mapped[str] = mapped_column(String(64), index=True)
     attitude: Mapped[float] = mapped_column(Float, default=0.0)
     polish: Mapped[float] = mapped_column(Float, default=0.0)
     raters: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class RatingVote(UUIDMixin, Base):
+    """单张评分选票（成员匿名提交）。唯一约束 (meeting, rater, presenter) 保证每人对每位报告人
+    只计一次 —— 重复提交即覆盖，杜绝刷分。讨论 Top5 也存于此，按 rater 去重后重算讨论得分。"""
+    __tablename__ = "eval_rating_votes"
+    __table_args__ = (UniqueConstraint("meeting_id", "rater_id", "presenter", name="uq_vote_once"),)
+    meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
+    rater_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    presenter: Mapped[str] = mapped_column(String(64), index=True)
+    attitude: Mapped[float] = mapped_column(Float, default=0.0)
+    polish: Mapped[float] = mapped_column(Float, default=0.0)
+    top5: Mapped[list] = mapped_column(JSON, default=list)  # 讨论 Top5 姓名（第 i 名 +(5-i) 分）
 
 
 class PeerBaseline(UUIDMixin, Base):

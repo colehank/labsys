@@ -19,7 +19,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 //     右下「③进展表现」— 管理员对入选者拖拽主观排序，进展名次由顺序得出
 //   计算: 组会表现 = 四项归一分的加权平均；终极排名 = 组会表现名次 与 进展名次 的 Borda 平均合并。
 //   每个面板固定高度、内部滚动，整页一屏可览。
-  const { Card, Button, Avatar, Badge, Dialog } = NS;
+  const { Card, Button, Avatar, Badge, Dialog, ScreenState } = NS;
 
   const L1 = [
     { key: "attitude", nk: "nAttitude", wk: "attitude", label: "报告态度", short: "报告态度", color: "var(--terracotta-500)", raw: (r) => r.attitude.toFixed(1) },
@@ -129,9 +129,11 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   function AdminStats() {
     const isMobile = useIsMobile();
-    const { data: evData } = useEvalCompute();
+    const evQ = useEvalCompute();
+    const cfgQ = useEvalConfig();
+    const { data: evData } = evQ;
     const { data: meUser } = useMe();
-    const { data: cfg } = useEvalConfig();
+    const { data: cfg } = cfgQ;
     const { data: excellence } = useExcellence();
     const updateConfig = useUpdateEvalConfig();
     const publishExc = usePublishExcellence();
@@ -140,7 +142,9 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [pubCount, setPubCount] = React.useState(5);
     const [justPublished, setJustPublished] = React.useState(false);
 
-    if (!evData || !cfg) return null;
+    if (evQ.isLoading || cfgQ.isLoading) return <ScreenState loading />;
+    if (evQ.isError || cfgQ.isError) return <ScreenState error onRetry={() => { evQ.refetch(); cfgQ.refetch(); }} />;
+    if (!evData || !cfg) return <ScreenState error onRetry={() => { evQ.refetch(); cfgQ.refetch(); }} />;
 
     const w = cfg.weights as Record<string, number>;
     const f = cfg.filters as Record<string, number>;
@@ -194,11 +198,37 @@ import { useIsMobile } from "../lib/useIsMobile";
     const pubN = Math.max(1, Math.min(pubCount | 0, ev.merged.length));
     const pubPreview = ev.merged.slice(0, pubN);
     const doPublish = () => {
-      publishExc.mutate(pubN);
-      setPubOpen(false);
-      setJustPublished(true);
-      toast("已发布 · 优秀名单前 " + pubN + " 名");
-      setTimeout(() => setJustPublished(false), 2600);
+      if (publishExc.isPending) return;
+      publishExc.mutate(pubN, {
+        onSuccess: () => {
+          setPubOpen(false);
+          setJustPublished(true);
+          toast("已发布 · 优秀名单前 " + pubN + " 名");
+          setTimeout(() => setJustPublished(false), 2600);
+        },
+        onError: () => toast("发布失败，请重试", { tone: "error" }),
+      });
+    };
+
+    // 导出当前区间表现排名为 CSV（与表格同源，BOM 头保证 Excel 中文不乱码）。
+    const exportCSV = () => {
+      const header = ["终极名次", "成员", "报告态度", "制作精良", "出勤率", "讨论参与", "组会名次", "是否入选"];
+      const lines = [header.join(",")];
+      topRows.forEach((r: any) => {
+        lines.push([
+          r.finalRank ?? "—", r.name,
+          (r.attitude ?? 0).toFixed(1), (r.polish ?? 0).toFixed(1),
+          (r.attRate ?? 0) + "%", r.discuss ?? 0,
+          r.inSurv ? "#" + r.mRank : "—", r.inSurv ? "是" : "否",
+        ].join(","));
+      });
+      const csv = "﻿" + lines.join("\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = `表现统计_${range.from}_${range.to}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("已导出 CSV");
     };
 
     return (
@@ -215,7 +245,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               onCustom={() => setEvalRange({ preset: "custom" })}
               onFrom={(v) => setEvalRange({ from: v, preset: "custom" })}
               onTo={(v) => setEvalRange({ to: v, preset: "custom" })} />
-            <Button size="sm" variant="ghost" iconLeft={I("download")}>导出</Button>
+            <Button size="sm" variant="ghost" iconLeft={I("download")} onClick={exportCSV} disabled={topRows.length === 0}>导出</Button>
             <Button size="sm" variant="primary" iconLeft={I("award")} onClick={() => { setPubCount(latest ? latest.count : 5); setPubOpen(true); }} disabled={ev.merged.length === 0}>发布优秀</Button>
           </div>
         </div>

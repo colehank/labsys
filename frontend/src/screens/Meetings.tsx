@@ -373,7 +373,8 @@ import type { Me } from "../auth";
   }
 
   function Rating() {
-    const { data: reports = [] } = useEvalReports();
+    const reportsQ = useEvalReports();
+    const reports = reportsQ.data ?? [];
     const { data: ev } = useEvalCompute();
     const submitRating = useSubmitRating();
     const [submitted, setSubmitted] = React.useState<number[]>([]);
@@ -382,7 +383,11 @@ import type { Me } from "../auth";
     const presenters = (meeting?.presenters || []).map((name) => ({ name, topic: "" }));
     const allNames = (ev?.rows || []).map((r) => r.name);
     const pending = presenters.map((p, i) => ({ p, i })).filter(({ i }) => !submitted.includes(i));
-    if (!meeting) return null;
+    if (reportsQ.isLoading) return <ScreenState loading />;
+    if (reportsQ.isError) return <ScreenState error onRetry={() => reportsQ.refetch()} />;
+    if (!meeting) {
+      return <EmptyState title="暂无可评分的组会" description="评选期内还没有已结束的组会，组会结束后即可在此为报告人打分。" />;
+    }
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: "var(--accent-soft)", border: "1px solid var(--accent-soft-bd)", borderRadius: "var(--radius-md)" }}>
@@ -393,7 +398,7 @@ import type { Me } from "../auth";
         {pending.map(({ p, i }) => (
           <ReportRating key={i} index={i} presenter={p}
             candidates={allNames.filter((n) => n !== p.name)}
-            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => [...s, i]); } }); }} />
+            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => [...s, i]); }, onError: () => toast("提交失败，请重试", { tone: "error" }) }); }} />
         ))}
 
         {pending.length === 0 && (
@@ -539,7 +544,8 @@ import type { Me } from "../auth";
     const isMobile = useIsMobile();
     const { data: ev } = useEvalCompute();
     const [open, setOpen] = React.useState(false);
-    const row = ev?.rows.find((r) => r.name === me.name) || ev?.rows[0];
+    // 仅取「我」本人的行；找不到（未纳入本期评分名册）则不展示，绝不回退到他人数据冒充。
+    const row = ev?.rows.find((r) => r.name === me.name);
     if (!ev || !row) return null;
     const w: any = ev.weights;
     const wSum = (w.attitude + w.polish + w.attendance + w.discussion) || 1;
@@ -708,7 +714,7 @@ import type { Me } from "../auth";
     const peerSessions = meetingsData
       .filter((s) => s.presenters.some((p) => p.name !== meName))
       .flatMap((s) => s.presenters.filter((p) => p.name !== meName).map((p) => ({
-        id: `${s.id}__${p.name}`, date: s.dateLabel, mdLabel: s.mdLabel, type: s.type, name: p.name,
+        id: `${s.id}__${p.name}`, meetingId: s.id, date: s.dateLabel, mdLabel: s.mdLabel, type: s.type, name: p.name,
         topic: p.topic || "主题待定",
       })))
       .slice(0, 12);
@@ -717,7 +723,7 @@ import type { Me } from "../auth";
     const submit = () => {
       if (kind === "swap") {
         if (!picked) return;
-        createReq.mutate({ kind: "swap", fromDate: mine, toName: picked.name, toDate: picked.date, topic: picked.topic, reason, note: `已向 ${picked.name} 发送对调请求` }, { onSuccess: () => toast("已发送对调请求") });
+        createReq.mutate({ kind: "swap", fromDate: mine, toName: picked.name, toDate: picked.date, topic: picked.topic, reason, note: `已向 ${picked.name} 发送对调请求`, fromMeetingId: (session && session.id) || null, toMeetingId: picked.meetingId }, { onSuccess: () => toast("已发送对调请求"), onError: () => toast("发送失败，请重试", { tone: "error" }) });
       } else if (kind === "absence") {
         createReq.mutate({ kind: "absence", fromDate: mine, reason, note: "已提交轮空请假，等待管理员审批" }, { onSuccess: () => toast("已提交请假申请") });
       } else return;

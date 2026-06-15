@@ -80,8 +80,8 @@ import { useIsMobile } from "../lib/useIsMobile";
 
     const r = reports[sel];
 
-    // 报告人评分（态度/精良）由成员匿名提交，此处只读；后端暂未下发明细，缺省为空。
-    const ratings: Record<string, { attitude: number; polish: number; raters: number }> = {};
+    // 报告人评分（态度/精良）由成员匿名提交、后端聚合后随 report 下发，此处只读展示。
+    const ratings = ((r?.ratings || {}) as Record<string, { attitude: number; polish: number; raters: number }>);
     const cancelled = false;
 
     // 当前报告汇总

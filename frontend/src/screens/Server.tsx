@@ -13,7 +13,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 // Server — 服务器：真实 WebSSH 终端。
 // 设计：网页终端 = 用户本人的 SSH 会话，账号密码由用户自己输入，
 // 后端只做 PTY↔WebSocket 透传，绝不持有 root 凭据（见 webssh.py）。
-const { Button, Badge, Input, Dialog, Textarea } = NS;
+const { Button, Badge, Input, Dialog, Textarea, ScreenState, EmptyState } = NS;
 
 const NET = {
   intranet: { tone: "info", label: "内网" },
@@ -214,7 +214,8 @@ function HostCard({ hh, on, conn, onSelect, onReconnect }: any) {
 
 function Server() {
   const isMobile = useIsMobile();
-  const { data: HOSTS = [] } = useServers();
+  const serversQ = useServers();
+  const HOSTS = serversQ.data ?? [];
   const token = useAccessToken();
   const createReq = useCreateRequest();
 
@@ -276,7 +277,16 @@ function Server() {
     }
   }, [host?.id, connByHost]);
 
-  if (!HOSTS.length || !host) return null;
+  // 加载中 / 失败 / 真空三态 —— 不再以 return null 渲染空白页。
+  if (serversQ.isLoading) return <ScreenState loading />;
+  if (serversQ.isError) return <ScreenState error onRetry={() => serversQ.refetch()} />;
+  if (!HOSTS.length || !host) {
+    return (
+      <div style={{ maxWidth: 1060, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "24px 32px 48px" }}>
+        <EmptyState title="暂无服务器" description="管理员还没有登记任何服务器，登记后即可在此连接。" />
+      </div>
+    );
+  }
 
   const doConnect = () => {
     if (!username.trim()) { toast("请填写账号", { tone: "error" }); return; }

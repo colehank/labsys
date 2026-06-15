@@ -22,6 +22,7 @@ const ADMIN_NAV = [
   { id: "people-admin", label: "人员管理", icon: I("users-round") },
   { id: "server-admin", label: "服务器管理", icon: I("server-cog") },
   { id: "announce", label: "通知公告", icon: I("megaphone") },
+  { id: "feedback-admin", label: "匿名意见", icon: I("message-circle") },
 ];
 
 // Avatar → popout menu (通知 / 设置), opens the corresponding panel dialog.
