@@ -281,11 +281,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               </Panel>
               {/* step2 评优过滤（默认收起）*/}
               <Panel step="2" title="评优过滤" sub="筛出入选者" collapsible open={w2Open} onToggle={() => setW2Open((o) => !o)}
-                style={{ flex: 1, minHeight: 0 }}
-                right={<div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", background: "var(--accent-soft)", borderRadius: "var(--radius-pill)", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  <span style={{ width: 13, height: 13, display: "inline-flex", color: "var(--accent-text)" }}>{I("users-round", { size: 13 })}</span>
-                  <span style={{ fontSize: 12, color: "var(--accent-text)" }}>入选 <b className="cibol-mono">{ev.survivors.length}</b> 人</span>
-                </div>}>
+                style={{ flex: 1, minHeight: 0 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px" }}>
                   <FilterField label="报告态度" color={L1[0].color} value={f.attitudeMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ attitudeMin: v })} />
                   <FilterField label="制作精良度" color={L1[1].color} value={f.polishMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ polishMin: v })} />
