@@ -145,7 +145,8 @@ import { useIsMobile } from "../lib/useIsMobile";
     const { data: excellence } = useExcellence();
     const updateConfig = useUpdateEvalConfig();
     const publishExc = usePublishExcellence();
-    const [drag, setDrag] = React.useState(null);
+    const [dragItem, setDragItem] = React.useState<string | null>(null);   // 正在拖拽的成员名
+    const [liveOrder, setLiveOrder] = React.useState<string[] | null>(null); // 拖拽中的临时序列（实时挤压预览）
     // 组会权重 + 评选过滤收进「设置」弹窗（本次评选标准）
     const [settingsOpen, setSettingsOpen] = React.useState(false);
     // 右侧汇总表：默认只显示排名，点「明细」在后面展开各维得分
@@ -175,7 +176,6 @@ import { useIsMobile } from "../lib/useIsMobile";
     const setEvalWeights = (patch: any) => updateConfig.mutate(nextConfig({ weights: { ...cfg.weights, ...patch } }));
     const setEvalFilters = (patch: any) => updateConfig.mutate(nextConfig({ filters: { ...cfg.filters, ...patch } }));
     const setEvalRange = (patch: any) => updateConfig.mutate(nextConfig({ range: { ...cfg.range, ...patch } }));
-    const setProgressOrder = (arr: string[] | null) => updateConfig.mutate(nextConfig({ progress_order: arr }));
     const resetProgressOrder = () => updateConfig.mutate(nextConfig({ progress_order: null }));
 
     // —— 从后端 rows / merged 派生 survivors / order / mRankAmong（与本地计算等价）——
@@ -197,13 +197,27 @@ import { useIsMobile } from "../lib/useIsMobile";
       ...ev.rows.filter((r) => !survSet.has(r.name)).map((r) => ({ ...r, finalRank: null, mRank: null, pRank: null, inSurv: false })),
     ];
 
-    const onDrop = (target) => {
-      if (drag == null || drag === target) { setDrag(null); return; }
-      const newOrder = ev.order.slice();
-      const [moved] = newOrder.splice(drag, 1);
-      newOrder.splice(target, 0, moved);
-      setProgressOrder(newOrder);
-      setDrag(null);
+    // 拖拽中显示临时序列（实时挤压），未拖拽时用服务端计算的 order
+    const displayOrder = liveOrder ?? ev.order;
+    const onDragStartItem = (name: string) => { setDragItem(name); setLiveOrder(ev.order.slice()); };
+    // 拖到第 j 行：把被拖项移动到 j，其余实时顺移让位
+    const onDragEnterItem = (j: number) => {
+      setLiveOrder((cur) => {
+        if (!cur || dragItem == null) return cur;
+        const from = cur.indexOf(dragItem);
+        if (from === -1 || from === j) return cur;
+        const arr = cur.slice();
+        const [m] = arr.splice(from, 1);
+        arr.splice(j, 0, m);
+        return arr;
+      });
+    };
+    const endDrag = () => { setDragItem(null); setLiveOrder(null); };
+    const onDropItem = () => {
+      if (liveOrder && dragItem != null) {
+        updateConfig.mutate(nextConfig({ progress_order: liveOrder }), { onSettled: () => setLiveOrder(null) });
+      }
+      setDragItem(null);
     };
 
     const latest = excellence && excellence.published ? excellence : null;
@@ -271,25 +285,27 @@ import { useIsMobile } from "../lib/useIsMobile";
           <Panel title="进展排序" sub="拖拽调整名次"
             right={progressOrder ? <Button size="sm" variant="ghost" iconLeft={I("rotate-ccw")} onClick={() => resetProgressOrder()}>重置</Button> : null}>
             <div style={{ padding: 8 }}>
-              {ev.order.length === 0 && (
+              {displayOrder.length === 0 && (
                 <div style={{ padding: "28px 18px", textAlign: "center", fontSize: 12.5, color: "var(--text-faint)" }}>当前过滤条件下无人入选，请放宽下限。</div>
               )}
-              {ev.order.map((name, i) => {
+              {displayOrder.map((name, i) => {
                 const row = ev.survivors.find((s) => s.name === name);
                 const me = !!meUser && name === meUser.name;
-                const dragging = drag === i;
+                const dragging = dragItem === name;
                 return (
                   <div key={name} draggable
-                    onDragStart={() => setDrag(i)}
+                    onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStartItem(name); }}
+                    onDragEnter={() => onDragEnterItem(i)}
                     onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => onDrop(i)}
-                    onDragEnd={() => setDrag(null)}
+                    onDrop={(e) => { e.preventDefault(); onDropItem(); }}
+                    onDragEnd={endDrag}
                     style={{
                       display: "grid", gridTemplateColumns: "26px 1fr auto auto", gap: 10, alignItems: "center",
                       padding: "8px 10px", marginBottom: 4, borderRadius: "var(--radius-md)", cursor: "grab",
                       background: dragging ? "var(--accent-soft)" : me ? "var(--accent-soft)" : "var(--surface)",
                       border: `1px solid ${dragging ? "var(--accent)" : "var(--border-subtle)"}`,
-                      opacity: dragging ? 0.5 : 1, transition: "border-color var(--dur-fast), background var(--dur-fast)",
+                      boxShadow: dragging ? "var(--shadow-md)" : "none",
+                      opacity: dragging ? 0.85 : 1, transition: "border-color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast)",
                     }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                       <span style={{ width: 13, height: 13, display: "inline-flex", color: "var(--text-faint)" }}>{I("grip-vertical", { size: 13 })}</span>
@@ -304,7 +320,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                   </div>
                 );
               })}
-              {ev.order.length > 0 && (
+              {displayOrder.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 7, margin: "8px 2px 2px", fontSize: 11.5, color: "var(--text-faint)" }}>
                   <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>
                   <span>拖拽排序决定进展名次；进展名次参与终极合并。</span>
