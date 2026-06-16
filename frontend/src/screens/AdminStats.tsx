@@ -146,13 +146,11 @@ import { useIsMobile } from "../lib/useIsMobile";
     const updateConfig = useUpdateEvalConfig();
     const publishExc = usePublishExcellence();
     const [drag, setDrag] = React.useState(null);
-    // step1/step2 折叠态提到父层：两块都收起时，左列让出水平空间给进展排序
-    const [w1Open, setW1Open] = React.useState(false);
-    const [w2Open, setW2Open] = React.useState(false);
+    // 组会权重 + 评选过滤收进「设置」弹窗（本次评选标准）
+    const [settingsOpen, setSettingsOpen] = React.useState(false);
     // 右侧汇总表：默认只显示排名，点「明细」在后面展开各维得分
     const [detailOpen, setDetailOpen] = React.useState(false);
     const sumCols = isMobile ? "1fr" : (detailOpen ? "48px 1fr 52px 52px repeat(5, 1fr) 64px" : "48px 1fr 52px 52px");
-    const leftCols = isMobile ? "1fr" : (w1Open || w2Open ? "1fr 1fr" : "minmax(150px, 200px) 1fr");
     const [pubOpen, setPubOpen] = React.useState(false);
     const [pubCount, setPubCount] = React.useState(5);
     const [justPublished, setJustPublished] = React.useState(false);
@@ -259,6 +257,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               onCustom={() => setEvalRange({ preset: "custom" })}
               onFrom={(v) => setEvalRange({ from: v, preset: "custom" })}
               onTo={(v) => setEvalRange({ to: v, preset: "custom" })} />
+            <Button size="sm" variant="secondary" iconLeft={I("settings-2")} onClick={() => setSettingsOpen(true)}>设置标准</Button>
             <Button size="sm" variant="ghost" iconLeft={I("download")} onClick={exportCSV} disabled={topRows.length === 0}>导出</Button>
             <Button size="sm" variant="primary" iconLeft={I("award")} onClick={() => { setPubCount(latest ? latest.count : 5); setPubOpen(true); }} disabled={ev.merged.length === 0}>发布优秀</Button>
           </div>
@@ -266,40 +265,11 @@ import { useIsMobile } from "../lib/useIsMobile";
 
         {/* 优秀发布后的名单在「表现记录」标签页集中呈现，此处不再重复显示。 */}
 
-        {/* ── 主体：左右两区。左区[ (step1上/step2下) | step3整列 ]，右区汇总排序 ── */}
+        {/* ── 主体：左 进展排序 · 右 总体排名 ── */}
         <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-          {/* 左区（两块都收起时左列变窄，把水平空间让给进展排序）*/}
-          <div style={{ display: "grid", gridTemplateColumns: leftCols, gap: 12, minHeight: 0 }}>
-            {/* 左-左列：step1 组会权重（上） + step2 评优过滤（下） */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
-              {/* step1 组会权重（默认收起）*/}
-              <Panel step="1" title="组会权重" sub="加权得组会表现分" collapsible open={w1Open} onToggle={() => setW1Open((o) => !o)}
-                right={<Button size="sm" variant="ghost" onClick={() => setEvalWeights({ attitude: 0.2, polish: 0.2, logic: 0.2, attendance: 0.2, discussion: 0.2 })}>等权</Button>}
-                style={{ height: "auto", flexShrink: 0 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 16px" }}>
-                  {L1.map((m) => <WeightChip key={m.key} label={m.label} color={m.color} value={w[m.wk]} onChange={(v) => setEvalWeights({ [m.wk]: v })} />)}
-                </div>
-              </Panel>
-              {/* step2 评优过滤（默认收起）*/}
-              <Panel step="2" title="评优过滤" sub="筛出入选者" collapsible open={w2Open} onToggle={() => setW2Open((o) => !o)}
-                style={{ flex: 1, minHeight: 0 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px" }}>
-                  <FilterField label="报告态度" color={L1[0].color} value={f.attitudeMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ attitudeMin: v })} />
-                  <FilterField label="制作精良度" color={L1[1].color} value={f.polishMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ polishMin: v })} />
-                  <FilterField label="逻辑清晰度" color={L1[2].color} value={f.logicMin ?? 0} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ logicMin: v })} />
-                  <FilterField label="出勤率" color={L1[3].color} value={f.attMin} suffix="%" max={100} step={5} onChange={(v) => setEvalFilters({ attMin: v })} />
-                  <FilterField label="讨论参与" color={L1[4].color} value={f.discMin} suffix="次" onChange={(v) => setEvalFilters({ discMin: v })} />
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2, paddingTop: 11, borderTop: "1px dashed var(--border-subtle)", fontSize: 11.5, color: "var(--text-faint)" }}>
-                    <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>
-                    <span>达标者进入进展排序</span>
-                  </div>
-                </div>
-              </Panel>
-            </div>
-
-            {/* 左-右列：step3 进展排序（整列）—— 管理员拖拽主观排序 */}
-            <Panel step="3" title="进展排序" sub="拖拽调整名次"
-              right={progressOrder ? <Button size="sm" variant="ghost" iconLeft={I("rotate-ccw")} onClick={() => resetProgressOrder()}>重置</Button> : null}>
+          {/* 左：进展排序 —— 管理员拖拽主观排序 */}
+          <Panel title="进展排序" sub="拖拽调整名次"
+            right={progressOrder ? <Button size="sm" variant="ghost" iconLeft={I("rotate-ccw")} onClick={() => resetProgressOrder()}>重置</Button> : null}>
             <div style={{ padding: 8 }}>
               {ev.order.length === 0 && (
                 <div style={{ padding: "28px 18px", textAlign: "center", fontSize: 12.5, color: "var(--text-faint)" }}>当前过滤条件下无人入选，请放宽下限。</div>
@@ -341,11 +311,10 @@ import { useIsMobile } from "../lib/useIsMobile";
                 </div>
               )}
             </div>
-            </Panel>
-          </div>
+          </Panel>
 
-          {/* 右区：汇总评分排序。默认只显示排名，点「明细」在后面展开各维得分 */}
-          <Panel title="汇总评分排序" sub="终极排名" scroll={false} style={{ minHeight: 0 }}
+          {/* 右：总体排名。默认只显示排名，点「明细」在后面展开各维得分 */}
+          <Panel title="总体排名" sub="终极排名" scroll={false} style={{ minHeight: 0 }}
             right={<Button size="sm" variant="ghost" iconLeft={I(detailOpen ? "chevron-left" : "list")} onClick={() => setDetailOpen((o) => !o)}>{detailOpen ? "收起明细" : "明细"}</Button>}>
             <div style={{ height: "100%", overflow: "auto" }}>
               <div style={{ minWidth: isMobile || !detailOpen ? "auto" : 540 }}>
@@ -398,6 +367,41 @@ import { useIsMobile } from "../lib/useIsMobile";
             </div>
           </Panel>
         </div>
+
+        {/* 设置本次评选标准：组会权重 + 评选过滤 */}
+        <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)}
+          title="本次评选标准" subtitle="组会权重与评选过滤 · 改动即时生效"
+          icon={I("settings-2")} tone="accent" width={520}
+          footer={<Button variant="primary" onClick={() => setSettingsOpen(false)}>完成</Button>}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {/* 组会权重 */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>组会权重</span>
+                <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>加权得组会表现分</span>
+                <Button size="sm" variant="ghost" style={{ marginLeft: "auto" }} onClick={() => setEvalWeights({ attitude: 0.2, polish: 0.2, logic: 0.2, attendance: 0.2, discussion: 0.2 })}>等权</Button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {L1.map((m) => <WeightChip key={m.key} label={m.label} color={m.color} value={w[m.wk]} onChange={(v) => setEvalWeights({ [m.wk]: v })} />)}
+              </div>
+            </div>
+            {/* 评选过滤 */}
+            <div style={{ paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>评选过滤</span>
+                <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>筛出入选者</span>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--accent-text)" }}>入选 <b className="cibol-mono">{ev.survivors.length}</b> 人</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <FilterField label="报告态度" color={L1[0].color} value={f.attitudeMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ attitudeMin: v })} />
+                <FilterField label="制作精良度" color={L1[1].color} value={f.polishMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ polishMin: v })} />
+                <FilterField label="逻辑清晰度" color={L1[2].color} value={f.logicMin ?? 0} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ logicMin: v })} />
+                <FilterField label="出勤率" color={L1[3].color} value={f.attMin} suffix="%" max={100} step={5} onChange={(v) => setEvalFilters({ attMin: v })} />
+                <FilterField label="讨论参与" color={L1[4].color} value={f.discMin} suffix="次" onChange={(v) => setEvalFilters({ discMin: v })} />
+              </div>
+            </div>
+          </div>
+        </Dialog>
 
         {/* 发布优秀 — filter 几人 + 预览 */}
         <Dialog open={pubOpen} onClose={() => setPubOpen(false)}
