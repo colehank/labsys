@@ -30,7 +30,6 @@ import { useIsMobile } from "../lib/useIsMobile";
   ];
 
   const hCell = { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-faint)" };
-  const TABLE_COLS = "54px 102px repeat(5, 1fr) 64px 50px 50px";
 
   function MiniBar({ pct, color, w = 36 }: any) {
     return (
@@ -150,6 +149,9 @@ import { useIsMobile } from "../lib/useIsMobile";
     // step1/step2 折叠态提到父层：两块都收起时，左列让出水平空间给进展排序
     const [w1Open, setW1Open] = React.useState(false);
     const [w2Open, setW2Open] = React.useState(false);
+    // 右侧汇总表：默认只显示排名，点「明细」在后面展开各维得分
+    const [detailOpen, setDetailOpen] = React.useState(false);
+    const sumCols = isMobile ? "1fr" : (detailOpen ? "48px 1fr 52px 52px repeat(5, 1fr) 64px" : "48px 1fr 52px 52px");
     const leftCols = isMobile ? "1fr" : (w1Open || w2Open ? "1fr 1fr" : "minmax(150px, 200px) 1fr");
     const [pubOpen, setPubOpen] = React.useState(false);
     const [pubCount, setPubCount] = React.useState(5);
@@ -188,7 +190,6 @@ import { useIsMobile } from "../lib/useIsMobile";
     const mRankAmong: Record<string, number> = {};
     evData.merged.forEach((m) => { mRankAmong[m.name] = m.mRank; });
     const ev = { rows: evData.rows, merged: evData.merged, total: evData.total, survivors, order, mRankAmong };
-    const tableCols = isMobile ? "1fr" : TABLE_COLS;
 
     // —— 最终表现表：入选者按终极名次在前，其余按组会表现在后（淡化）——
     const survSet = new Set(ev.survivors.map((s) => s.name));
@@ -343,22 +344,25 @@ import { useIsMobile } from "../lib/useIsMobile";
             </Panel>
           </div>
 
-          {/* 右区：汇总评分排序（终极排名 + 组会表现各维明细）*/}
-          <Panel title="汇总评分排序" sub="终极排名" scroll={false} style={{ minHeight: 0 }}>
+          {/* 右区：汇总评分排序。默认只显示排名，点「明细」在后面展开各维得分 */}
+          <Panel title="汇总评分排序" sub="终极排名" scroll={false} style={{ minHeight: 0 }}
+            right={<Button size="sm" variant="ghost" iconLeft={I(detailOpen ? "chevron-left" : "list")} onClick={() => setDetailOpen((o) => !o)}>{detailOpen ? "收起明细" : "明细"}</Button>}>
             <div style={{ height: "100%", overflow: "auto" }}>
-              <div style={{ minWidth: isMobile ? "auto" : 540 }}>
+              <div style={{ minWidth: isMobile || !detailOpen ? "auto" : 540 }}>
                 {/* 表头（sticky）*/}
-                <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: tableCols, gap: 8, padding: "8px 16px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center", position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
-                  <span style={{ ...hCell, color: "var(--text-strong)" }}>终极名次</span>
+                <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: sumCols, gap: 8, padding: "8px 16px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center", position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
+                  <span style={{ ...hCell, color: "var(--text-strong)" }} title="终极名次">总#</span>
                   <span style={hCell}>成员</span>
-                  {L1.map((m) => (
-                    <span key={m.key} style={{ ...hCell, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color, flexShrink: 0 }} />{m.short}
-                    </span>
-                  ))}
-                  <span style={{ ...hCell, textAlign: "right" }}>组会表现</span>
                   <span style={{ ...hCell, textAlign: "center" }} title="组会表现在入选者中的名次">组会#</span>
                   <span style={{ ...hCell, textAlign: "center" }} title="进展表现 rerank 名次">进展#</span>
+                  {detailOpen && <>
+                    {L1.map((m) => (
+                      <span key={m.key} style={{ ...hCell, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color, flexShrink: 0 }} />{m.short}
+                      </span>
+                    ))}
+                    <span style={{ ...hCell, textAlign: "right" }}>组会表现</span>
+                  </>}
                 </div>
                 {/* 表体 */}
                 {topRows.map((r, i) => {
@@ -366,7 +370,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                   const top3 = r.inSurv && r.finalRank <= 3;
                   const medal = ["var(--amber-500)", "var(--slate-400)", "var(--terracotta-400)"][r.finalRank - 1];
                   return (
-                    <div key={r.name} style={{ display: "grid", gridTemplateColumns: tableCols, gap: 8, padding: isMobile ? "8px 14px" : "4px 16px", alignItems: "center", borderBottom: i < topRows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : r.inSurv ? "transparent" : "var(--surface-sunken)", opacity: r.inSurv ? 1 : 0.55 }}>
+                    <div key={r.name} style={{ display: "grid", gridTemplateColumns: sumCols, gap: 8, padding: isMobile ? "8px 14px" : "5px 16px", alignItems: "center", borderBottom: i < topRows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : r.inSurv ? "transparent" : "var(--surface-sunken)", opacity: r.inSurv ? 1 : 0.55 }}>
                       {r.inSurv ? (
                         <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontSize: 12.5, fontWeight: 700, color: top3 ? "#fff" : "var(--text-muted)", background: top3 ? medal : "var(--surface-hover)", fontVariantNumeric: "tabular-nums" }}>{r.finalRank}</span>
                       ) : (
@@ -376,15 +380,17 @@ import { useIsMobile } from "../lib/useIsMobile";
                         <Avatar name={r.name} size="xs" />
                         <span style={{ fontSize: 12.5, fontWeight: me ? 600 : 500, color: "var(--text-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
                       </div>
-                      {L1.map((m) => (
-                        <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <MiniBar pct={r[m.nk]} color={m.color} />
-                          <span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-body)", width: 28, flexShrink: 0 }}>{m.raw(r)}</span>
-                        </div>
-                      ))}
-                      <span className="cibol-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.meeting.toFixed(1)}</span>
                       <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>{r.inSurv ? "#" + r.mRank : "—"}</span>
                       <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>{r.inSurv ? "#" + r.pRank : "—"}</span>
+                      {detailOpen && <>
+                        {L1.map((m) => (
+                          <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <MiniBar pct={r[m.nk]} color={m.color} />
+                            <span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-body)", width: 28, flexShrink: 0 }}>{m.raw(r)}</span>
+                          </div>
+                        ))}
+                        <span className="cibol-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.meeting.toFixed(1)}</span>
+                      </>}
                     </div>
                   );
                 })}
