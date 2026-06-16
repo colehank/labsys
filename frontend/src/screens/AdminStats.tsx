@@ -253,93 +253,44 @@ import { useIsMobile } from "../lib/useIsMobile";
 
         {/* 优秀发布后的名单在「表现记录」标签页集中呈现，此处不再重复显示。 */}
 
-        {/* ── 最上方：最终表现（① 汇总权重 + 终极排名/组会表现明细）── */}
-        <Panel title="最终表现" sub="终极排名" scroll={false}
-          right={<Button size="sm" variant="ghost" onClick={() => setEvalWeights({ attitude: 0.2, polish: 0.2, logic: 0.2, attendance: 0.2, discussion: 0.2 })}>等权</Button>}
-          style={{ flex: 1, minHeight: 200 }}>
-          <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-            {/* ① 汇总权重 */}
-            <div style={{ flexShrink: 0, background: "var(--surface-sunken)", borderBottom: "1px solid var(--border-subtle)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px 0" }}>
-                <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: "var(--radius-sm)", background: "var(--accent-soft)", color: "var(--accent-text)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontSize: 11, fontWeight: 600 }}>1</span>
-                <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-faint)" }}>汇总权重</span>
-                <span style={{ fontSize: 11, color: "var(--text-faint)" }}>加权得组会表现分</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(5, 1fr)", gap: "6px 22px", padding: "8px 16px 10px" }}>
-                {L1.map((m) => <WeightChip key={m.key} label={m.label} color={m.color} value={w[m.wk]} onChange={(v) => setEvalWeights({ [m.wk]: v })} />)}
-              </div>
-            </div>
-            {/* 表头 */}
-            <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: tableCols, gap: 8, padding: "6px 16px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center", flexShrink: 0 }}>
-              <span style={{ ...hCell, color: "var(--text-strong)" }}>终极名次</span>
-              <span style={hCell}>成员</span>
-              {L1.map((m) => (
-                <span key={m.key} style={{ ...hCell, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color, flexShrink: 0 }} />{m.short}
-                </span>
-              ))}
-              <span style={{ ...hCell, textAlign: "right" }}>组会表现</span>
-              <span style={{ ...hCell, textAlign: "center" }} title="组会表现在入选者中的名次">组会#</span>
-              <span style={{ ...hCell, textAlign: "center" }} title="进展表现 rerank 名次">进展#</span>
-            </div>
-            {/* 表体（滚动）*/}
-            <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
-              {topRows.map((r, i) => {
-                const me = !!meUser && r.name === meUser.name;
-                const top3 = r.inSurv && r.finalRank <= 3;
-                const medal = ["var(--amber-500)", "var(--slate-400)", "var(--terracotta-400)"][r.finalRank - 1];
-                return (
-                  <div key={r.name} style={{ display: "grid", gridTemplateColumns: tableCols, gap: 8, padding: isMobile ? "8px 14px" : "4px 16px", alignItems: "center", borderBottom: i < topRows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : r.inSurv ? "transparent" : "var(--surface-sunken)", opacity: r.inSurv ? 1 : 0.55 }}>
-                    {/* 终极名次 */}
-                    {r.inSurv ? (
-                      <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontSize: 12.5, fontWeight: 700, color: top3 ? "#fff" : "var(--text-muted)", background: top3 ? medal : "var(--surface-hover)", fontVariantNumeric: "tabular-nums" }}>{r.finalRank}</span>
-                    ) : (
-                      <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>未入选</span>
-                    )}
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                      <Avatar name={r.name} size="xs" />
-                      <span style={{ fontSize: 12.5, fontWeight: me ? 600 : 500, color: "var(--text-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
-                    </div>
-                    {L1.map((m) => (
-                      <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <MiniBar pct={r[m.nk]} color={m.color} />
-                        <span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-body)", width: 28, flexShrink: 0 }}>{m.raw(r)}</span>
-                      </div>
-                    ))}
-                    <span className="cibol-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.meeting.toFixed(1)}</span>
-                    <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>{r.inSurv ? "#" + r.mRank : "—"}</span>
-                    <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>{r.inSurv ? "#" + r.pRank : "—"}</span>
+        {/* ── 主体：左右两区。左区[ (step1上/step2下) | step3整列 ]，右区汇总排序 ── */}
+        <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+          {/* 左区 */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, minHeight: 0 }}>
+            {/* 左-左列：step1 组会权重（上） + step2 评优过滤（下） */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
+              {/* step1 组会权重 */}
+              <Panel step="1" title="组会权重" sub="加权得组会表现分"
+                right={<Button size="sm" variant="ghost" onClick={() => setEvalWeights({ attitude: 0.2, polish: 0.2, logic: 0.2, attendance: 0.2, discussion: 0.2 })}>等权</Button>}
+                style={{ height: "auto", flexShrink: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 16px" }}>
+                  {L1.map((m) => <WeightChip key={m.key} label={m.label} color={m.color} value={w[m.wk]} onChange={(v) => setEvalWeights({ [m.wk]: v })} />)}
+                </div>
+              </Panel>
+              {/* step2 评优过滤 */}
+              <Panel step="2" title="评优过滤" sub="筛出入选者"
+                style={{ flex: 1, minHeight: 0 }}
+                right={<div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", background: "var(--accent-soft)", borderRadius: "var(--radius-pill)", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  <span style={{ width: 13, height: 13, display: "inline-flex", color: "var(--accent-text)" }}>{I("users-round", { size: 13 })}</span>
+                  <span style={{ fontSize: 12, color: "var(--accent-text)" }}>入选 <b className="cibol-mono">{ev.survivors.length}</b> 人</span>
+                </div>}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px" }}>
+                  <FilterField label="报告态度" color={L1[0].color} value={f.attitudeMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ attitudeMin: v })} />
+                  <FilterField label="制作精良度" color={L1[1].color} value={f.polishMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ polishMin: v })} />
+                  <FilterField label="逻辑清晰度" color={L1[2].color} value={f.logicMin ?? 0} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ logicMin: v })} />
+                  <FilterField label="出勤率" color={L1[3].color} value={f.attMin} suffix="%" max={100} step={5} onChange={(v) => setEvalFilters({ attMin: v })} />
+                  <FilterField label="讨论参与" color={L1[4].color} value={f.discMin} suffix="次" onChange={(v) => setEvalFilters({ discMin: v })} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2, paddingTop: 11, borderTop: "1px dashed var(--border-subtle)", fontSize: 11.5, color: "var(--text-faint)" }}>
+                    <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>
+                    <span>达标者进入进展排序</span>
                   </div>
-                );
-              })}
+                </div>
+              </Panel>
             </div>
-          </div>
-        </Panel>
 
-        {/* ── 底部两栏：② 过滤下限 + ③ 进展表现 ── */}
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "0.85fr 1fr", gap: 12, height: isMobile ? "auto" : 256, flexShrink: 0 }}>
-          {/* ② 过滤下限 */}
-          <Panel step="2" title="过滤下限" sub="筛出入选者"
-            right={<div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", background: "var(--accent-soft)", borderRadius: "var(--radius-pill)", whiteSpace: "nowrap", flexShrink: 0 }}>
-              <span style={{ width: 13, height: 13, display: "inline-flex", color: "var(--accent-text)" }}>{I("users-round", { size: 13 })}</span>
-              <span style={{ fontSize: 12, color: "var(--accent-text)" }}>入选 <b className="cibol-mono">{ev.survivors.length}</b> 人</span>
-            </div>}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px" }}>
-              <FilterField label="报告态度" color={L1[0].color} value={f.attitudeMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ attitudeMin: v })} />
-              <FilterField label="制作精良度" color={L1[1].color} value={f.polishMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ polishMin: v })} />
-              <FilterField label="逻辑清晰度" color={L1[2].color} value={f.logicMin ?? 0} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ logicMin: v })} />
-              <FilterField label="出勤率" color={L1[3].color} value={f.attMin} suffix="%" max={100} step={5} onChange={(v) => setEvalFilters({ attMin: v })} />
-              <FilterField label="讨论参与" color={L1[4].color} value={f.discMin} suffix="次" onChange={(v) => setEvalFilters({ discMin: v })} />
-              <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2, paddingTop: 11, borderTop: "1px dashed var(--border-subtle)", fontSize: 11.5, color: "var(--text-faint)" }}>
-                <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>
-                <span>达标者进入进展排序</span>
-              </div>
-            </div>
-          </Panel>
-
-          {/* ③ 进展表现 —— 管理员拖拽主观排序 */}
-          <Panel step="3" title="进展表现" sub="拖拽调整名次"
-            right={progressOrder ? <Button size="sm" variant="ghost" iconLeft={I("rotate-ccw")} onClick={() => resetProgressOrder()}>重置</Button> : null}>
+            {/* 左-右列：step3 进展排序（整列）—— 管理员拖拽主观排序 */}
+            <Panel step="3" title="进展排序" sub="拖拽调整名次"
+              right={progressOrder ? <Button size="sm" variant="ghost" iconLeft={I("rotate-ccw")} onClick={() => resetProgressOrder()}>重置</Button> : null}>
             <div style={{ padding: 8 }}>
               {ev.order.length === 0 && (
                 <div style={{ padding: "28px 18px", textAlign: "center", fontSize: 12.5, color: "var(--text-faint)" }}>当前过滤条件下无人入选，请放宽下限。</div>
@@ -380,6 +331,56 @@ import { useIsMobile } from "../lib/useIsMobile";
                   <span>拖拽排序决定进展名次；进展名次参与终极合并。</span>
                 </div>
               )}
+            </div>
+            </Panel>
+          </div>
+
+          {/* 右区：汇总评分排序（终极排名 + 组会表现各维明细）*/}
+          <Panel title="汇总评分排序" sub="终极排名" scroll={false} style={{ minHeight: 0 }}>
+            <div style={{ height: "100%", overflow: "auto" }}>
+              <div style={{ minWidth: isMobile ? "auto" : 540 }}>
+                {/* 表头（sticky）*/}
+                <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: tableCols, gap: 8, padding: "8px 16px", borderBottom: "1px solid var(--border-subtle)", alignItems: "center", position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 }}>
+                  <span style={{ ...hCell, color: "var(--text-strong)" }}>终极名次</span>
+                  <span style={hCell}>成员</span>
+                  {L1.map((m) => (
+                    <span key={m.key} style={{ ...hCell, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color, flexShrink: 0 }} />{m.short}
+                    </span>
+                  ))}
+                  <span style={{ ...hCell, textAlign: "right" }}>组会表现</span>
+                  <span style={{ ...hCell, textAlign: "center" }} title="组会表现在入选者中的名次">组会#</span>
+                  <span style={{ ...hCell, textAlign: "center" }} title="进展表现 rerank 名次">进展#</span>
+                </div>
+                {/* 表体 */}
+                {topRows.map((r, i) => {
+                  const me = !!meUser && r.name === meUser.name;
+                  const top3 = r.inSurv && r.finalRank <= 3;
+                  const medal = ["var(--amber-500)", "var(--slate-400)", "var(--terracotta-400)"][r.finalRank - 1];
+                  return (
+                    <div key={r.name} style={{ display: "grid", gridTemplateColumns: tableCols, gap: 8, padding: isMobile ? "8px 14px" : "4px 16px", alignItems: "center", borderBottom: i < topRows.length - 1 ? "1px solid var(--border-subtle)" : "none", background: me ? "var(--accent-soft)" : r.inSurv ? "transparent" : "var(--surface-sunken)", opacity: r.inSurv ? 1 : 0.55 }}>
+                      {r.inSurv ? (
+                        <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontSize: 12.5, fontWeight: 700, color: top3 ? "#fff" : "var(--text-muted)", background: top3 ? medal : "var(--surface-hover)", fontVariantNumeric: "tabular-nums" }}>{r.finalRank}</span>
+                      ) : (
+                        <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>未入选</span>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                        <Avatar name={r.name} size="xs" />
+                        <span style={{ fontSize: 12.5, fontWeight: me ? 600 : 500, color: "var(--text-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                      </div>
+                      {L1.map((m) => (
+                        <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <MiniBar pct={r[m.nk]} color={m.color} />
+                          <span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-body)", width: 28, flexShrink: 0 }}>{m.raw(r)}</span>
+                        </div>
+                      ))}
+                      <span className="cibol-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.meeting.toFixed(1)}</span>
+                      <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>{r.inSurv ? "#" + r.mRank : "—"}</span>
+                      <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center" }}>{r.inSurv ? "#" + r.pRank : "—"}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </Panel>
         </div>
