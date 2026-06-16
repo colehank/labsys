@@ -41,16 +41,22 @@ import { useIsMobile } from "../lib/useIsMobile";
   }
 
   // 面板外壳：标题条 + 填充父容器、可选内部滚动的主体
-  function Panel({ step, title, sub, right, children, scroll = true, style }: any) {
+  function Panel({ step, title, sub, right, children, scroll = true, style, collapsible = false, defaultOpen = true }: any) {
+    const [open, setOpen] = React.useState(defaultOpen);
+    const collapsed = collapsible && !open;
+    // 收起时退掉撑高（flex:1 / height:100%），只保留标题栏
+    const rootStyle = collapsed ? { ...style, height: "auto", flex: "none", minHeight: 0 } : style;
     return (
-      <div style={{ display: "flex", flexDirection: "column", minHeight: 0, height: "100%", background: "var(--surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-xs)", overflow: "hidden", ...style }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 14px", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", minHeight: 0, height: "100%", background: "var(--surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-xs)", overflow: "hidden", ...rootStyle }}>
+        <div onClick={collapsible ? () => setOpen((o: boolean) => !o) : undefined}
+          style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 14px", borderBottom: collapsed ? "none" : "1px solid var(--border-subtle)", flexShrink: 0, cursor: collapsible ? "pointer" : "default", userSelect: "none" }}>
           {step != null && <span style={{ width: 20, height: 20, flexShrink: 0, borderRadius: "var(--radius-sm)", background: "var(--accent-soft)", color: "var(--accent-text)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontSize: 12, fontWeight: 600 }}>{step}</span>}
           <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)" }}>{title}</span>
           {sub && <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{sub}</span>}
-          {right && <div style={{ marginLeft: "auto" }}>{right}</div>}
+          {right && <div style={{ marginLeft: "auto" }} onClick={(e) => e.stopPropagation()}>{right}</div>}
+          {collapsible && <span style={{ marginLeft: right ? 8 : "auto", display: "inline-flex", color: "var(--text-faint)", flexShrink: 0 }}>{I(open ? "chevron-up" : "chevron-down", { size: 17 })}</span>}
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: scroll ? "auto" : "hidden" }}>{children}</div>
+        {!collapsed && <div style={{ flex: 1, minHeight: 0, overflowY: scroll ? "auto" : "hidden" }}>{children}</div>}
       </div>
     );
   }
@@ -259,16 +265,16 @@ import { useIsMobile } from "../lib/useIsMobile";
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, minHeight: 0 }}>
             {/* 左-左列：step1 组会权重（上） + step2 评优过滤（下） */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0 }}>
-              {/* step1 组会权重 */}
-              <Panel step="1" title="组会权重" sub="加权得组会表现分"
+              {/* step1 组会权重（默认收起）*/}
+              <Panel step="1" title="组会权重" sub="加权得组会表现分" collapsible defaultOpen={false}
                 right={<Button size="sm" variant="ghost" onClick={() => setEvalWeights({ attitude: 0.2, polish: 0.2, logic: 0.2, attendance: 0.2, discussion: 0.2 })}>等权</Button>}
                 style={{ height: "auto", flexShrink: 0 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 16px" }}>
                   {L1.map((m) => <WeightChip key={m.key} label={m.label} color={m.color} value={w[m.wk]} onChange={(v) => setEvalWeights({ [m.wk]: v })} />)}
                 </div>
               </Panel>
-              {/* step2 评优过滤 */}
-              <Panel step="2" title="评优过滤" sub="筛出入选者"
+              {/* step2 评优过滤（默认收起）*/}
+              <Panel step="2" title="评优过滤" sub="筛出入选者" collapsible defaultOpen={false}
                 style={{ flex: 1, minHeight: 0 }}
                 right={<div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 11px", background: "var(--accent-soft)", borderRadius: "var(--radius-pill)", whiteSpace: "nowrap", flexShrink: 0 }}>
                   <span style={{ width: 13, height: 13, display: "inline-flex", color: "var(--accent-text)" }}>{I("users-round", { size: 13 })}</span>
