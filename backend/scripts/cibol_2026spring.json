@@ -1,0 +1,729 @@
+{
+ "schedule": [
+  {
+   "iso": "2026-03-06",
+   "host": "袁鑫淼",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "王陈龙",
+     "topic": "Muttenthaler, L., Greff, K., Born, F. et al. Aligning machine and human visual representations across abstraction levels.  Nature 647, 349–355 (2025). https://doi.org/10.1038/s41586-025-09631-6",
+     "kind": "文献精读"
+    },
+    {
+     "name": "周真琦",
+     "topic": "Wang, S., Zhang, X., Liu, Y. et al. Latent space-based network analysis for brain–behavior linking in neuroimaging. Nat Methods 23, 225–235 (2026). https://doi.org/10.1038/s41592-025-02896-9",
+     "kind": "文献精读"
+    },
+    {
+     "name": "袁鑫淼",
+     "topic": "Chen, H., Liu, B., Wang, S. et al. Combined evidence from artificial neural networks and human brain-lesion models reveals that language modulates vision in human perception. Nat Hum Behav (2025). https://doi.org/10.1038/s41562-025-02357-5",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-03-10",
+   "host": "周真琦",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "余可",
+     "topic": "Shmatko, A., Jung, A.W., Gaurav, K. et al. Learning the natural history of human disease with generative transformers. Nature 647, 249–258 (2025).https://doi.org/10.1038/s41586-025-09529-3",
+     "kind": "文献精读"
+    },
+    {
+     "name": "刘一诺",
+     "topic": "Yang, H., Zhou, HY., Liu, J. et al. A multimodal vision–language model for generalizable\nannotation-free pathology localization. Nat. Biomed. Eng (2026).https://doi.org/10.1038/s41551-025-01574-7",
+     "kind": "文献精读"
+    },
+    {
+     "name": "马赛",
+     "topic": "Casamitjana, A., Mancini, M., Robinson, E. et al. A probabilistic histological atlas of the human brain for MRI segmentation. Nature 648, 678–685 (2025). https://doi.org/10.1038/s41586-025-09708-2",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-03-17",
+   "host": "李慧",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "陈晨",
+     "topic": "Vibe coding",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "桂阳",
+     "topic": "Guo, L., Chen, H., Chen, Y. et al. A neural network for modeling human concept formation, understanding and communication. Nat Comput\nSci (2026).https://doi.org/10.1038/s43588-026-00956-4",
+     "kind": "文献精读"
+    },
+    {
+     "name": "张国浩",
+     "topic": "Cowley, B.R., Stan, P.L., Pillow, J.W. et al. Compact deep neural network models of the visual cortex. Nature (2026). https://doi.org/10.1038/s41586-026-10150-1",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-03-24",
+   "host": "刘一诺",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "张国浩、邓尧、袁鑫淼",
+     "topic": "基于AI的认知神经科学写作进展",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "刘艺",
+     "topic": "Asai, A., He, J., Shao, R. et\nal. Synthesizing scientific literature with retrieval-augmented language models. Nature 650, 857–863 (2026).https://doi.org/10.1038/s41586-025-10072-",
+     "kind": "文献精读"
+    },
+    {
+     "name": "杜钰麟",
+     "topic": "Wakhloo, A.J., Slatton, W. & Chung, S. Neural population geometry and optimal coding of tasks with shared latent structure. Nat Neurosci (2026). https://doi.org/10.1038/s41593-025-02183-y",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-03-31",
+   "host": "马赛",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "陈晨",
+     "topic": "Vibe coding",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "李慧",
+     "topic": "Tak, D., Garomsa, B.A., Zapaishchykova, A. et al. A generalizable foundation model for analysis of human brain MRI. Nat Neurosci (2026). https://doi.org/10.1038/s41593-026-02202-6",
+     "kind": "文献精读"
+    },
+    {
+     "name": "邹洋斌",
+     "topic": "总结当前各种智能体记忆框架（分层，推理，动态图式），分析之间的异同，并形成自己研究论文的框架。",
+     "kind": "进展汇报"
+    }
+   ]
+  },
+  {
+   "iso": "2026-04-07",
+   "host": "",
+   "type": "团建",
+   "cancelled": false,
+   "presenters": []
+  },
+  {
+   "iso": "2026-04-14",
+   "host": "",
+   "type": "文献精读",
+   "cancelled": true,
+   "presenters": []
+  },
+  {
+   "iso": "2026-04-21",
+   "host": "王陈龙",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "张国浩、邓尧、袁鑫淼",
+     "topic": "基于AI的认知神经科学写作进展",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "陈晨",
+     "topic": "Bausch, M., Niediek, J., Reber, T.P. et al. Distinct neuronal populations in the human brain combine content and context. Nature (2026).https://doi.org/10.1038/s41586-025-09910-2",
+     "kind": "文献精读"
+    },
+    {
+     "name": "王陈龙",
+     "topic": "Tafazoli, S., Bouchacourt, F.M., Ardalan, A. et al. Building compositional tasks with shared neural\nsubspaces. Nature (2025).https://doi.org/10.1038/s41586-025-09805-2",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-04-28",
+   "host": "邹洋斌",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "陈晨",
+     "topic": "Vibe coding",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "周真琦",
+     "topic": "Blankemeier, L., Kumar, A.,\nCohen, J.P. et al. Merlin: a computed tomography vision–language foundation\nmodel and dataset. Nature (2026).https://doi.org/10.1038/s41586-026-10181-8",
+     "kind": "文献精读"
+    },
+    {
+     "name": "杜钰麟",
+     "topic": "Betley, J., Warncke, N.,\nSztyber-Betley, A. et al. Training large language models on narrow tasks can\nlead to broad misalignment. Nature 649, 584–589 (2026).https://doi.org/10.1038/s41586-025-09937-5",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-05-12",
+   "host": "张国浩",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "张国浩、邓尧、袁鑫淼",
+     "topic": "基于AI的认知神经科学写作进展",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "余可",
+     "topic": "Shi, Y., Bi, D., Hesse, J.K. et\nal. Rapid concerted switching of the neural code in the inferotemporal cortex.\nNature (2026).https://doi.org/10.1038/s41586-026-10267-3",
+     "kind": "文献精读"
+    },
+    {
+     "name": "刘一诺",
+     "topic": "C. Chen, X.L. Gong, C. Tseng, D.L. Klein, J.L. Gallant, & F. Deniz, Bilingual language processing relies on shared semantic representations that are modulated by each language, Proc. Natl. Acad. Sci. U.S.A. 123 (9) e2503721123, https://doi.org/10.1073/pnas.2503721123 (2026).",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-05-19",
+   "host": "",
+   "type": "AI Agent工作坊",
+   "cancelled": false,
+   "presenters": []
+  },
+  {
+   "iso": "2026-05-26",
+   "host": "",
+   "type": "AI Agent工作坊",
+   "cancelled": false,
+   "presenters": []
+  },
+  {
+   "iso": "2026-06-02",
+   "host": "余可",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "陈晨",
+     "topic": "Vibe coding",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "马赛",
+     "topic": "Tian, L.Y., Garzón Gupta, K., Hanuska, D.J. et al. Neural representation of action symbols in primate frontal cortex. Nature (2026). https://doi.org/10.1038/s41586-026-10297-x",
+     "kind": "文献精读"
+    },
+    {
+     "name": "张国浩",
+     "topic": "Toker D., Zheng Z. S., Thum J. A., et al. Adversarial AI reveals mechanisms and treatments for disorders of consciousness. Nature Neuroscience (2026). DOI:https://doi.org/10.1038/s41593-026-02220-4",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-06-09",
+   "host": "周真琦",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "桂阳",
+     "topic": "Lu, C., Lu, C., Lange, R.T. et\nal. Towards end-to-end automation of AI research. Nature 651, 914–919 (2026).https://doi.org/10.1038/s41586-026-10265-5",
+     "kind": "文献精读"
+    },
+    {
+     "name": "袁鑫淼",
+     "topic": "Taylor, H.P., Huynh, K.M., Thung, KH. et al. Functional hierarchy of the human neocortex across the lifespan. Nature (2026).\nhttps://doi.org/10.1038/s41586-026-10219-x",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-06-16",
+   "host": "袁鑫淼",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "陈晨",
+     "topic": "Vibe coding",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "李慧",
+     "topic": "van den Heuvel, M.P., Libedinsky, I., Quiroz Monnens, S. et al. Investigating the methodological foundation of lesion network mapping. Nat Neurosci (2026).https://doi.org/10.1038/s41593-025-02196-7",
+     "kind": "文献精读"
+    },
+    {
+     "name": "刘艺",
+     "topic": "Pohl, S., Walker, E.Y., Barack,\nD.L. et al. Clarifying the conceptual dimensions of representation in\nneuroscience. Nat. Rev. Neurosci. (2026).https://doi.org/10.1038/s41583-026-01030-8",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-06-23",
+   "host": "桂阳",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "周真琦",
+     "topic": "Modeling conditional distributions of neural and behavioral data with masked variational\nautoencoders.https://www.cell.com/cell-reports/fulltext/S2211-1247(25)00109-3",
+     "kind": "文献精读"
+    },
+    {
+     "name": "邹洋斌",
+     "topic": "Durstewitz, D., Averbeck, B.\n& Koppe, G. What neuroscience can tell AI about learning in continuously\nchanging environments. Nat Mach Intell 7, 1897–1912 (2025).https://doi.org/10.1038/s42256-025-01146-z",
+     "kind": "文献精读"
+    }
+   ]
+  },
+  {
+   "iso": "2026-06-30",
+   "host": "李慧",
+   "type": "文献精读",
+   "cancelled": false,
+   "presenters": [
+    {
+     "name": "陈晨",
+     "topic": "Jude, J.J., Levi-Aharoni, H., Acosta, A.J. et al. Restoring rapid natural bimanual typing with a neuroprosthesis after paralysis. Nat Neurosci (2026). https://doi.org/10.1038/s41593-026-02218-y",
+     "kind": "文献精读"
+    },
+    {
+     "name": "王陈龙",
+     "topic": "Zhou, L., Pacchiardi, L., Martínez-Plumed, F. et al. General scales unlock AI evaluation with explanatory and predictive power. Nature 652, 58–67 (2026). https://doi.org/10.1038/s41586-026-10303-2",
+     "kind": "文献精读"
+    },
+    {
+     "name": "张国浩、邓尧、袁鑫淼",
+     "topic": "基于AI的认知神经科学写作进展",
+     "kind": "进展汇报"
+    },
+    {
+     "name": "闫石",
+     "topic": "",
+     "kind": "文献精读"
+    },
+    {
+     "name": "方宇飞",
+     "topic": "",
+     "kind": "文献精读"
+    }
+   ]
+  }
+ ],
+ "attendance": {
+  "2026-03-06": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "leave",
+   "余可": "leave",
+   "桂阳": "present",
+   "王陈龙": "present",
+   "刘艺": "present",
+   "杜钰麟": "leave",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "leave",
+   "邓尧": "leave"
+  },
+  "2026-03-10": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "present",
+   "余可": "present",
+   "桂阳": "present",
+   "王陈龙": "leave",
+   "刘艺": "present",
+   "杜钰麟": "present",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-03-17": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "present",
+   "余可": "present",
+   "桂阳": "present",
+   "王陈龙": "leave",
+   "刘艺": "present",
+   "杜钰麟": "present",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-03-24": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "present",
+   "余可": "present",
+   "桂阳": "present",
+   "王陈龙": "present",
+   "刘艺": "present",
+   "杜钰麟": "present",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-03-31": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "present",
+   "余可": "present",
+   "桂阳": "present",
+   "王陈龙": "present",
+   "刘艺": "present",
+   "杜钰麟": "present",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-04-21": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "leave",
+   "余可": "leave",
+   "桂阳": "present",
+   "王陈龙": "present",
+   "刘艺": "present",
+   "杜钰麟": "present",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "leave",
+   "邓尧": "present"
+  },
+  "2026-04-28": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "leave",
+   "余可": "present",
+   "桂阳": "present",
+   "刘艺": "present",
+   "杜钰麟": "present",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-05-12": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "present",
+   "余可": "present",
+   "桂阳": "present",
+   "王陈龙": "leave",
+   "刘艺": "present",
+   "杜钰麟": "present",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-05-19": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "present",
+   "余可": "present",
+   "桂阳": "present",
+   "王陈龙": "present",
+   "刘艺": "present",
+   "杜钰麟": "absent",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-05-26": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "刘一诺": "leave",
+   "余可": "present",
+   "桂阳": "present",
+   "王陈龙": "present",
+   "刘艺": "present",
+   "杜钰麟": "absent",
+   "张国浩": "present",
+   "陈晨": "present",
+   "邹洋斌": "present",
+   "邓尧": "present"
+  },
+  "2026-06-02": {
+   "马赛": "present",
+   "李慧": "present",
+   "袁鑫淼": "present",
+   "周真琦": "present",
+   "余可": "present",
+   "王陈龙": "present",
+   "陈晨": "present",
+   "邹洋斌": "present"
+  },
+  "2026-06-09": {
+   "王陈龙": "leave"
+  }
+ },
+ "speaks": {
+  "2026-03-06": {
+   "周真琦": 1,
+   "张国浩": 2,
+   "方宇飞": 1,
+   "马赛": 2,
+   "李慧": 1,
+   "桂阳": 2,
+   "王陈龙": 1,
+   "陈晨": 1
+  },
+  "2026-03-10": {
+   "马赛": 2,
+   "李慧": 2,
+   "袁鑫淼": 2,
+   "周真琦": 2,
+   "桂阳": 3,
+   "闫石": 2,
+   "张国浩": 2
+  },
+  "2026-03-17": {
+   "马赛": 1,
+   "李慧": 1,
+   "袁鑫淼": 1,
+   "周真琦": 2,
+   "刘一诺": 1,
+   "余可": 1,
+   "杜钰麟": 1,
+   "邹洋斌": 2,
+   "方宇飞": 1
+  },
+  "2026-03-24": {
+   "马赛": 3,
+   "李慧": 3,
+   "周真琦": 1,
+   "余可": 1,
+   "桂阳": 3,
+   "王陈龙": 1,
+   "邹洋斌": 3,
+   "袁鑫淼": 2,
+   "张国浩": 2
+  },
+  "2026-03-31": {
+   "马赛": 3,
+   "袁鑫淼": 3,
+   "刘一诺": 1,
+   "余可": 2,
+   "桂阳": 3,
+   "王陈龙": 2,
+   "张国浩": 3,
+   "邹洋斌": 2,
+   "周真琦": 1,
+   "杜钰麟": 1,
+   "方宇飞": 2
+  },
+  "2026-04-21": {
+   "李慧": 2,
+   "袁鑫淼": 1,
+   "周真琦": 2,
+   "桂阳": 2,
+   "刘艺": 1,
+   "张国浩": 1,
+   "邓尧": 1
+  },
+  "2026-04-28": {
+   "马赛": 3,
+   "袁鑫淼": 3,
+   "闫石": 2,
+   "桂阳": 3,
+   "张国浩": 3,
+   "陈晨": 1,
+   "李慧": 1,
+   "邹洋斌": 2,
+   "邓尧": 1,
+   "余可": 1
+  },
+  "2026-05-12": {
+   "桂阳": 2,
+   "马赛": 1,
+   "周真琦": 1,
+   "刘一诺": 1,
+   "张国浩": 1,
+   "邹洋斌": 2,
+   "袁鑫淼": 1,
+   "余可": 1,
+   "邓尧": 1
+  },
+  "2026-05-19": {},
+  "2026-05-26": {},
+  "2026-06-02": {
+   "李慧": 1,
+   "袁鑫淼": 2,
+   "周真琦": 1,
+   "余可": 2,
+   "邹洋斌": 1
+  }
+ },
+ "skipped_events": [],
+ "ratings": {
+  "2026-03-06": {
+   "袁鑫淼": {
+    "attitude": 4.433,
+    "polish": 4.433,
+    "logic": 4.433,
+    "raters": 0
+   },
+   "周真琦": {
+    "attitude": 3.827,
+    "polish": 3.827,
+    "logic": 3.827,
+    "raters": 0
+   },
+   "王陈龙": {
+    "attitude": 4.41,
+    "polish": 4.41,
+    "logic": 4.41,
+    "raters": 0
+   }
+  },
+  "2026-03-10": {
+   "马赛": {
+    "attitude": 4.75,
+    "polish": 4.75,
+    "logic": 4.75,
+    "raters": 0
+   },
+   "刘一诺": {
+    "attitude": 4.0,
+    "polish": 4.0,
+    "logic": 4.0,
+    "raters": 0
+   },
+   "余可": {
+    "attitude": 4.547,
+    "polish": 4.547,
+    "logic": 4.547,
+    "raters": 0
+   }
+  },
+  "2026-03-17": {
+   "桂阳": {
+    "attitude": 4.357,
+    "polish": 4.357,
+    "logic": 4.357,
+    "raters": 0
+   },
+   "张国浩": {
+    "attitude": 4.8,
+    "polish": 4.8,
+    "logic": 4.8,
+    "raters": 0
+   }
+  },
+  "2026-03-24": {
+   "刘艺": {
+    "attitude": 4.22,
+    "polish": 4.22,
+    "logic": 4.22,
+    "raters": 0
+   },
+   "杜钰麟": {
+    "attitude": 4.217,
+    "polish": 4.217,
+    "logic": 4.217,
+    "raters": 0
+   }
+  },
+  "2026-03-31": {
+   "李慧": {
+    "attitude": 4.703,
+    "polish": 4.703,
+    "logic": 4.703,
+    "raters": 0
+   },
+   "邹洋斌": {
+    "attitude": 4.0,
+    "polish": 4.0,
+    "logic": 4.0,
+    "raters": 0
+   }
+  },
+  "2026-04-21": {
+   "王陈龙": {
+    "attitude": 4.75,
+    "polish": 4.75,
+    "logic": 4.75,
+    "raters": 0
+   },
+   "陈晨": {
+    "attitude": 4.5,
+    "polish": 4.5,
+    "logic": 4.5,
+    "raters": 0
+   }
+  },
+  "2026-04-28": {
+   "周真琦": {
+    "attitude": 4.473,
+    "polish": 4.473,
+    "logic": 4.473,
+    "raters": 0
+   },
+   "杜钰麟": {
+    "attitude": 4.733,
+    "polish": 4.733,
+    "logic": 4.733,
+    "raters": 0
+   }
+  },
+  "2026-05-12": {
+   "刘一诺": {
+    "attitude": 4.407,
+    "polish": 4.407,
+    "logic": 4.407,
+    "raters": 0
+   },
+   "余可": {
+    "attitude": 4.667,
+    "polish": 4.667,
+    "logic": 4.667,
+    "raters": 0
+   }
+  }
+ }
+}

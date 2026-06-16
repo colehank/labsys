@@ -325,10 +325,10 @@ export function useEvalReports() {
 export function useSubmitRating() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { key: string; presenter: string; attitude: number; polish: number; top5: string[] }) =>
+    mutationFn: (vars: { key: string; presenter: string; attitude: number; polish: number; logic: number; top5: string[] }) =>
       unwrap(api.POST("/api/eval/reports/{key}/rating", {
         params: { path: { key: vars.key } },
-        body: { presenter: vars.presenter, attitude: vars.attitude, polish: vars.polish, top5: vars.top5 },
+        body: { presenter: vars.presenter, attitude: vars.attitude, polish: vars.polish, logic: vars.logic, top5: vars.top5 },
       })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["eval"] }),
   });

@@ -79,7 +79,7 @@ async def list_reports(_: CurrentUser, db: DbSession) -> list[ReportOut]:
         out.append(ReportOut(
             key=m.id, mo=m.date.month - 1, day=m.date.day,
             dateLabel=f"{m.date.month}月{m.date.day}日 周{_WD[m.date.weekday()]}",
-            type=m.type.value, presenters=[p.name for p in m.presenters],
+            type=m.type, presenters=[p.name for p in m.presenters],
             attendance=data["attendance"].get(m.id, {}),
             speaks=data["speaks"].get(m.id, {}),
             ratings=data["ratings"].get(m.id, {}),
@@ -117,27 +117,29 @@ async def _recompute_meeting_eval(db, meeting_id: str) -> None:
     # —— 报告人评分聚合 ——
     agg: dict[str, list[float]] = {}
     for v in votes:
-        a = agg.setdefault(v.presenter, [0.0, 0.0, 0])
+        a = agg.setdefault(v.presenter, [0.0, 0.0, 0.0, 0])
         a[0] += v.attitude
         a[1] += v.polish
-        a[2] += 1
+        a[2] += v.logic
+        a[3] += 1
     existing = {
         r.presenter: r for r in (await db.execute(
             select(Rating).where(Rating.meeting_id == meeting_id)
         )).scalars()
     }
-    for presenter, (asum, psum, n) in agg.items():
+    for presenter, (asum, psum, lsum, n) in agg.items():
         rt = existing.get(presenter)
         if rt is None:
             rt = Rating(meeting_id=meeting_id, presenter=presenter)
             db.add(rt)
         rt.attitude = asum / n if n else 0.0
         rt.polish = psum / n if n else 0.0
+        rt.logic = lsum / n if n else 0.0
         rt.raters = n
     # 已无选票的报告人评分归零（撤回场景）
     for presenter, rt in existing.items():
         if presenter not in agg:
-            rt.attitude = rt.polish = 0.0
+            rt.attitude = rt.polish = rt.logic = 0.0
             rt.raters = 0
 
     # —— 讨论得分（每个 rater 的 Top5 只计一次，取其任一张选票的 top5）——
@@ -184,6 +186,7 @@ async def submit_rating(key: str, body: RatingSubmit, me: CurrentUser, db: DbSes
         db.add(vote)
     vote.attitude = body.attitude
     vote.polish = body.polish
+    vote.logic = body.logic
     vote.top5 = [n for n in body.top5 if n]
     await db.flush()
     await _recompute_meeting_eval(db, meeting.id)

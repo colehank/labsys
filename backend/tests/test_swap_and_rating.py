@@ -76,9 +76,9 @@ async def test_rating_dedup_repeat_submit(client: AsyncClient, db_session: Async
 
     # 苏沐 对 周明 连续提交两次（值不同）
     await client.post(f"{API}/eval/reports/{key}/rating", headers=_h(m),
-                      json={"presenter": "周明", "attitude": 5, "polish": 5, "top5": ["苏沐"]})
+                      json={"presenter": "周明", "attitude": 5, "polish": 5, "logic": 5, "top5": ["苏沐"]})
     await client.post(f"{API}/eval/reports/{key}/rating", headers=_h(m),
-                      json={"presenter": "周明", "attitude": 3, "polish": 3, "top5": ["苏沐"]})
+                      json={"presenter": "周明", "attitude": 3, "polish": 3, "logic": 3, "top5": ["苏沐"]})
 
     db_session.expire_all()
     votes = (await db_session.execute(
@@ -90,7 +90,7 @@ async def test_rating_dedup_repeat_submit(client: AsyncClient, db_session: Async
     # 只算一票，且为最后一次提交的值（去重覆盖，不累加）
     assert votes == 1
     assert rt.raters == 1
-    assert rt.attitude == 3 and rt.polish == 3
+    assert rt.attitude == 3 and rt.polish == 3 and rt.logic == 3
 
 
 async def test_rating_cannot_rate_self(client: AsyncClient) -> None:
@@ -99,5 +99,5 @@ async def test_rating_cannot_rate_self(client: AsyncClient) -> None:
     key = next(x for x in meetings if x["presenters"][0]["name"] == "周明")["id"]
     # 周明 给自己评分被拒
     bad = await client.post(f"{API}/eval/reports/{key}/rating", headers=_h(a),
-                            json={"presenter": "周明", "attitude": 5, "polish": 5, "top5": []})
+                            json={"presenter": "周明", "attitude": 5, "polish": 5, "logic": 5, "top5": []})
     assert bad.status_code == 403

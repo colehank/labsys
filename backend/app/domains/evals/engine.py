@@ -19,8 +19,9 @@ MEMBERS: list[str] = [
 
 # 默认评选期与权重/阈值（= data.ts evalPeriod + store.ts 初值）
 DEFAULT_RANGE = {"from": "2026-04-19", "to": "2026-06-07"}
-DEFAULT_WEIGHTS = {"attitude": 0.25, "polish": 0.25, "attendance": 0.25, "discussion": 0.25}
-DEFAULT_FILTERS = {"attitudeMin": 0, "polishMin": 0, "attMin": 100, "discMin": 4}
+# 报告评分三维（态度/精良/逻辑清晰，对齐问卷星表单）+ 出勤 + 讨论
+DEFAULT_WEIGHTS = {"attitude": 0.2, "polish": 0.2, "logic": 0.2, "attendance": 0.2, "discussion": 0.2}
+DEFAULT_FILTERS = {"attitudeMin": 0, "polishMin": 0, "logicMin": 0, "attMin": 100, "discMin": 4}
 
 
 def eval_h(s: str, salt: int) -> int:
@@ -83,10 +84,15 @@ def seed_eval(reports: list[dict]) -> dict:
             ratings[rid][pn] = {
                 "attitude": 3 + (eval_h(pn + rid, 5) % 21) / 10,
                 "polish": 3 + (eval_h(pn + rid, 9) % 21) / 10,
+                "logic": 3 + (eval_h(pn + rid, 11) % 21) / 10,
                 "raters": 9 + (eval_h(pn + rid, 3) % 8),
             }
     peer_baseline = {
-        name: {"attitude": 3 + (eval_h(name, 5) % 21) / 10, "polish": 3 + (eval_h(name, 9) % 21) / 10}
+        name: {
+            "attitude": 3 + (eval_h(name, 5) % 21) / 10,
+            "polish": 3 + (eval_h(name, 9) % 21) / 10,
+            "logic": 3 + (eval_h(name, 11) % 21) / 10,
+        }
         for name in MEMBERS
     }
     return {"attendance": attendance, "discussion": discussion,
@@ -133,8 +139,8 @@ def compute_eval(
     rows: list[dict] = []
     for name in members:
         present = discuss = 0
-        a_sum = p_sum = 0.0
-        a_n = p_n = 0
+        a_sum = p_sum = l_sum = 0.0
+        a_n = p_n = l_n = 0
         for r in rs:
             rid = r["id"]
             if attendance.get(rid, {}).get(name) == "present":
@@ -144,24 +150,29 @@ def compute_eval(
             if rt:
                 a_sum += rt["attitude"]; a_n += 1
                 p_sum += rt["polish"]; p_n += 1
-        base = peer_baseline.get(name, {"attitude": 0, "polish": 0})
+                l_sum += rt.get("logic", 0.0); l_n += 1
+        base = peer_baseline.get(name, {"attitude": 0, "polish": 0, "logic": 0})
         attitude = a_sum / a_n if a_n else base["attitude"]
         polish = p_sum / p_n if p_n else base["polish"]
+        logic = l_sum / l_n if l_n else base.get("logic", 0)
         rows.append({
-            "name": name, "attitude": attitude, "polish": polish,
+            "name": name, "attitude": attitude, "polish": polish, "logic": logic,
             "attRate": _js_round(present / total * 100), "discuss": discuss, "reported": a_n,
         })
 
     _norm(rows, "attitude", "nAttitude")
     _norm(rows, "polish", "nPolish")
+    _norm(rows, "logic", "nLogic")
     _norm(rows, "attRate", "nAtt")
     _norm(rows, "discuss", "nDisc")
 
     w = weights
-    sw = (w["attitude"] + w["polish"] + w["attendance"] + w["discussion"]) or 1
+    sw = (w["attitude"] + w["polish"] + w.get("logic", 0)
+          + w["attendance"] + w["discussion"]) or 1
     for r in rows:
         r["meeting"] = (
             w["attitude"] * r["nAttitude"] + w["polish"] * r["nPolish"]
+            + w.get("logic", 0) * r["nLogic"]
             + w["attendance"] * r["nAtt"] + w["discussion"] * r["nDisc"]
         ) / sw
 
@@ -173,6 +184,7 @@ def compute_eval(
     survivors = [
         r for r in by_meeting
         if r["attitude"] >= f["attitudeMin"] and r["polish"] >= f["polishMin"]
+        and r["logic"] >= f.get("logicMin", 0)
         and r["attRate"] >= f["attMin"] and r["discuss"] >= f["discMin"]
     ]
     surv_names = [r["name"] for r in survivors]
@@ -239,7 +251,7 @@ def rank_series_for(
         if metric == "discuss":
             arr = sorted(ev["rows"], key=lambda a: (-a["discuss"], -a["meeting"]))
         elif metric == "report":
-            arr = sorted(ev["rows"], key=lambda a: (-(a["nAttitude"] + a["nPolish"]), -a["meeting"]))
+            arr = sorted(ev["rows"], key=lambda a: (-(a["nAttitude"] + a["nPolish"] + a["nLogic"]), -a["meeting"]))
         idx = next((i for i, a in enumerate(arr) if a["name"] == name), -1)
         points.append({"label": f"{r['mo'] + 1}/{r['day']:02d}"})
         ranks.append(idx + 1 if idx >= 0 else total)

@@ -56,7 +56,7 @@ def _report_dict(m: Meeting) -> dict:
         "id": m.id,
         "mo": m.date.month - 1,
         "day": m.date.day,
-        "type": m.type.value,
+        "type": m.type,
         "presenters": [p.name for p in m.presenters],
     }
 
@@ -95,7 +95,8 @@ async def load_eval_data(db: AsyncSession) -> dict:
     for rt in (await db.execute(select(Rating))).scalars():
         if rt.meeting_id in ids:
             ratings[rt.meeting_id][rt.presenter] = {
-                "attitude": rt.attitude, "polish": rt.polish, "raters": rt.raters,
+                "attitude": rt.attitude, "polish": rt.polish, "logic": rt.logic,
+                "raters": rt.raters,
             }
 
     # PeerBaseline 已无任何写入方（历史遗留的同行基线维度）；保持空 dict——

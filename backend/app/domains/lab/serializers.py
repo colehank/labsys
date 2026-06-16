@@ -12,12 +12,16 @@ _WD_CN = ["一", "二", "三", "四", "五", "六", "日"]  # Mon..Sun (date.wee
 _LEVEL_WEIGHT = {"urgent": 3, "important": 2, "info": 1}
 
 
+# 已知类型 → 色调；自定义类型回退 neutral
+_TYPE_TONE = {MeetingType.progress.value: "accent", MeetingType.literature.value: "info"}
+
+
 def meeting_out(m: Meeting) -> MeetingOut:
     d: date = m.date
     mo0 = d.month - 1
     md = f"{d.month}/{d.day:02d}"
     label = f"{d.month}月{d.day}日 周{_WD_CN[d.weekday()]}"
-    tone = "accent" if m.type == MeetingType.progress else "info"
+    tone = _TYPE_TONE.get(m.type, "neutral")
     online = None
     if m.online_url or m.online_status:  # 已预约/预约失败/进行中都暴露给前端
         online = OnlineMeetingOut(
@@ -26,7 +30,8 @@ def meeting_out(m: Meeting) -> MeetingOut:
         )
     return MeetingOut(
         id=m.id, y=d.year, mo=mo0, day=d.day, mdLabel=md, dateLabel=label,
-        type=m.type.value, tone=tone, status=m.status.value,
+        type=m.type, tone=tone, status=m.status.value,
+        host=m.host or "",
         time=m.time or "", place=m.place or "", online=online,
         presenters=[
             PresenterOut(name=p.name, topic=p.topic, kind=p.kind, minutes=p.minutes)

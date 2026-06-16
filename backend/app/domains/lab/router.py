@@ -165,6 +165,7 @@ class PresenterIn(BaseModel):
 class MeetingIn(BaseModel):
     date: date
     type: str = "进展汇报"        # MeetingType 值：进展汇报 / 文献精读
+    host: str = ""               # 主持人（排期指定，可空）
     time: str = ""
     place: str = ""
     presenters: list[PresenterIn] = []
@@ -194,10 +195,8 @@ async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> lis
         if m is None:
             m = Meeting(date=mi.date, status=MeetingStatus.scheduled)
             db.add(m)
-        try:
-            m.type = MeetingType(mi.type)
-        except ValueError:
-            m.type = MeetingType.progress
+        m.type = mi.type or MeetingType.progress.value   # 自由文本类型，管理员自定义
+        m.host = mi.host
         m.time = mi.time
         m.place = mi.place
         # presenters 关系 cascade=all,delete-orphan → 整体替换

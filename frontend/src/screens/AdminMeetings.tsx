@@ -47,7 +47,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       const iso = `${m.y}-${String(m.mo + 1).padStart(2, "0")}-${String(m.day).padStart(2, "0")}`;
       slots.push({ id: "s" + (UID++), iso, date: m.dateLabel || fmt(new Date(iso + "T00:00:00")), cancelled: false });
       groups.push({
-        id: "g" + (UID++), time: m.time || "", place: m.place || "", type: m.type || "",
+        id: "g" + (UID++), time: m.time || "", place: m.place || "", type: m.type || "", host: m.host || "",
         presenters: (m.presenters || []).map((p) => ({ name: p.name, topic: p.topic || "", skipped: false })),
       });
     });
@@ -363,6 +363,7 @@ import { useIsMobile } from "../lib/useIsMobile";
           return {
             date: c.slot.iso,
             type: kind,
+            host: c.group.host || "",
             time: c.group.time || "",   // 空 = 沿用全局默认（成员端回退渲染）
             place: c.group.place || "",
             presenters: (c.group.presenters || [])
@@ -512,12 +513,21 @@ import { useIsMobile } from "../lib/useIsMobile";
                       <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{slot.pending ? "顺延待排" : slot.date.split(" ")[1]}</div>
                     </div>
                     <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
-                      {active.length ? active.map((p) => (
-                        <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <Avatar name={p.name} size="xs" />
-                          <span style={{ fontSize: 13, color: "var(--text-body)" }}>{p.name}</span>
+                      {active.length
+                        ? active.map((p) => (
+                          <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <Avatar name={p.name} size="xs" />
+                            <span style={{ fontSize: 13, color: "var(--text-body)" }}>{p.name}</span>
+                          </span>
+                        ))
+                        : g.type && !["进展汇报", "文献精读"].includes(g.type)
+                          ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)" }}>{g.type}</span>
+                          : <span style={{ fontSize: 13, color: "var(--warning-text)" }}>待安排报告人</span>}
+                      {g.host && (
+                        <span title="主持人" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: "var(--accent-text)", background: "var(--accent-soft)", padding: "2px 7px", borderRadius: "var(--radius-pill)" }}>
+                          {I("mic", { size: 11 })}主持 {g.host}
                         </span>
-                      )) : <span style={{ fontSize: 13, color: "var(--warning-text)" }}>待安排报告人</span>}
+                      )}
                     </div>
                     {!slot.pending && (
                       <IconButton size="sm" icon={I("calendar-x")} label="取消组会" onClick={(e) => { e.stopPropagation(); cancelSlot(slot.id); }} />
@@ -532,19 +542,30 @@ import { useIsMobile } from "../lib/useIsMobile";
                           onSwap={(name) => swap(g.id, pi, name)} onRemove={() => removeP(g.id, pi)}
                           onMove={(dir) => moveP(g.id, pi, dir)} />
                       ))}
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 12, marginTop: 4, borderTop: "1px solid var(--border-subtle)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 12, marginTop: 4, borderTop: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>添加报告人</span>
                         <div style={{ width: 180 }}>
                           <Select size="sm" placeholder="选择成员…" value=""
                             onChange={(e) => { if (e.target.value) addP(g.id, e.target.value); }}
                             options={roster.filter((m) => !g.presenters.some((p) => p.name === m.name)).map((m) => ({ value: m.name, label: m.role ? `${m.name} · ${m.role}` : m.name }))} />
                         </div>
+                        <span style={{ fontSize: 12.5, color: "var(--text-muted)", marginLeft: 8 }}>主持人</span>
+                        <div style={{ width: 180 }}>
+                          <Select size="sm" placeholder="未指定" value={g.host || ""}
+                            onChange={(e) => setMeta(g.id, "host", e.target.value)}
+                            options={[{ value: "", label: "未指定" }, ...roster.map((m) => ({ value: m.name, label: m.role ? `${m.name} · ${m.role}` : m.name }))]} />
+                        </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10, paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
+                        <Input size="sm" label="类型（可自定义）" value={g.type || ""} placeholder="进展汇报 / 文献精读 / 团建…" iconLeft={I("tag")} list={`mtypes-${g.id}`}
+                          onChange={(e) => setMeta(g.id, "type", e.target.value)} />
                         <Input size="sm" label="本场时间（留空 = 默认）" value={g.time || ""} placeholder={cfg?.meetingDefault?.time || "全局默认"} iconLeft={I("clock")}
                           onChange={(e) => setMeta(g.id, "time", e.target.value)} />
                         <Input size="sm" label="本场地点（留空 = 默认）" value={g.place || ""} placeholder={cfg?.meetingDefault?.place || "全局默认"} iconLeft={I("map-pin")}
                           onChange={(e) => setMeta(g.id, "place", e.target.value)} />
+                        <datalist id={`mtypes-${g.id}`}>
+                          {["进展汇报", "文献精读", "团建", "AI Agent工作坊", "工作坊"].map((t) => <option key={t} value={t} />)}
+                        </datalist>
                       </div>
                     </div>
                   )}

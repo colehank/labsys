@@ -38,6 +38,7 @@ class Rating(UUIDMixin, Base):
     presenter: Mapped[str] = mapped_column(String(64), index=True)
     attitude: Mapped[float] = mapped_column(Float, default=0.0)
     polish: Mapped[float] = mapped_column(Float, default=0.0)
+    logic: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")  # 报告逻辑清晰程度
     raters: Mapped[int] = mapped_column(Integer, default=0)
 
 
@@ -51,6 +52,7 @@ class RatingVote(UUIDMixin, Base):
     presenter: Mapped[str] = mapped_column(String(64), index=True)
     attitude: Mapped[float] = mapped_column(Float, default=0.0)
     polish: Mapped[float] = mapped_column(Float, default=0.0)
+    logic: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")  # 报告逻辑清晰程度
     top5: Mapped[list] = mapped_column(JSON, default=list)  # 讨论 Top5 姓名（第 i 名 +(5-i) 分）
 
 

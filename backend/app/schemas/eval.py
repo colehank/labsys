@@ -8,12 +8,14 @@ class EvalRowOut(BaseModel):
     name: str
     attitude: float
     polish: float
+    logic: float
     attRate: int
     discuss: int
     meeting: float
     meetingRank: int
     nAttitude: float
     nPolish: float
+    nLogic: float
     nAtt: float
     nDisc: float
 
@@ -71,6 +73,7 @@ class RatingSubmit(BaseModel):
     presenter: str
     attitude: float = Field(ge=0, le=5)  # 评分区间 0~5，拒绝越界刷分
     polish: float = Field(ge=0, le=5)
+    logic: float = Field(ge=0, le=5)     # 报告逻辑清晰程度
     top5: list[str] = Field(default=[], max_length=5)
 
 

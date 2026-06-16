@@ -162,9 +162,10 @@ import type { Me } from "../auth";
                           : <Badge tone="warning" size="sm" dot>在线会议待设置</Badge>}
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--text-muted)", fontSize: 13, marginBottom: 14, flexWrap: "wrap" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("clock", { size: 14 })}{sel.time || md.time}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("map-pin", { size: 14 })}{sel.place || md.place}</span>
+                    {sel.host && <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("mic", { size: 14 })}主持 {sel.host}</span>}
                   </div>
                   {sel.presenters.map((p, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 0" }}>
@@ -248,6 +249,7 @@ import type { Me } from "../auth";
     const isMobile = useIsMobile();
     const [att, setAtt] = React.useState(0);
     const [pol, setPol] = React.useState(0);
+    const [log, setLog] = React.useState(0);
     const [confirm, setConfirm] = React.useState(false);
     // discussion Top5 for THIS report — ordered slots, pick from candidates
     const [top5, setTop5] = React.useState([null, null, null, null, null]);
@@ -259,7 +261,7 @@ import type { Me } from "../auth";
       const j = i + dir; if (j < 0 || j >= t.length) return t;
       const a = [...t]; [a[i], a[j]] = [a[j], a[i]]; return a;
     });
-    const done = att > 0 && pol > 0 && chosen.length === 5;
+    const done = att > 0 && pol > 0 && log > 0 && chosen.length === 5;
 
     return (
       <Card padding="none" style={{ overflow: "visible" }}>
@@ -290,6 +292,11 @@ import type { Me } from "../auth";
                 <span style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-strong)" }}>制作精良</span>
                 <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>幻灯片与材料的完成度</span>
                 <ScoreDots value={pol} onChange={setPol} />
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10, padding: "16px 0", borderTop: "1px solid var(--border-subtle)" }}>
+                <span style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-strong)" }}>逻辑清晰</span>
+                <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>报告条理是否清楚、论证是否连贯</span>
+                <ScoreDots value={log} onChange={setLog} />
               </div>
             </div>
           </div>
@@ -350,7 +357,7 @@ import type { Me } from "../auth";
         {/* footer — per-report submit */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: "1px solid var(--border-subtle)" }}>
           <span style={{ flex: 1, fontSize: 12.5, color: "var(--text-faint)" }}>
-            {done ? "评分匿名提交，报告人看不到具体打分人。" : "完成两项评分并选满讨论 Top 5 后可提交。"}
+            {done ? "评分匿名提交，报告人看不到具体打分人。" : "完成三项评分并选满讨论 Top 5 后可提交。"}
           </span>
           <Button size="sm" variant="primary" iconLeft={I("check")} disabled={!done} onClick={() => setConfirm(true)}>提交本报告评分</Button>
         </div>
@@ -360,11 +367,12 @@ import type { Me } from "../auth";
           icon={I("check")} tone="accent" width={420}
           footer={<>
             <Button variant="ghost" onClick={() => setConfirm(false)}>再看看</Button>
-            <Button variant="primary" onClick={() => { setConfirm(false); onSubmit({ attitude: att, polish: pol, top5: chosen }); }}>确认提交</Button>
+            <Button variant="primary" onClick={() => { setConfirm(false); onSubmit({ attitude: att, polish: pol, logic: log, top5: chosen }); }}>确认提交</Button>
           </>}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13.5, color: "var(--text-body)" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>报告态度</span><ScoreDots value={att} readOnly showValue /></div>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>制作精良</span><ScoreDots value={pol} readOnly showValue /></div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>逻辑清晰</span><ScoreDots value={log} readOnly showValue /></div>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>讨论 Top 5</span><span style={{ fontWeight: 600 }}>已选 {chosen.length} 人</span></div>
           </div>
         </Dialog>
@@ -398,7 +406,7 @@ import type { Me } from "../auth";
         {pending.map(({ p, i }) => (
           <ReportRating key={i} index={i} presenter={p}
             candidates={allNames.filter((n) => n !== p.name)}
-            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => [...s, i]); }, onError: () => toast("提交失败，请重试", { tone: "error" }) }); }} />
+            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, logic: vals.logic, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => [...s, i]); }, onError: () => toast("提交失败，请重试", { tone: "error" }) }); }} />
         ))}
 
         {pending.length === 0 && (
@@ -548,10 +556,11 @@ import type { Me } from "../auth";
     const row = ev?.rows.find((r) => r.name === me.name);
     if (!ev || !row) return null;
     const w: any = ev.weights;
-    const wSum = (w.attitude + w.polish + w.attendance + w.discussion) || 1;
+    const wSum = (w.attitude + w.polish + (w.logic || 0) + w.attendance + w.discussion) || 1;
     const subs = [
       { label: "汇报态度", raw: row.attitude.toFixed(1), unit: "/ 5", norm: row.nAttitude, weight: w.attitude, color: "var(--terracotta-500)" },
       { label: "汇报精良", raw: row.polish.toFixed(1), unit: "/ 5", norm: row.nPolish, weight: w.polish, color: "var(--amber-500)" },
+      { label: "逻辑清晰", raw: (row.logic ?? 0).toFixed(1), unit: "/ 5", norm: row.nLogic, weight: w.logic || 0, color: "var(--terracotta-400)" },
       { label: "讨论", raw: String(row.discuss), unit: "次", norm: row.nDisc, weight: w.discussion, color: "var(--slate-500)" },
       { label: "出勤", raw: row.attRate + "%", unit: "", norm: row.nAtt, weight: w.attendance, color: "var(--sage-500)" },
     ];

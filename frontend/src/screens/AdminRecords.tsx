@@ -13,7 +13,7 @@ import { useIsMobile } from "../lib/useIsMobile";
   const { Avatar, Button } = NS;
 
   const hCell = { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-faint)" };
-  const GRID = "150px repeat(5, 1fr)";
+  const GRID = "150px repeat(6, 1fr)";
 
   function MiniBar({ pct, color }: any) {
     return (
@@ -54,6 +54,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const COLS = [
       { key: "attitude", label: "报告态度", color: "var(--terracotta-500)", raw: (r) => r.attitude.toFixed(1), pct: (r) => r.nAttitude, val: (r) => r.attitude },
       { key: "polish", label: "制作精良", color: "var(--amber-500)", raw: (r) => r.polish.toFixed(1), pct: (r) => r.nPolish, val: (r) => r.polish },
+      { key: "logic", label: "逻辑清晰", color: "var(--terracotta-400)", raw: (r) => (r.logic ?? 0).toFixed(1), pct: (r) => r.nLogic, val: (r) => r.logic ?? 0 },
       { key: "attRate", label: "出勤", color: "var(--sage-500)", raw: (r) => r.attRate + "%", pct: (r) => r.nAtt, val: (r) => r.attRate },
       { key: "discuss", label: "讨论参与", color: "var(--slate-500)", raw: (r) => String(r.discuss), pct: (r) => r.nDisc, val: (r) => r.discuss },
       { key: "award", label: "优秀", color: "var(--amber-500)", raw: (r) => (awardCount[r.name] || 0) + " 次", pct: (r) => (awardCount[r.name] || 0) / maxAward * 100, val: (r) => awardCount[r.name] || 0 },
@@ -79,10 +80,10 @@ import { useIsMobile } from "../lib/useIsMobile";
     const gridCols = isMobile ? "1fr" : GRID;
 
     const exportCSV = () => {
-      const header = ["成员", "身份", "报告态度", "制作精良", "出勤率", "讨论参与", "优秀次数"];
+      const header = ["成员", "身份", "报告态度", "制作精良", "逻辑清晰", "出勤率", "讨论参与", "优秀次数"];
       const lines = [header.join(",")];
       rows.forEach((r) => {
-        lines.push([r.name, roleByName[r.name] || "", r.attitude.toFixed(1), r.polish.toFixed(1), r.attRate + "%", r.discuss, awardCount[r.name] || 0].join(","));
+        lines.push([r.name, roleByName[r.name] || "", r.attitude.toFixed(1), r.polish.toFixed(1), (r.logic ?? 0).toFixed(1), r.attRate + "%", r.discuss, awardCount[r.name] || 0].join(","));
       });
       const csv = "﻿" + lines.join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

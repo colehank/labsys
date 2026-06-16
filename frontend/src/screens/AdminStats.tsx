@@ -24,12 +24,13 @@ import { useIsMobile } from "../lib/useIsMobile";
   const L1 = [
     { key: "attitude", nk: "nAttitude", wk: "attitude", label: "报告态度", short: "报告态度", color: "var(--terracotta-500)", raw: (r) => r.attitude.toFixed(1) },
     { key: "polish", nk: "nPolish", wk: "polish", label: "制作精良度", short: "制作精良", color: "var(--amber-500)", raw: (r) => r.polish.toFixed(1) },
+    { key: "logic", nk: "nLogic", wk: "logic", label: "逻辑清晰度", short: "逻辑清晰", color: "var(--terracotta-400)", raw: (r) => (r.logic ?? 0).toFixed(1) },
     { key: "attRate", nk: "nAtt", wk: "attendance", label: "出勤率", short: "出勤率", color: "var(--sage-500)", raw: (r) => r.attRate + "%" },
     { key: "discuss", nk: "nDisc", wk: "discussion", label: "讨论参与", short: "讨论参与", color: "var(--slate-500)", raw: (r) => String(r.discuss) },
   ];
 
   const hCell = { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-faint)" };
-  const TABLE_COLS = "54px 102px repeat(4, 1fr) 64px 50px 50px";
+  const TABLE_COLS = "54px 102px repeat(5, 1fr) 64px 50px 50px";
 
   function MiniBar({ pct, color, w = 36 }: any) {
     return (
@@ -212,12 +213,12 @@ import { useIsMobile } from "../lib/useIsMobile";
 
     // 导出当前区间表现排名为 CSV（与表格同源，BOM 头保证 Excel 中文不乱码）。
     const exportCSV = () => {
-      const header = ["终极名次", "成员", "报告态度", "制作精良", "出勤率", "讨论参与", "组会名次", "是否入选"];
+      const header = ["终极名次", "成员", "报告态度", "制作精良", "逻辑清晰", "出勤率", "讨论参与", "组会名次", "是否入选"];
       const lines = [header.join(",")];
       topRows.forEach((r: any) => {
         lines.push([
           r.finalRank ?? "—", r.name,
-          (r.attitude ?? 0).toFixed(1), (r.polish ?? 0).toFixed(1),
+          (r.attitude ?? 0).toFixed(1), (r.polish ?? 0).toFixed(1), (r.logic ?? 0).toFixed(1),
           (r.attRate ?? 0) + "%", r.discuss ?? 0,
           r.inSurv ? "#" + r.mRank : "—", r.inSurv ? "是" : "否",
         ].join(","));
@@ -254,7 +255,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 
         {/* ── 最上方：最终表现（① 汇总权重 + 终极排名/组会表现明细）── */}
         <Panel title="最终表现" sub="终极排名" scroll={false}
-          right={<Button size="sm" variant="ghost" onClick={() => setEvalWeights({ attitude: 0.25, polish: 0.25, attendance: 0.25, discussion: 0.25 })}>等权</Button>}
+          right={<Button size="sm" variant="ghost" onClick={() => setEvalWeights({ attitude: 0.2, polish: 0.2, logic: 0.2, attendance: 0.2, discussion: 0.2 })}>等权</Button>}
           style={{ flex: 1, minHeight: 200 }}>
           <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
             {/* ① 汇总权重 */}
@@ -264,7 +265,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                 <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-faint)" }}>汇总权重</span>
                 <span style={{ fontSize: 11, color: "var(--text-faint)" }}>加权得组会表现分</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap: "6px 22px", padding: "8px 16px 10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(5, 1fr)", gap: "6px 22px", padding: "8px 16px 10px" }}>
                 {L1.map((m) => <WeightChip key={m.key} label={m.label} color={m.color} value={w[m.wk]} onChange={(v) => setEvalWeights({ [m.wk]: v })} />)}
               </div>
             </div>
@@ -326,8 +327,9 @@ import { useIsMobile } from "../lib/useIsMobile";
             <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 16px" }}>
               <FilterField label="报告态度" color={L1[0].color} value={f.attitudeMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ attitudeMin: v })} />
               <FilterField label="制作精良度" color={L1[1].color} value={f.polishMin} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ polishMin: v })} />
-              <FilterField label="出勤率" color={L1[2].color} value={f.attMin} suffix="%" max={100} step={5} onChange={(v) => setEvalFilters({ attMin: v })} />
-              <FilterField label="讨论参与" color={L1[3].color} value={f.discMin} suffix="次" onChange={(v) => setEvalFilters({ discMin: v })} />
+              <FilterField label="逻辑清晰度" color={L1[2].color} value={f.logicMin ?? 0} suffix="分" max={5} step={0.5} onChange={(v) => setEvalFilters({ logicMin: v })} />
+              <FilterField label="出勤率" color={L1[3].color} value={f.attMin} suffix="%" max={100} step={5} onChange={(v) => setEvalFilters({ attMin: v })} />
+              <FilterField label="讨论参与" color={L1[4].color} value={f.discMin} suffix="次" onChange={(v) => setEvalFilters({ discMin: v })} />
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 2, paddingTop: 11, borderTop: "1px dashed var(--border-subtle)", fontSize: 11.5, color: "var(--text-faint)" }}>
                 <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>
                 <span>达标者进入进展排序</span>

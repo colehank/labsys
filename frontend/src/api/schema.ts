@@ -1098,6 +1098,8 @@ export interface components {
             attitude: number;
             /** Polish */
             polish: number;
+            /** Logic */
+            logic: number;
             /** Attrate */
             attRate: number;
             /** Discuss */
@@ -1110,6 +1112,8 @@ export interface components {
             nAttitude: number;
             /** Npolish */
             nPolish: number;
+            /** Nlogic */
+            nLogic: number;
             /** Natt */
             nAtt: number;
             /** Ndisc */
@@ -1204,6 +1208,11 @@ export interface components {
              */
             type: string;
             /**
+             * Host
+             * @default
+             */
+            host: string;
+            /**
              * Time
              * @default
              */
@@ -1239,6 +1248,11 @@ export interface components {
             tone: string;
             /** Status */
             status: string;
+            /**
+             * Host
+             * @default
+             */
+            host: string;
             /**
              * Time
              * @default
@@ -1353,6 +1367,8 @@ export interface components {
             attitude: number;
             /** Polish */
             polish: number;
+            /** Logic */
+            logic: number;
             /**
              * Top5
              * @default []

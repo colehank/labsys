@@ -81,7 +81,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const r = reports[sel];
 
     // 报告人评分（态度/精良）由成员匿名提交、后端聚合后随 report 下发，此处只读展示。
-    const ratings = ((r?.ratings || {}) as Record<string, { attitude: number; polish: number; raters: number }>);
+    const ratings = ((r?.ratings || {}) as Record<string, { attitude: number; polish: number; logic: number; raters: number }>);
     const cancelled = false;
 
     // 当前报告汇总
@@ -198,13 +198,13 @@ import { useIsMobile } from "../lib/useIsMobile";
               <span style={{ fontSize: 11.5, color: "var(--text-faint)", marginLeft: "auto" }}>只读</span>
             </div>
             {r.presenters.map((pn, i) => {
-              const rt = ratings[pn] || { attitude: 0, polish: 0, raters: 0 };
+              const rt = ratings[pn] || { attitude: 0, polish: 0, logic: 0, raters: 0 };
               return (
                 <div key={pn} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 20px", borderTop: i ? "1px solid var(--border-subtle)" : "none" }}>
                   <Avatar name={pn} size="sm" />
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{pn}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-                    {([["报告态度", rt.attitude, "var(--terracotta-500)"], ["制作精良", rt.polish, "var(--amber-500)"]] as [string, number, string][]).map(([lb, v, c]) => (
+                    {([["报告态度", rt.attitude, "var(--terracotta-500)"], ["制作精良", rt.polish, "var(--amber-500)"], ["逻辑清晰", rt.logic, "var(--terracotta-400)"]] as [string, number, string][]).map(([lb, v, c]) => (
                       <div key={lb} style={{ display: "flex", alignItems: "center", gap: 7 }}>
                         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{lb}</span>
                         <span className="cibol-mono" style={{ fontSize: 14, fontWeight: 700, color: c }}>{v ? v.toFixed(1) : "—"}</span>
