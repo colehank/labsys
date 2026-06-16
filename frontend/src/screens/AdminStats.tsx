@@ -147,6 +147,8 @@ import { useIsMobile } from "../lib/useIsMobile";
     const publishExc = usePublishExcellence();
     const [dragItem, setDragItem] = React.useState<string | null>(null);   // 正在拖拽的成员名
     const [liveOrder, setLiveOrder] = React.useState<string[] | null>(null); // 拖拽中的临时序列（实时挤压预览）
+    const rowRefs = React.useRef<Record<string, HTMLElement | null>>({});  // 名 → 行 DOM，用于 FLIP 动画
+    const prevTops = React.useRef<Record<string, number>>({});             // 上一帧各行位置
     // 组会权重 + 评选过滤收进「设置」弹窗（本次评选标准）
     const [settingsOpen, setSettingsOpen] = React.useState(false);
     // 右侧汇总表：默认只显示排名，点「明细」在后面展开各维得分
@@ -219,6 +221,27 @@ import { useIsMobile } from "../lib/useIsMobile";
       }
       setDragItem(null);
     };
+
+    // FLIP 动画：重排后让各行从旧位置平滑滑到新位置（被拖的那行直接吸附，不动画）
+    React.useLayoutEffect(() => {
+      const tops: Record<string, number> = {};
+      Object.entries(rowRefs.current).forEach(([name, el]) => {
+        if (!el) return;
+        const top = el.getBoundingClientRect().top;
+        tops[name] = top;
+        const prev = prevTops.current[name];
+        if (prev != null && prev !== top && name !== dragItem) {
+          const dy = prev - top;
+          el.style.transition = "none";
+          el.style.transform = `translateY(${dy}px)`;
+          requestAnimationFrame(() => {
+            el.style.transition = "transform 220ms cubic-bezier(.2,.8,.2,1)";
+            el.style.transform = "";
+          });
+        }
+      });
+      prevTops.current = tops;
+    });
 
     const latest = excellence && excellence.published ? excellence : null;
     const pubN = Math.max(1, Math.min(pubCount | 0, ev.merged.length));
@@ -294,6 +317,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                 const dragging = dragItem === name;
                 return (
                   <div key={name} draggable
+                    ref={(el) => { if (el) rowRefs.current[name] = el; else delete rowRefs.current[name]; }}
                     onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStartItem(name); }}
                     onDragEnter={() => onDragEnterItem(i)}
                     onDragOver={(e) => e.preventDefault()}
