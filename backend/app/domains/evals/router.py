@@ -77,7 +77,7 @@ async def list_reports(_: CurrentUser, db: DbSession) -> list[ReportOut]:
         if rng.get("to") and iso > rng["to"]:
             continue
         out.append(ReportOut(
-            key=m.id, mo=m.date.month - 1, day=m.date.day,
+            key=m.id, y=m.date.year, mo=m.date.month - 1, day=m.date.day,
             dateLabel=f"{m.date.month}月{m.date.day}日 周{_WD[m.date.weekday()]}",
             type=m.type, presenters=[p.name for p in m.presenters],
             attendance=data["attendance"].get(m.id, {}),

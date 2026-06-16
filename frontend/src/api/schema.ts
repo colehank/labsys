@@ -1384,6 +1384,8 @@ export interface components {
         ReportOut: {
             /** Key */
             key: string;
+            /** Y */
+            y: number;
             /** Mo */
             mo: number;
             /** Day */

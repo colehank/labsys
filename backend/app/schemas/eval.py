@@ -59,6 +59,7 @@ class PresenterAtt(BaseModel):
 
 class ReportOut(BaseModel):
     key: str
+    y: int
     mo: int
     day: int
     dateLabel: str

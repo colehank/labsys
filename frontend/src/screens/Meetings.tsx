@@ -386,9 +386,17 @@ import type { Me } from "../auth";
     const { data: ev } = useEvalCompute();
     const submitRating = useSubmitRating();
     const [submitted, setSubmitted] = React.useState<number[]>([]);
-    // 评分对象 = 评选期内最近一场组会。
-    const meeting = reports.length ? reports[reports.length - 1] : null;
-    const presenters = (meeting?.presenters || []).map((name) => ({ name, topic: "" }));
+    // 评分对象 = 今天或最近已发生、且有报告人的那场（排除团建/工作坊/取消等空场）；
+    // 都还没发生则取最近一场即将到来的，避免误把评选期最后一场当「今日组会」。
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const ratable = reports.filter((r: any) => (r.presenters || []).length > 0);
+    const ts = (r: any) => new Date(r.y, r.mo, r.day).getTime();
+    const past = ratable.filter((r: any) => ts(r) <= today.getTime());
+    const meeting: any = past.length
+      ? past[past.length - 1]
+      : (ratable.length ? ratable[0] : null);
+    const isToday = !!meeting && ts(meeting) === today.getTime();
+    const presenters = (meeting?.presenters || []).map((name: string) => ({ name, topic: "" }));
     const allNames = (ev?.rows || []).map((r) => r.name);
     const pending = presenters.map((p, i) => ({ p, i })).filter(({ i }) => !submitted.includes(i));
     if (reportsQ.isLoading) return <ScreenState loading />;
@@ -400,7 +408,7 @@ import type { Me } from "../auth";
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: "var(--accent-soft)", border: "1px solid var(--accent-soft-bd)", borderRadius: "var(--radius-md)" }}>
           {I("clock", { size: 16, style: { color: "var(--accent-text)" } })}
-          <span style={{ fontSize: 13.5, color: "var(--accent-text)" }}>今日组会·{meeting.dateLabel} · 评分 <strong>6 小时后关闭</strong></span>
+          <span style={{ fontSize: 13.5, color: "var(--accent-text)" }}>{isToday ? "今日组会" : "最近组会"}·{meeting.dateLabel} · 为本场报告人评分</span>
         </div>
 
         {pending.map(({ p, i }) => (
