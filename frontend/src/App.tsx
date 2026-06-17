@@ -58,11 +58,14 @@ export function App() {
     return <Login mark="/assets/mark-stone.svg" />;
   }
 
+  // server 页一旦访问过就保持 mount（避免切页面断开 WebSocket 会话）
+  const [serverMounted, setServerMounted] = React.useState(false);
+  React.useEffect(() => { if (view === "server") setServerMounted(true); }, [view]);
+
   const screen = (() => {
     switch (view) {
       case "home": return <Home onNavigate={navigate} me={me} />;
       case "meetings": return <Meetings key={mtNonce} initialTab={mtTab} admin={admin} me={me} />;
-      case "server": return <Server />;
       case "api": return <API />;
       case "approvals": return isAdmin(me) ? <Approvals /> : <Home onNavigate={navigate} me={me} />;
       case "meeting-hub": return isAdmin(me) ? <AdminMeetingHub /> : <Home onNavigate={navigate} me={me} />;
@@ -78,7 +81,9 @@ export function App() {
   return (
     <>
       <AppShell active={view} onNavigate={navigate} admin={admin} onToggleAdmin={toggleAdmin} onOpenPanel={setPanel} onLogout={() => { setPanel(null); setView("home"); setAdmin(false); logout(); }} links={LINKS} me={me}>
-        {screen}
+        {/* server 常驻：隐藏而非卸载，WebSocket 会话不中断 */}
+        {serverMounted && <div style={{ display: view === "server" ? "block" : "none" }}><Server active={view === "server"} /></div>}
+        {view !== "server" && screen}
         {panel && (
           <div onClick={() => setPanel(null)}
             style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "5vh 24px", background: "var(--overlay-scrim)", backdropFilter: "blur(2px)" }}>

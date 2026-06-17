@@ -283,7 +283,7 @@ function HostCard({ hh, on, conn, onSelect, onReconnect }: any) {
   );
 }
 
-function Server() {
+function Server({ active: pageActive = true }: { active?: boolean }) {
   const isMobile = useIsMobile();
   const serversQ = useServers();
   const HOSTS = serversQ.data ?? [];
@@ -438,7 +438,7 @@ function Server() {
             const sess = sessions[h.id];
             return (
               <div key={h.id} style={{ display: h.id === host.id ? "block" : "none" }}>
-                <Terminal key={`${h.id}-${sess.nonce}`} host={h} active={h.id === host.id}
+                <Terminal key={`${h.id}-${sess.nonce}`} host={h} active={h.id === host.id && pageActive}
                   creds={sess} token={token}
                   onState={(s: Conn) => setConnByHost((c) => ({ ...c, [h.id]: s }))} />
               </div>
