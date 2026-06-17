@@ -358,6 +358,10 @@ export function useExcellence() {
   return useQuery({ queryKey: ["eval", "excellence"], queryFn: () => unwrap(api.GET("/api/eval/excellence")) });
 }
 
+export function useExcellenceAll() {
+  return useQuery({ queryKey: ["eval", "excellence", "all"], queryFn: () => unwrap(api.GET("/api/eval/excellence/all")) });
+}
+
 export function useRankSeries(name: string, from: string, to: string, metric: string) {
   return useQuery({
     queryKey: ["eval", "rank-series", name, from, to, metric],

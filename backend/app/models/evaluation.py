@@ -74,6 +74,8 @@ class EvalConfig(UUIDMixin, Base):
     range_: Mapped[dict] = mapped_column("range", JSON, default=dict)
     progress_order: Mapped[list | None] = mapped_column(JSON, nullable=True)
     period: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    award_excellence: Mapped[int] = mapped_column(Integer, default=1000, server_default="1000")
+    award_attendance: Mapped[int] = mapped_column(Integer, default=100, server_default="100")
 
 
 class Excellence(UUIDMixin, Base):
@@ -85,4 +87,7 @@ class Excellence(UUIDMixin, Base):
     to: Mapped[str] = mapped_column("to_date", String(16))
     names: Mapped[list] = mapped_column(JSON, default=list)
     count: Mapped[int] = mapped_column(Integer, default=0)
+    perfect_attendance: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
+    award_excellence: Mapped[int] = mapped_column(Integer, default=1000, server_default="1000")
+    award_attendance: Mapped[int] = mapped_column(Integer, default=100, server_default="100")
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

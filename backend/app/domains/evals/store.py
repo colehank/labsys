@@ -115,6 +115,8 @@ async def load_eval_data(db: AsyncSession) -> dict:
         "rng": cfg.range_ if cfg else dict(DEFAULT_RANGE),
         "progress_order": cfg.progress_order if cfg else None,
         "period": cfg.period if cfg else "",
+        "award_excellence": cfg.award_excellence if cfg else 1000,
+        "award_attendance": cfg.award_attendance if cfg else 100,
         "config_row": cfg,
         "meetings_rows": meetings,
     }

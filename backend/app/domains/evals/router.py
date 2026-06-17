@@ -111,15 +111,27 @@ async def excellence(_: CurrentUser, db: DbSession, count: int = 5) -> Excellenc
         await db.execute(select(Excellence).order_by(Excellence.published_at.desc()).limit(1))
     ).scalar_one_or_none()
     if latest:
-        return ExcellenceOut(period=latest.period, from_=latest.from_, to=latest.to,
-                             names=latest.names, count=latest.count, published=True,
-                             published_at=latest.published_at)
+        return ExcellenceOut(
+            period=latest.period, from_=latest.from_, to=latest.to,
+            names=latest.names, count=latest.count,
+            perfect_attendance=latest.perfect_attendance or [],
+            award_excellence=latest.award_excellence,
+            award_attendance=latest.award_attendance,
+            published=True, published_at=latest.published_at,
+        )
     data = await load_eval_data(db)
     ev = _compute(data)
     names = [m["name"] for m in ev["merged"][:count]]
+    perfect_att = [r["name"] for r in ev["rows"] if r.get("attRate", 0) == 100]
     rng = data["rng"]
-    return ExcellenceOut(period=data.get("period", ""), from_=rng.get("from", ""),
-                         to=rng.get("to", ""), names=names, count=len(names), published=False)
+    return ExcellenceOut(
+        period=data.get("period", ""), from_=rng.get("from", ""),
+        to=rng.get("to", ""), names=names, count=len(names),
+        perfect_attendance=perfect_att,
+        award_excellence=data.get("award_excellence", 1000),
+        award_attendance=data.get("award_attendance", 100),
+        published=False,
+    )
 
 
 async def _recompute_meeting_eval(db, meeting_id: str) -> None:
@@ -273,7 +285,9 @@ async def get_config(_: AdminUser, db: DbSession) -> EvalConfigIO:
     data = await load_eval_data(db)
     return EvalConfigIO(weights=data["weights"], filters=data["filters"],
                         range=data["rng"], progress_order=data["progress_order"],
-                        period=data.get("period", ""))
+                        period=data.get("period", ""),
+                        award_excellence=data.get("award_excellence", 1000),
+                        award_attendance=data.get("award_attendance", 100))
 
 
 @router.put("/config", response_model=EvalConfigIO)
@@ -287,8 +301,29 @@ async def put_config(body: EvalConfigIO, _: AdminUser, db: DbSession) -> EvalCon
     cfg.range_ = body.range
     cfg.progress_order = body.progress_order
     cfg.period = body.period
+    cfg.award_excellence = body.award_excellence
+    cfg.award_attendance = body.award_attendance
     await db.commit()
     return body
+
+
+# ── 管理员：获取全部历史优秀名单 ──
+@router.get("/excellence/all", response_model=list[ExcellenceOut])
+async def excellence_all(_: CurrentUser, db: DbSession) -> list[ExcellenceOut]:
+    rows = list((await db.execute(
+        select(Excellence).order_by(Excellence.published_at.desc())
+    )).scalars())
+    return [
+        ExcellenceOut(
+            period=e.period, from_=e.from_, to=e.to,
+            names=e.names, count=e.count,
+            perfect_attendance=e.perfect_attendance or [],
+            award_excellence=e.award_excellence,
+            award_attendance=e.award_attendance,
+            published=True, published_at=e.published_at,
+        )
+        for e in rows
+    ]
 
 
 # ── 管理员：发布优秀名单 ──
@@ -296,7 +331,6 @@ async def put_config(body: EvalConfigIO, _: AdminUser, db: DbSession) -> EvalCon
 async def publish_excellence(body: PublishExcellence, _: AdminUser, db: DbSession) -> ExcellenceOut:
     data = await load_eval_data(db)
     period = data.get("period", "")
-    # 幂等保护：无论 period 是否为空都执行去重检查
     existing = (await db.execute(
         select(Excellence).where(Excellence.period == period).limit(1)
     )).scalar_one_or_none()
@@ -305,11 +339,25 @@ async def publish_excellence(body: PublishExcellence, _: AdminUser, db: DbSessio
         raise HTTPException(status.HTTP_409_CONFLICT, detail=f"{label}优秀名单已发布，如需重新发布请先联系管理员清除旧记录")
     ev = _compute(data)
     names = [m["name"] for m in ev["merged"][: max(1, body.count)]]
+    # 全勤 = 评选期内出勤率 100% 的成员
+    perfect_att = [r["name"] for r in ev["rows"] if r.get("attRate", 0) == 100]
     rng = data["rng"]
-    exc = Excellence(period=period, from_=rng.get("from", ""), to=rng.get("to", ""),
-                     names=names, count=len(names), published_at=datetime.now(timezone.utc))
+    award_exc = data.get("award_excellence", 1000)
+    award_att = data.get("award_attendance", 100)
+    exc = Excellence(
+        period=period, from_=rng.get("from", ""), to=rng.get("to", ""),
+        names=names, count=len(names),
+        perfect_attendance=perfect_att,
+        award_excellence=award_exc, award_attendance=award_att,
+        published_at=datetime.now(timezone.utc),
+    )
     db.add(exc)
     await db.commit()
-    return ExcellenceOut(period=exc.period, from_=exc.from_, to=exc.to,
-                         names=exc.names, count=exc.count, published=True,
-                         published_at=exc.published_at)
+    return ExcellenceOut(
+        period=exc.period, from_=exc.from_, to=exc.to,
+        names=exc.names, count=exc.count,
+        perfect_attendance=exc.perfect_attendance,
+        award_excellence=exc.award_excellence,
+        award_attendance=exc.award_attendance,
+        published=True, published_at=exc.published_at,
+    )

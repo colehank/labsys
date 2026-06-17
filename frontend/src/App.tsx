@@ -44,6 +44,13 @@ export function App() {
 
   useFeel(t);
 
+  React.useEffect(() => {
+    if (!panel) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPanel(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [panel]);
+
   // 有 token 但仍在拉取当前用户：短暂留白，避免闪现登录页。
   if (meLoading) return null;
 
@@ -66,13 +73,6 @@ export function App() {
       default: return <Home onNavigate={navigate} me={me} />;
     }
   })();
-
-  React.useEffect(() => {
-    if (!panel) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPanel(null); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [panel]);
 
   const panelTitle = panel === "inbox" ? "消息" : "设置";
   return (

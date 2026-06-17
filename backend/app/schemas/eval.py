@@ -50,6 +50,9 @@ class ExcellenceOut(BaseModel):
     to: str
     names: list[str]
     count: int
+    perfect_attendance: list[str] = []
+    award_excellence: int = 1000
+    award_attendance: int = 100
     published: bool
     published_at: datetime | None = None
 
@@ -104,6 +107,8 @@ class EvalConfigIO(BaseModel):
     range: dict
     progress_order: list[str] | None = None
     period: str = ""
+    award_excellence: int = 1000
+    award_attendance: int = 100
 
 
 class PublishExcellence(BaseModel):

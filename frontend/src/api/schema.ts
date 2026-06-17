@@ -593,6 +593,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eval/excellence/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Excellence All */
+        get: operations["excellence_all_api_eval_excellence_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/eval/reports/{key}/rating": {
         parameters: {
             query?: never;
@@ -1091,6 +1108,10 @@ export interface components {
             progress_order?: string[] | null;
             /** Period */
             period?: string;
+            /** Award Excellence */
+            award_excellence?: number;
+            /** Award Attendance */
+            award_attendance?: number;
         };
         /** EvalRowOut */
         EvalRowOut: {
@@ -1133,8 +1154,19 @@ export interface components {
             names: string[];
             /** Count */
             count: number;
+            /** Perfect Attendance */
+            perfect_attendance?: string[];
+            /** Award Excellence */
+            award_excellence?: number;
+            /** Award Attendance */
+            award_attendance?: number;
             /** Published */
             published: boolean;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at?: string | null;
         };
         /** FeedbackCreate */
         FeedbackCreate: {
@@ -2742,6 +2774,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportOut"][];
+                };
+            };
+        };
+    };
+    excellence_all_api_eval_excellence_all_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcellenceOut"][];
                 };
             };
         };

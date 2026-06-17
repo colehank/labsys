@@ -183,6 +183,8 @@ import { useIsMobile } from "../lib/useIsMobile";
     });
     const setEvalWeights = (patch: any) => updateConfig.mutate(nextConfig({ weights: { ...cfg.weights, ...patch } }));
     const setEvalFilters = (patch: any) => updateConfig.mutate(nextConfig({ filters: { ...cfg.filters, ...patch } }));
+    const awardExcellence: number = (cfg as any).award_excellence ?? 1000;
+    const awardAttendance: number = (cfg as any).award_attendance ?? 100;
     const setEvalRange = (patch: any) => updateConfig.mutate(nextConfig({ range: { ...cfg.range, ...patch } }));
     const semesterStart: string | undefined = (semCfg as any)?.semester?.start;
     const resetProgressOrder = () => updateConfig.mutate(nextConfig({ progress_order: null }));
@@ -443,6 +445,17 @@ import { useIsMobile } from "../lib/useIsMobile";
                 <FilterField label="出勤率" color={L1[3].color} value={f.attMin} suffix="%" max={100} step={5} onChange={(v) => setEvalFilters({ attMin: v })} />
                 <FilterField label="讨论参与" color={L1[4].color} value={f.discMin} suffix="次" onChange={(v) => setEvalFilters({ discMin: v })} />
               </div>
+            </div>
+            {/* 奖金设置 */}
+            <div style={{ paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>奖金设置</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <FilterField label="全勤奖" color="var(--sage-500)" value={awardAttendance} suffix="元" min={0} step={50}
+                  onChange={(v) => updateConfig.mutate(nextConfig({ award_attendance: v }))} />
+                <FilterField label="优秀奖" color="var(--amber-500)" value={awardExcellence} suffix="元" min={0} step={100}
+                  onChange={(v) => updateConfig.mutate(nextConfig({ award_excellence: v }))} />
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>发布时快照，修改不影响历史记录</div>
             </div>
           </div>
         </Dialog>
