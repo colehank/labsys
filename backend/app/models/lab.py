@@ -68,7 +68,7 @@ class Meeting(UUIDMixin, TimestampMixin, Base):
     """一次组会（整学期排期，每周一次）。"""
     __tablename__ = "meetings"
 
-    date: Mapped[date] = mapped_column(Date, index=True)
+    date: Mapped[date] = mapped_column(Date, unique=True, index=True)
     # 自由文本类型（管理员自定义）；预设见 MeetingType
     type: Mapped[str] = mapped_column(String(32), default=MeetingType.progress.value)
     host: Mapped[str] = mapped_column(String(64), default="")   # 主持人（排期时指定，可空）

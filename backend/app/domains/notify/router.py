@@ -19,6 +19,7 @@ async def my_notifications(me: CurrentUser, db: DbSession) -> list[Notification]
                 select(Notification)
                 .where(Notification.user_id == me.id)
                 .order_by(Notification.created_at.desc())
+                .limit(50)
             )
         ).scalars()
     )

@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
@@ -12,7 +13,7 @@ from sqlalchemy import select
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.domains.evals.engine import compute_eval, rank_series_for
 from app.domains.evals.store import load_eval_data
-from app.models import Attendance, Discussion, Excellence, Meeting, Rating, RatingVote
+from app.models import Attendance, Discussion, Excellence, Meeting, Presenter, Rating, RatingVote
 from app.schemas.eval import (
     AttendanceSet,
     EvalComputeOut,
@@ -28,6 +29,7 @@ from app.schemas.eval import (
 router = APIRouter(prefix="/eval", tags=["eval"])
 
 _WD = ["一", "二", "三", "四", "五", "六", "日"]
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _compute(data: dict) -> dict:
@@ -57,7 +59,13 @@ async def rank_series(
     _: CurrentUser, db: DbSession, name: str,
     from_: str = "2026-04-19", to: str = "2026-06-07", metric: str = "total",
 ) -> RankSeriesOut:
+    if not name.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="name 不能为空")
+    if not _DATE_RE.match(from_) or not _DATE_RE.match(to):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="日期格式须为 YYYY-MM-DD")
     data = await load_eval_data(db)
+    if name not in data["members"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"成员「{name}」不存在")
     s = rank_series_for(name, from_, to, metric, data["members"], data["reports"], data["attendance"],
                         data["discussion"], data["ratings"], data["peer_baseline"],
                         data["weights"], data["filters"])
@@ -65,10 +73,19 @@ async def rank_series(
 
 
 @router.get("/reports", response_model=list[ReportOut])
-async def list_reports(_: CurrentUser, db: DbSession) -> list[ReportOut]:
+async def list_reports(me: CurrentUser, db: DbSession) -> list[ReportOut]:
     """评选期内的组会（直接来自 meetings 表，与组会日历同源），供管理员录入。"""
     data = await load_eval_data(db)
     rng = data["rng"]
+
+    # 查询当前用户的全部投票记录，建立 {meeting_id -> {presenter, ...}} 索引
+    my_votes = list((await db.execute(
+        select(RatingVote).where(RatingVote.rater_id == me.id)
+    )).scalars())
+    my_rated: dict[str, set[str]] = {}
+    for v in my_votes:
+        my_rated.setdefault(v.meeting_id, set()).add(v.presenter)
+
     out = []
     for m in data["meetings_rows"]:
         iso = f"{m.date.year:04d}-{m.date.month:02d}-{m.date.day:02d}"
@@ -83,6 +100,7 @@ async def list_reports(_: CurrentUser, db: DbSession) -> list[ReportOut]:
             attendance=data["attendance"].get(m.id, {}),
             speaks=data["speaks"].get(m.id, {}),
             ratings=data["ratings"].get(m.id, {}),
+            rated_by=list(my_rated.get(m.id, set())),
         ))
     return out
 
@@ -94,12 +112,13 @@ async def excellence(_: CurrentUser, db: DbSession, count: int = 5) -> Excellenc
     ).scalar_one_or_none()
     if latest:
         return ExcellenceOut(period=latest.period, from_=latest.from_, to=latest.to,
-                             names=latest.names, count=latest.count, published=True)
+                             names=latest.names, count=latest.count, published=True,
+                             published_at=latest.published_at)
     data = await load_eval_data(db)
     ev = _compute(data)
     names = [m["name"] for m in ev["merged"][:count]]
     rng = data["rng"]
-    return ExcellenceOut(period="2026 春季 · 第二评选期", from_=rng.get("from", ""),
+    return ExcellenceOut(period=data.get("period", ""), from_=rng.get("from", ""),
                          to=rng.get("to", ""), names=names, count=len(names), published=False)
 
 
@@ -111,7 +130,7 @@ async def _recompute_meeting_eval(db, meeting_id: str) -> None:
     讨论行的 speaks（管理员录入）原样保留，只重写 points。
     """
     votes = list((await db.execute(
-        select(RatingVote).where(RatingVote.meeting_id == meeting_id)
+        select(RatingVote).where(RatingVote.meeting_id == meeting_id).order_by(RatingVote.id)
     )).scalars())
 
     # —— 报告人评分聚合 ——
@@ -142,10 +161,11 @@ async def _recompute_meeting_eval(db, meeting_id: str) -> None:
             rt.attitude = rt.polish = rt.logic = 0.0
             rt.raters = 0
 
-    # —— 讨论得分（每个 rater 的 Top5 只计一次，取其任一张选票的 top5）——
+    # —— 讨论得分（每个 rater 的 Top5 只计一次；同一 rater 多次提交时取最后一次非空 top5）——
     by_rater: dict[str, list] = {}
     for v in votes:
-        by_rater.setdefault(v.rater_id, v.top5 or [])
+        top5 = [n for n in (v.top5 or []) if n]
+        by_rater[v.rater_id] = top5
     points: dict[str, int] = {}
     for top5 in by_rater.values():
         for i, name in enumerate(top5[:5]):
@@ -171,6 +191,19 @@ async def _recompute_meeting_eval(db, meeting_id: str) -> None:
 @router.post("/reports/{key}/rating", status_code=status.HTTP_204_NO_CONTENT)
 async def submit_rating(key: str, body: RatingSubmit, me: CurrentUser, db: DbSession) -> None:
     meeting = await _meeting_by_id(db, key)
+    # 只允许对评选期内的组会提交评分
+    data = await load_eval_data(db)
+    rng = data["rng"]
+    iso = meeting.date.isoformat()
+    if rng.get("from") and iso < rng["from"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="该组会不在当前评选期范围内，无法评分")
+    if rng.get("to") and iso > rng["to"]:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="该组会不在当前评选期范围内，无法评分")
+    valid_presenters = list((await db.execute(
+        select(Presenter.name).where(Presenter.meeting_id == meeting.id)
+    )).scalars())
+    if body.presenter not in valid_presenters:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="该报告人不在本场组会中")
     # 不可给自己评分
     if me.name == body.presenter:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="不能给自己评分")
@@ -187,7 +220,7 @@ async def submit_rating(key: str, body: RatingSubmit, me: CurrentUser, db: DbSes
     vote.attitude = body.attitude
     vote.polish = body.polish
     vote.logic = body.logic
-    vote.top5 = [n for n in body.top5 if n]
+    vote.top5 = [n for n in body.top5 if n and n != me.name]
     await db.flush()
     await _recompute_meeting_eval(db, meeting.id)
     await db.commit()
@@ -215,7 +248,6 @@ async def set_attendance(key: str, body: AttendanceSet, _: AdminUser, db: DbSess
         ).scalar_one_or_none()
         if d is not None:
             d.points = 0
-            d.speaks = 0
     await db.commit()
 
 
@@ -240,7 +272,8 @@ async def set_speaks(key: str, body: SpeaksSet, _: AdminUser, db: DbSession) -> 
 async def get_config(_: AdminUser, db: DbSession) -> EvalConfigIO:
     data = await load_eval_data(db)
     return EvalConfigIO(weights=data["weights"], filters=data["filters"],
-                        range=data["rng"], progress_order=data["progress_order"])
+                        range=data["rng"], progress_order=data["progress_order"],
+                        period=data.get("period", ""))
 
 
 @router.put("/config", response_model=EvalConfigIO)
@@ -253,6 +286,7 @@ async def put_config(body: EvalConfigIO, _: AdminUser, db: DbSession) -> EvalCon
     cfg.filters = body.filters
     cfg.range_ = body.range
     cfg.progress_order = body.progress_order
+    cfg.period = body.period
     await db.commit()
     return body
 
@@ -261,12 +295,21 @@ async def put_config(body: EvalConfigIO, _: AdminUser, db: DbSession) -> EvalCon
 @router.post("/excellence", response_model=ExcellenceOut, status_code=status.HTTP_201_CREATED)
 async def publish_excellence(body: PublishExcellence, _: AdminUser, db: DbSession) -> ExcellenceOut:
     data = await load_eval_data(db)
+    period = data.get("period", "")
+    # 幂等保护：无论 period 是否为空都执行去重检查
+    existing = (await db.execute(
+        select(Excellence).where(Excellence.period == period).limit(1)
+    )).scalar_one_or_none()
+    if existing is not None:
+        label = f"「{period}」" if period else "（未命名评选期）"
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"{label}优秀名单已发布，如需重新发布请先联系管理员清除旧记录")
     ev = _compute(data)
     names = [m["name"] for m in ev["merged"][: max(1, body.count)]]
     rng = data["rng"]
-    exc = Excellence(period="2026 春季 · 第二评选期", from_=rng.get("from", ""), to=rng.get("to", ""),
+    exc = Excellence(period=period, from_=rng.get("from", ""), to=rng.get("to", ""),
                      names=names, count=len(names), published_at=datetime.now(timezone.utc))
     db.add(exc)
     await db.commit()
     return ExcellenceOut(period=exc.period, from_=exc.from_, to=exc.to,
-                         names=exc.names, count=exc.count, published=True)
+                         names=exc.names, count=exc.count, published=True,
+                         published_at=exc.published_at)

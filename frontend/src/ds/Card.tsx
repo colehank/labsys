@@ -26,6 +26,14 @@ export function Card({
       onClick={onClick}
       onMouseEnter={() => interactive && setHover(true)}
       onMouseLeave={() => interactive && setHover(false)}
+      onKeyDown={interactive ? (e: React.KeyboardEvent) => {
+        if ((e.key === "Enter" || e.key === " ") && onClick) {
+          e.preventDefault();
+          onClick(e as any);
+        }
+      } : undefined}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
       style={{
         background: "var(--surface)",
         border: `var(--border-w) solid ${hover ? "var(--border-default)" : "var(--border-subtle)"}`,

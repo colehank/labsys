@@ -57,15 +57,22 @@ export function App() {
       case "meetings": return <Meetings key={mtNonce} initialTab={mtTab} admin={admin} me={me} />;
       case "server": return <Server />;
       case "api": return <API />;
-      case "approvals": return <Approvals />;
-      case "meeting-hub": return <AdminMeetingHub />;
-      case "server-admin": return <AdminServers />;
-      case "announce": return <AdminAnnounce />;
-      case "people-admin": return <AdminPeople />;
-      case "feedback-admin": return <AdminFeedback />;
+      case "approvals": return isAdmin(me) ? <Approvals /> : <Home onNavigate={navigate} me={me} />;
+      case "meeting-hub": return isAdmin(me) ? <AdminMeetingHub /> : <Home onNavigate={navigate} me={me} />;
+      case "server-admin": return isAdmin(me) ? <AdminServers /> : <Home onNavigate={navigate} me={me} />;
+      case "announce": return isAdmin(me) ? <AdminAnnounce /> : <Home onNavigate={navigate} me={me} />;
+      case "people-admin": return isAdmin(me) ? <AdminPeople /> : <Home onNavigate={navigate} me={me} />;
+      case "feedback-admin": return isAdmin(me) ? <AdminFeedback /> : <Home onNavigate={navigate} me={me} />;
       default: return <Home onNavigate={navigate} me={me} />;
     }
   })();
+
+  React.useEffect(() => {
+    if (!panel) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPanel(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [panel]);
 
   const panelTitle = panel === "inbox" ? "消息" : "设置";
   return (

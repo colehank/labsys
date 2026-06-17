@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
@@ -49,18 +49,52 @@ async def create_user(body: UserCreate, _: AdminUser, db: DbSession) -> User:
         role=body.role, password_hash=hash_password(body.password), settings={},
     )
     db.add(u)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="该邮箱或姓名已被注册")
     await db.refresh(u)
     return u
 
 
+@router.patch("/me", response_model=UserOut)
+async def update_me(body: UserSettingsUpdate, user: CurrentUser, db: DbSession) -> User:
+    """更新本人资料 / 设置（「我的」页）。"""
+    data = body.model_dump(exclude_unset=True)
+    if "settings" in data and data["settings"] is not None:
+        user.settings = {**(user.settings or {}), **data.pop("settings")}
+    old_name = user.name
+    for field, value in data.items():
+        if value is not None:
+            setattr(user, field, value)
+    await _cascade_rename(db, user.id, old_name, user.name)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="该姓名或邮箱已被占用")
+    await db.refresh(user)
+    return user
+
+
 @router.patch("/{user_id}", response_model=UserOut)
-async def admin_update_user(user_id: str, body: UserAdminUpdate, _: AdminUser, db: DbSession) -> User:
+async def admin_update_user(user_id: str, body: UserAdminUpdate, me: AdminUser, db: DbSession) -> User:
     """管理员改用户资料 / 权限 / 密码（password 留空则不改）。"""
     u = await db.get(User, user_id)
     if u is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="用户不存在")
     data = body.model_dump(exclude_unset=True)
+    # 不允许停用自己，也不允许降级/停用最后一个活跃管理员
+    if user_id == me.id and data.get("disabled") is True:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="不能停用当前登录的自己")
+    if u.role == "admin" and (data.get("role") == "member" or data.get("disabled") is True):
+        remaining = (await db.execute(
+            select(func.count()).select_from(User)
+            .where(User.role == "admin", User.disabled.is_(False), User.id != user_id)
+        )).scalar_one()
+        if remaining == 0:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="系统必须保留至少一位活跃管理员")
     pwd = data.pop("password", None)
     if pwd:
         u.password_hash = hash_password(pwd)
@@ -74,7 +108,11 @@ async def admin_update_user(user_id: str, body: UserAdminUpdate, _: AdminUser, d
         if v is not None:
             setattr(u, k, str(v) if k == "email" else v)
     await _cascade_rename(db, u.id, old_name, u.name)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="该邮箱或姓名已被占用")
     await db.refresh(u)
     return u
 
@@ -101,25 +139,16 @@ async def delete_user(user_id: str, me: AdminUser, db: DbSession) -> UserDeleteR
         await db.rollback()
         u = await db.get(User, user_id)
         if u is not None:
+            if u.role == "admin":
+                remaining = (await db.execute(
+                    select(func.count()).select_from(User)
+                    .where(User.role == "admin", User.disabled.is_(False), User.id != user_id)
+                )).scalar_one()
+                if remaining == 0:
+                    raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="无法操作：系统至少需要保留一名活跃管理员")
             u.disabled = True
             await db.commit()
         return UserDeleteResult(
             action="disabled",
             detail=f"{name} 有历史记录无法删除，已停用（无法登录，历史保留）",
         )
-
-
-@router.patch("/me", response_model=UserOut)
-async def update_me(body: UserSettingsUpdate, user: CurrentUser, db: DbSession) -> User:
-    """更新本人资料 / 设置（「我的」页）。"""
-    data = body.model_dump(exclude_unset=True)
-    if "settings" in data and data["settings"] is not None:
-        user.settings = {**(user.settings or {}), **data.pop("settings")}
-    old_name = user.name
-    for field, value in data.items():
-        if value is not None:
-            setattr(user, field, value)
-    await _cascade_rename(db, user.id, old_name, user.name)
-    await db.commit()
-    await db.refresh(user)
-    return user

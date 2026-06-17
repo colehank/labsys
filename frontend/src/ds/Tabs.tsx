@@ -10,10 +10,13 @@ export function Tabs({
   style = {},
 }: any) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 4,
-      borderBottom: "var(--border-w) solid var(--border-subtle)", ...style,
-    }}>
+    <div
+      role="tablist"
+      style={{
+        display: "flex", alignItems: "center", gap: 4,
+        borderBottom: "var(--border-w) solid var(--border-subtle)", ...style,
+      }}
+    >
       {tabs.map((t) => {
         const on = t.id === active;
         return <TabItem key={t.id} tab={t} active={on} onClick={() => onChange && onChange(t.id)} />;
@@ -27,6 +30,8 @@ function TabItem({ tab, active, onClick }: any) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}

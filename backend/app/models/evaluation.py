@@ -18,6 +18,7 @@ from app.models.base import Base, UUIDMixin
 
 class Attendance(UUIDMixin, Base):
     __tablename__ = "eval_attendance"
+    __table_args__ = (UniqueConstraint("meeting_id", "name", name="uq_attendance_meeting_name"),)
     meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(64), index=True)
     status: Mapped[str] = mapped_column(String(16))  # present | leave | absent
@@ -25,6 +26,7 @@ class Attendance(UUIDMixin, Base):
 
 class Discussion(UUIDMixin, Base):
     __tablename__ = "eval_discussion"
+    __table_args__ = (UniqueConstraint("meeting_id", "name", name="uq_discussion_meeting_name"),)
     meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(64), index=True)
     points: Mapped[int] = mapped_column(Integer, default=0)            # 讨论得分（成员匿名评价 Top5）
@@ -34,6 +36,7 @@ class Discussion(UUIDMixin, Base):
 class Rating(UUIDMixin, Base):
     """报告人评分聚合（态度/精良/评分人数）—— 由 RatingVote 重算得出，只读快照。"""
     __tablename__ = "eval_ratings"
+    __table_args__ = (UniqueConstraint("meeting_id", "presenter", name="uq_rating_meeting_presenter"),)
     meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     presenter: Mapped[str] = mapped_column(String(64), index=True)
     attitude: Mapped[float] = mapped_column(Float, default=0.0)
@@ -70,11 +73,13 @@ class EvalConfig(UUIDMixin, Base):
     filters: Mapped[dict] = mapped_column(JSON, default=dict)
     range_: Mapped[dict] = mapped_column("range", JSON, default=dict)
     progress_order: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    period: Mapped[str] = mapped_column(String(64), default="", server_default="")
 
 
 class Excellence(UUIDMixin, Base):
     """管理员发布的优秀名单快照。"""
     __tablename__ = "eval_excellence"
+    __table_args__ = (UniqueConstraint("period", name="uq_excellence_period"),)
     period: Mapped[str] = mapped_column(String(64))
     from_: Mapped[str] = mapped_column("from_date", String(16))
     to: Mapped[str] = mapped_column("to_date", String(16))

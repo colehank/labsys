@@ -29,15 +29,14 @@ import { useIsMobile } from "../lib/useIsMobile";
       if (editing) {
         updateServer.mutate(
           { id: initial.id, patch: { name: f.name.trim(), ip: f.ip.trim(), ssh_port: Number(f.ssh_port) || 22, gpu: f.gpu.trim(), net: f.net as Server["net"], desc: f.desc.trim() } },
-          { onSuccess: () => toast("已保存修改") },
+          { onSuccess: () => { toast("已保存修改"); onClose(); }, onError: () => toast("保存失败，请重试", { tone: "error" }) },
         );
       } else {
         createServer.mutate(
           { name: f.name.trim(), ip: f.ip.trim(), ssh_port: Number(f.ssh_port) || 22, gpu: f.gpu.trim(), net: f.net as Server["net"], desc: f.desc.trim() },
-          { onSuccess: () => toast("已添加服务器") },
+          { onSuccess: () => { toast("已添加服务器"); onClose(); }, onError: () => toast("添加失败，请重试", { tone: "error" }) },
         );
       }
-      onClose();
     };
     return (
       <Dialog open={open} onClose={onClose} title={editing ? "编辑服务器" : "添加服务器"}
@@ -85,7 +84,7 @@ import { useIsMobile } from "../lib/useIsMobile";
         <ServerDialog open={edit} initial={s} onClose={() => setEdit(false)} />
         <Dialog open={confirm} onClose={() => setConfirm(false)} title="删除服务器" subtitle={s.name}
           icon={I("trash-2")} tone="danger" width={400}
-          footer={<><Button variant="ghost" onClick={() => setConfirm(false)}>取消</Button><Button variant="primary" onClick={() => { deleteServer.mutate(s.id, { onSuccess: () => toast("已删除服务器") }); setConfirm(false); }}>确认删除</Button></>}>
+          footer={<><Button variant="ghost" onClick={() => setConfirm(false)}>取消</Button><Button variant="primary" onClick={() => deleteServer.mutate(s.id, { onSuccess: () => { toast("已删除服务器"); setConfirm(false); }, onError: () => toast("删除失败，请重试", { tone: "error" }) })}>确认删除</Button></>}>
           <p style={{ fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.6 }}>删除后该服务器将从用户端「服务器」页移除，且无法恢复。</p>
         </Dialog>
       </div>

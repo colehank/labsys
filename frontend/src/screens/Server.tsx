@@ -109,11 +109,9 @@ function Terminal({ host, creds, token, onState, active }: any) {
     };
     const ro = new ResizeObserver(() => sendResize());
     ro.observe(wrapRef.current);
-    window.addEventListener("resize", sendResize);
 
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", sendResize);
       onData.dispose();
       ws.close();
       term.dispose();
@@ -182,7 +180,6 @@ function HostCard({ hh, on, conn, onSelect, onReconnect }: any) {
             {NET[hh.net] && <Badge tone={NET[hh.net].tone} size="sm">{NET[hh.net].label}</Badge>}
           </div>
         </div>
-        <style>{`@keyframes cibol-spin{to{transform:rotate(360deg)}}`}</style>
       </div>
       {!disabled && (
         <button type="button" onClick={reconnect} title="重连" aria-label={`重连 ${hh.name}`}
@@ -268,7 +265,7 @@ function Server() {
     if (host && activeCred && !sessions[host.id] && !suppressAuto.current.has(host.id)) {
       startSession(host.id, { username: activeCred.username, password: "", useSaved: true, credId: activeCred.id });
     }
-  }, [host?.id, activeCred?.id, sessions]);
+  }, [host?.id, activeCred?.id, !!sessions[host?.id]]);
 
   // 勾「记住」连上后刷新账密列表（新账号出现在选择器/设置页 → 与设置页同步）
   React.useEffect(() => {
@@ -404,7 +401,7 @@ function Server() {
               <span>记住账号密码（加密保存，下次自动连接，跨设备）</span>
             </label>
           )}
-          <button onClick={() => { setCredsOpen(false); setReqOpen(true); }} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 13, cursor: "pointer", textAlign: "center" }}>
+          <button type="button" onClick={() => { setCredsOpen(false); setReqOpen(true); }} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 13, cursor: "pointer", textAlign: "center" }}>
             还没有服务器账号？申请开通 →
           </button>
         </div>

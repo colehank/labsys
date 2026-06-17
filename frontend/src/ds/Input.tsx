@@ -20,6 +20,7 @@ export function Input({
   const [focus, setFocus] = React.useState(false);
   const reactId = React.useId();
   const fieldId = id || reactId;
+  const hintId = (hint || error) ? `${fieldId}-hint` : undefined;
   const sizes = { sm: 32, md: 38, lg: 44 };
   const h = sizes[size] || sizes.md;
 
@@ -53,6 +54,8 @@ export function Input({
           id={fieldId}
           type={type}
           disabled={disabled}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={hintId}
           onFocus={() => setFocus(true)}
           onBlur={() => setFocus(false)}
           style={{
@@ -67,7 +70,7 @@ export function Input({
         )}
       </div>
       {(hint || error) && (
-        <div style={{
+        <div id={hintId} style={{
           marginTop: 5, fontSize: "var(--text-xs)",
           color: error ? "var(--danger-text)" : "var(--text-faint)",
         }}>{error || hint}</div>

@@ -52,7 +52,7 @@ async def upsert_credential(body: CredCreate, me: CurrentUser, db: DbSession) ->
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail="未配置凭据加密密钥")
     username = body.username.strip()
     if not username:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="账号不能为空")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="账号不能为空")
     cred = (await db.execute(
         select(SshCredential).where(
             SshCredential.user_id == me.id, SshCredential.username == username
@@ -81,7 +81,7 @@ async def issue_credential(body: CredIssue, _: AdminUser, db: DbSession) -> Cred
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="成员不存在")
     username = body.username.strip()
     if not username:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="账号不能为空")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="账号不能为空")
     cred = (await db.execute(
         select(SshCredential).where(
             SshCredential.user_id == user.id, SshCredential.username == username
@@ -100,6 +100,7 @@ async def issue_credential(body: CredIssue, _: AdminUser, db: DbSession) -> Cred
 @router.delete("/{cred_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_credential(cred_id: str, me: CurrentUser, db: DbSession) -> None:
     cred = await db.get(SshCredential, cred_id)
-    if cred is not None and cred.user_id == me.id:
-        await db.delete(cred)
-        await db.commit()
+    if cred is None or cred.user_id != me.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="凭据不存在")
+    await db.delete(cred)
+    await db.commit()

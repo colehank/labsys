@@ -41,7 +41,7 @@ export function RankRow({
         borderRadius: "50%",
       }}>{rank}</span>
       <Avatar name={name} size="sm" />
-      <div style={{ minWidth: 0, flex: "0 0 auto", width: 120 }}>
+      <div style={{ flex: "1 1 80px", minWidth: 60, maxWidth: 120 }}>
         <div style={{ fontSize: "var(--text-md)", fontWeight: "var(--fw-medium)", color: "var(--text-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         {subtitle && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-faint)" }}>{subtitle}</div>}
       </div>

@@ -21,7 +21,7 @@ async def submit_feedback(body: FeedbackCreate, _: CurrentUser, db: DbSession) -
     """任意登录成员匿名提交；不落任何身份信息。"""
     text = body.body.strip()
     if not text:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="内容不能为空")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="内容不能为空")
     db.add(Feedback(body=text, created_at=datetime.now(timezone.utc)))
     await db.commit()
 
@@ -45,6 +45,17 @@ async def unread_count(_: AdminUser, db: DbSession) -> dict[str, int]:
 @router.post("/{fb_id}/read", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_feedback_read(fb_id: str, _: AdminUser, db: DbSession) -> None:
     fb = await db.get(Feedback, fb_id)
-    if fb is not None:
-        fb.read = True
-        await db.commit()
+    if fb is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="意见不存在")
+    fb.read = True
+    await db.commit()
+
+
+@router.delete("/{fb_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_feedback(fb_id: str, _: AdminUser, db: DbSession) -> None:
+    """管理员删除意见（清理无效/违规条目）。"""
+    fb = await db.get(Feedback, fb_id)
+    if fb is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="意见不存在")
+    await db.delete(fb)
+    await db.commit()

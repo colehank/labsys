@@ -31,8 +31,10 @@ export function Avatar({
 
   const presenceColors = { online: "var(--success)", offline: "var(--stone-400)", busy: "var(--warning)" };
 
+  const presenceLabels: Record<string, string> = { online: "在线", offline: "离线", busy: "忙碌" };
+
   return (
-    <span style={{ position: "relative", display: "inline-flex", width: dim, height: dim, flexShrink: 0, ...style }}>
+    <span aria-label={name || undefined} style={{ position: "relative", display: "inline-flex", width: dim, height: dim, flexShrink: 0, ...style }}>
       <span style={{
         width: dim, height: dim, borderRadius: "var(--radius-pill)",
         display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -43,12 +45,15 @@ export function Avatar({
         {src ? <img src={src} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}
       </span>
       {presence && (
-        <span style={{
-          position: "absolute", right: -1, bottom: -1,
-          width: Math.max(8, dim * 0.26), height: Math.max(8, dim * 0.26),
-          borderRadius: "50%", background: presenceColors[presence] || "var(--stone-400)",
-          border: "2px solid var(--surface)",
-        }} />
+        <span
+          aria-label={presenceLabels[presence] || presence}
+          style={{
+            position: "absolute", right: -1, bottom: -1,
+            width: Math.max(8, dim * 0.26), height: Math.max(8, dim * 0.26),
+            borderRadius: "50%", background: presenceColors[presence] || "var(--stone-400)",
+            border: "2px solid var(--surface)",
+          }}
+        />
       )}
     </span>
   );

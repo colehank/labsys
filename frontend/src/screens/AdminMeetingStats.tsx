@@ -2,9 +2,10 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useEvalCompute, useEvalReports, useSetAttendance, useSetSpeaks } from "../api/hooks";
+import { useEvalCompute, useEvalReports, useSetAttendance, useSetSpeaks, useMeetings } from "../api/hooks";
 import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
+import { useQueryClient } from "@tanstack/react-query";
 
 // AdminMeetingStats — 组会统计: 管理员逐次组会核对「出勤」。
 // 报告评分（态度/精良）与讨论参与来自成员匿名评分，此处只读 —— 单一数据源，不重复录入。
@@ -42,6 +43,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   function AdminMeetingStats() {
     const isMobile = useIsMobile();
+    const qc = useQueryClient();
     const { data: compute } = useEvalCompute();
     const reportQ = useEvalReports();
     const reportData = reportQ.data;
@@ -53,8 +55,15 @@ import { useIsMobile } from "../lib/useIsMobile";
     const reports = reportData ?? [];
     const members = rows.map((r) => r.name);
 
-    const [sel, setSel] = React.useState(0); // 默认最近一次（末位），加载后校正
-    React.useEffect(() => { setSel(Math.max(0, reports.length - 1)); }, [reports.length]);
+    const [sel, setSel] = React.useState(0);
+    const initializedRef = React.useRef(false);
+    React.useEffect(() => {
+      if (!initializedRef.current && reports.length > 0) {
+        initializedRef.current = true;
+        setSel(reports.length - 1);
+      }
+    }, [reports.length]);
+    const [saving, setSaving] = React.useState(false);
 
     // 出勤 / 发言次数本地态：以各会次后端值为种子，管理员可逐人核对 / 录入。
     const [attEdits, setAttEdits] = React.useState<Record<string, Record<string, string>>>({});
@@ -76,13 +85,15 @@ import { useIsMobile } from "../lib/useIsMobile";
       return { ...seed, ...(spkEdits[key] || {}) };
     };
 
-    const mdLabelOf = (rr: { mo: number; day: number }) => `${rr.mo + 1}/${String(rr.day).padStart(2, "0")}`;
+    const mdLabelOf = (rr: any) => rr.mo != null ? `${rr.mo + 1}/${String(rr.day ?? 1).padStart(2, "0")}` : (rr.dateLabel || "—");
 
     const r = reports[sel];
 
     // 报告人评分（态度/精良）由成员匿名提交、后端聚合后随 report 下发，此处只读展示。
     const ratings = ((r?.ratings || {}) as Record<string, { attitude: number; polish: number; logic: number; raters: number }>);
-    const cancelled = false;
+    // cancelled 状态从 meetings 交叉查询得出（ReportOut 本身不含 status 字段）
+    const { data: meetings = [] } = useMeetings();
+    const cancelled = r ? meetings.find((m) => m.id === r.key)?.status === "cancelled" : false;
 
     // 当前报告汇总
     const att = r ? attendanceOf(r.key) : {};
@@ -119,19 +130,29 @@ import { useIsMobile } from "../lib/useIsMobile";
             <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>核对每次组会出勤、录入发言次数 · 报告评分由成员提交</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <Button size="sm" variant="primary" iconLeft={I("check")} disabled={cancelled || setAtt.isPending || setSpk.isPending}
-              onClick={() => {
+            <Button size="sm" variant="primary" iconLeft={I("check")} disabled={cancelled || saving}
+              onClick={async () => {
+                if (cancelled) { toast("已取消的组会不可录入数据", { tone: "error" }); return; }
                 const key = reports[sel]?.key;
-                if (!key) return;
+                if (!key || saving) return;
                 const attE = Object.entries(attEdits[key] || {});
                 const spkE = Object.entries(spkEdits[key] || {});
                 if (attE.length === 0 && spkE.length === 0) { toast("无改动"); return; }
-                Promise.all([
-                  ...attE.map(([name, status]) => setAtt.mutateAsync({ key, name, status: status as string })),
-                  ...spkE.map(([name, count]) => setSpk.mutateAsync({ key, name, count: count as number })),
-                ])
-                  .then(() => toast("已保存 · 本次组会出勤与发言次数"))
-                  .catch(() => toast("保存失败", { tone: "error" }));
+                setSaving(true);
+                try {
+                  await Promise.all([
+                    ...attE.map(([name, status]) => setAtt.mutateAsync({ key, name, status: status as string })),
+                    ...spkE.map(([name, count]) => setSpk.mutateAsync({ key, name, count: count as number })),
+                  ]);
+                  toast("已保存 · 本次组会出勤与发言次数");
+                  await qc.invalidateQueries({ queryKey: ["eval"] });
+                  setAttEdits((prev) => { const n = { ...prev }; delete n[key]; return n; });
+                  setSpkEdits((prev) => { const n = { ...prev }; delete n[key]; return n; });
+                } catch {
+                  toast("保存失败", { tone: "error" });
+                } finally {
+                  setSaving(false);
+                }
               }}>保存</Button>
           </div>
         </div>
@@ -140,10 +161,11 @@ import { useIsMobile } from "../lib/useIsMobile";
         <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 0 14px" }}>
           {reports.map((rr, i) => {
             const on = i === sel;
-            const a = attendanceOf(rr.key);
-            const filled = members.some((n) => a[n]);
+            const backendAtt = (rr.attendance || {}) as Record<string, string>;
+            const backendSpk = (rr.speaks || {}) as Record<string, number>;
+            const filled = Object.keys(backendAtt).length > 0 || Object.keys(backendSpk).length > 0;
             return (
-              <button key={rr.key} onClick={() => setSel(i)}
+              <button type="button" key={rr.key} onClick={() => setSel(i)}
                 style={{
                   flexShrink: 0, display: "flex", flexDirection: "column", gap: 4, padding: "10px 14px", textAlign: "left", cursor: "pointer",
                   border: `1px solid ${on ? "var(--accent)" : "var(--border-subtle)"}`,

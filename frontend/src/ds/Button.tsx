@@ -58,6 +58,7 @@ export function Button({
     <button
       type={type}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { setHover(false); setActive(false); }}
@@ -82,7 +83,7 @@ export function Button({
       {...rest}
     >
       {loading ? (
-        <span style={{
+        <span aria-hidden="true" style={{
           width: s.icon, height: s.icon, borderRadius: "50%",
           border: `2px solid ${p.fg}`, borderTopColor: "transparent",
           display: "inline-block", animation: "cibol-spin 0.7s linear infinite",
@@ -94,7 +95,6 @@ export function Button({
       {iconRight && !loading && (
         <span style={{ display: "inline-flex", width: s.icon, height: s.icon }}>{iconRight}</span>
       )}
-      <style>{`@keyframes cibol-spin{to{transform:rotate(360deg)}}`}</style>
     </button>
   );
 }

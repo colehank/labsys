@@ -10,7 +10,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 //   ① 每位成员的 报告态度 / 制作精良 / 出勤 / 讨论参与 / 优秀(获奖次数)，可切换归一化。
 //   ② 当前评选期已发布的优秀奖获得者。
 //   ③ 数据可导出为 CSV。
-  const { Avatar, Button } = NS;
+  const { Avatar, Button, ScreenState, EmptyState } = NS;
 
   const hCell = { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-faint)" };
   const GRID = "150px repeat(6, 1fr)";
@@ -34,7 +34,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const ev = evalQ.data || { rows: [], merged: [], total: 0 };
     const exc = excQ.data;
 
-    // 后端当前仅暴露最新一次优秀名单（非多评选期历史），渲染为长度为 1 的数组。
+    // 后端当前仅暴露最新一次优秀名单（非多评选期历史），0/1 值表示本期是否入选。
     const excellence = exc ? [exc] : [];
 
     // 身份映射来自真实用户表（按姓名 → 身份/title），不再用假花名册。
@@ -52,12 +52,12 @@ import { useIsMobile } from "../lib/useIsMobile";
     const periodLabel = exc ? exc.period : "当前评选期";
 
     const COLS = [
-      { key: "attitude", label: "报告态度", color: "var(--terracotta-500)", raw: (r) => r.attitude.toFixed(1), pct: (r) => r.nAttitude, val: (r) => r.attitude },
-      { key: "polish", label: "制作精良", color: "var(--amber-500)", raw: (r) => r.polish.toFixed(1), pct: (r) => r.nPolish, val: (r) => r.polish },
+      { key: "attitude", label: "报告态度", color: "var(--terracotta-500)", raw: (r) => (r.attitude ?? 0).toFixed(1), pct: (r) => r.nAttitude, val: (r) => r.attitude ?? 0 },
+      { key: "polish", label: "制作精良", color: "var(--amber-500)", raw: (r) => (r.polish ?? 0).toFixed(1), pct: (r) => r.nPolish, val: (r) => r.polish ?? 0 },
       { key: "logic", label: "逻辑清晰", color: "var(--terracotta-400)", raw: (r) => (r.logic ?? 0).toFixed(1), pct: (r) => r.nLogic, val: (r) => r.logic ?? 0 },
-      { key: "attRate", label: "出勤", color: "var(--sage-500)", raw: (r) => r.attRate + "%", pct: (r) => r.nAtt, val: (r) => r.attRate },
-      { key: "discuss", label: "讨论参与", color: "var(--slate-500)", raw: (r) => String(r.discuss), pct: (r) => r.nDisc, val: (r) => r.discuss },
-      { key: "award", label: "优秀", color: "var(--amber-500)", raw: (r) => (awardCount[r.name] || 0) + " 次", pct: (r) => (awardCount[r.name] || 0) / maxAward * 100, val: (r) => awardCount[r.name] || 0 },
+      { key: "attRate", label: "出勤", color: "var(--sage-500)", raw: (r) => (r.attRate ?? 0) + "%", pct: (r) => r.nAtt, val: (r) => r.attRate ?? 0 },
+      { key: "discuss", label: "讨论参与", color: "var(--slate-500)", raw: (r) => String(r.discuss ?? 0), pct: (r) => r.nDisc, val: (r) => r.discuss ?? 0 },
+      { key: "award", label: "优秀（本期）", color: "var(--amber-500)", raw: (r) => awardCount[r.name] ? "✓" : "—", pct: (r) => awardCount[r.name] ? 100 : 0, val: (r) => awardCount[r.name] || 0 },
     ];
 
     // 排序：点击列头切换列 / 升降序；默认按组会表现降序（ev.rows 原序）
@@ -80,19 +80,26 @@ import { useIsMobile } from "../lib/useIsMobile";
     const gridCols = isMobile ? "1fr" : GRID;
 
     const exportCSV = () => {
+      const esc = (v: string) => /[,"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
       const header = ["成员", "身份", "报告态度", "制作精良", "逻辑清晰", "出勤率", "讨论参与", "优秀次数"];
-      const lines = [header.join(",")];
+      const lines = [header.map(esc).join(",")];
       rows.forEach((r) => {
-        lines.push([r.name, roleByName[r.name] || "", r.attitude.toFixed(1), r.polish.toFixed(1), (r.logic ?? 0).toFixed(1), r.attRate + "%", r.discuss, awardCount[r.name] || 0].join(","));
+        lines.push([r.name, roleByName[r.name] || "", (r.attitude ?? 0).toFixed(1), (r.polish ?? 0).toFixed(1), (r.logic ?? 0).toFixed(1), (r.attRate ?? 0) + "%", r.discuss ?? 0, awardCount[r.name] || 0].map(String).map(esc).join(","));
       });
       const csv = "﻿" + lines.join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `表现记录_${from}_${to}.csv`;
+      a.href = url;
+      const today = new Date().toISOString().slice(0, 10);
+      a.download = `表现记录_${from || today}${to ? "_" + to : ""}.csv`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
+
+    if (evalQ.isLoading || excQ.isLoading) return <ScreenState loading />;
+    if (evalQ.isError) return <ScreenState error onRetry={() => evalQ.refetch()} />;
+    if (excQ.isError) return <ScreenState error onRetry={() => excQ.refetch()} />;
 
     return (
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "16px 14px 40px" : "20px 28px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -109,29 +116,32 @@ import { useIsMobile } from "../lib/useIsMobile";
               <span style={{ color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 500, maxWidth: 220, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{periodLabel}</span>
             </div>
             {/* 归一化开关 */}
-            <button onClick={() => setNorm((v) => !v)}
+            <button type="button" onClick={() => setNorm((v) => !v)}
               style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 32, padding: "0 12px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12.5, color: "var(--text-body)" }}>
               <span style={{ width: 30, height: 17, borderRadius: 999, background: norm ? "var(--accent)" : "var(--surface-hover)", position: "relative", transition: "background var(--dur-fast)", flexShrink: 0 }}>
                 <span style={{ position: "absolute", top: 2, left: norm ? 15 : 2, width: 13, height: 13, borderRadius: "50%", background: "#fff", transition: "left var(--dur-fast)", boxShadow: "var(--shadow-xs)" }} />
               </span>
               归一化
             </button>
-            <Button size="sm" variant="ghost" iconLeft={I("download")} onClick={exportCSV}>导出</Button>
+            <Button size="sm" variant="ghost" iconLeft={I("download")} onClick={exportCSV} disabled={rows.length === 0}>导出</Button>
           </div>
         </div>
 
         {/* ① 成员表现表 */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-xs)", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 10, padding: "10px 18px", borderBottom: "1px solid var(--border-subtle)", background: "var(--surface-sunken)", alignItems: "center" }}>
-            <button onClick={() => toggleSort("name")} title="按姓名排序"
+            <button type="button" onClick={() => toggleSort("name")} title="按姓名排序"
               style={{ ...hCell, display: "inline-flex", alignItems: "center", gap: 2, border: "none", background: "none", cursor: "pointer", padding: 0, color: sort.key === "name" ? "var(--accent-text)" : "var(--text-faint)" }}>成员{sortArrow("name")}</button>
             {COLS.map((c) => (
-              <button key={c.key} onClick={() => toggleSort(c.key)} title={`按${c.label}排序`}
+              <button type="button" key={c.key} onClick={() => toggleSort(c.key)} title={`按${c.label}排序`}
                 style={{ ...hCell, display: "inline-flex", alignItems: "center", gap: 4, border: "none", background: "none", cursor: "pointer", padding: 0, color: sort.key === c.key ? "var(--accent-text)" : "var(--text-faint)" }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.color, flexShrink: 0 }} />{c.label}{sortArrow(c.key)}
               </button>
             ))}
           </div>
+          {rows.length === 0 && (
+            <EmptyState compact title="当前评选期暂无成员数据" style={{ padding: "24px 0" }} />
+          )}
           {rows.map((r, i) => {
             const me = !!meUser && r.name === meUser.name;
             return (

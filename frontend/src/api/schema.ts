@@ -1089,6 +1089,8 @@ export interface components {
             };
             /** Progress Order */
             progress_order?: string[] | null;
+            /** Period */
+            period?: string;
         };
         /** EvalRowOut */
         EvalRowOut: {
@@ -1414,6 +1416,12 @@ export interface components {
             ratings: {
                 [key: string]: unknown;
             };
+            /**
+             * Rated By
+             * 当前用户已评分的报告人姓名列表
+             * @default []
+             */
+            rated_by: string[];
         };
         /** RequestEventOut */
         RequestEventOut: {

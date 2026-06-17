@@ -51,7 +51,7 @@ def build_past_reports() -> list[dict]:
             pres.append(MEMBERS[ri % len(MEMBERS)])
             ri += 3
         out.append({
-            "id": f"r-{mo + 1}-{day}", "mo": mo, "day": day,
+            "id": f"r-{mo + 1}-{day}", "y": cur.year, "mo": mo, "day": day,
             "type": "进展汇报" if n % 2 == 0 else "文献精读",
             "presenters": pres,
         })
@@ -100,10 +100,12 @@ def seed_eval(reports: list[dict]) -> dict:
 
 
 def _norm(rows: list[dict], key: str, nk: str) -> None:
+    if not rows:
+        return
     vals = [r[key] for r in rows]
     mn, mx = min(vals), max(vals)
     for r in rows:
-        r[nk] = ((r[key] - mn) / (mx - mn)) * 100 if mx > mn else 100.0
+        r[nk] = ((r[key] - mn) / (mx - mn)) * 100 if mx > mn else 50.0
 
 
 def compute_eval(
@@ -126,7 +128,7 @@ def compute_eval(
     cancelled = cancelled or set()
 
     def iso_of(r: dict) -> str:
-        return f"2026-{r['mo'] + 1:02d}-{r['day']:02d}"
+        return f"{r['y']:04d}-{r['mo'] + 1:02d}-{r['day']:02d}"
 
     rs = [
         r for r in reports
@@ -227,7 +229,7 @@ def rank_series_for(
     cancelled = cancelled or set()
 
     def iso_of(r: dict) -> str:
-        return f"2026-{r['mo'] + 1:02d}-{r['day']:02d}"
+        return f"{r['y']:04d}-{r['mo'] + 1:02d}-{r['day']:02d}"
 
     reps = sorted(
         [
@@ -254,6 +256,6 @@ def rank_series_for(
             arr = sorted(ev["rows"], key=lambda a: (-(a["nAttitude"] + a["nPolish"] + a["nLogic"]), -a["meeting"]))
         idx = next((i for i, a in enumerate(arr) if a["name"] == name), -1)
         points.append({"label": f"{r['mo'] + 1}/{r['day']:02d}"})
-        ranks.append(idx + 1 if idx >= 0 else total)
+        ranks.append(idx + 1 if idx >= 0 else max(total, 1))
     return {"points": points, "ranks": ranks, "total": total}
 

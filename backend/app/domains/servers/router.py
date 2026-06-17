@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.models import Server
@@ -20,7 +21,11 @@ async def list_servers(_: CurrentUser, db: DbSession) -> list[Server]:
 async def create_server(body: ServerCreate, _: AdminUser, db: DbSession) -> Server:
     srv = Server(**body.model_dump())
     db.add(srv)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="服务器名称已存在")
     await db.refresh(srv)
     return srv
 
@@ -33,7 +38,11 @@ async def update_server(server_id: str, body: ServerUpdate, _: AdminUser, db: Db
     for k, v in body.model_dump(exclude_unset=True).items():
         if v is not None:
             setattr(srv, k, v)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="服务器名称已存在")
     await db.refresh(srv)
     return srv
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 from jose import JWTError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.deps import CurrentUser, DbSession
 from app.core.security import (
@@ -63,4 +64,8 @@ async def change_password(body: ChangePasswordRequest, user: CurrentUser, db: Db
     if not verify_password(body.old_password, user.password_hash):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="原密码错误")
     user.password_hash = hash_password(body.new_password)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="密码修改失败，请重试")

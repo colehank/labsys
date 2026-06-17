@@ -122,8 +122,8 @@ import { useIsMobile } from "../lib/useIsMobile";
               ))}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {keys.map((k, i) => (
-                <div key={i} style={{ padding: "13px 15px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+              {keys.map((k) => (
+                <div key={k.name} style={{ padding: "13px 15px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>{k.name}</span>
                     <Badge tone="success" size="sm" dot>启用中</Badge>

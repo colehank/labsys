@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.domains.lab.serializers import ann_sort_key, announcement_out, meeting_out
+from app.domains.notify.service import notify
 from app.models import (
     Announcement,
     LabConfig,
@@ -18,6 +19,7 @@ from app.models import (
     MeetingType,
     Presenter,
     Semester,
+    User,
 )
 from app.schemas.lab import (
     AnnouncementCreate,
@@ -99,17 +101,25 @@ async def update_config(body: ConfigIn, _: AdminUser, db: DbSession) -> ConfigOu
 
 
 @router.get("/announcements", response_model=list[AnnouncementOut])
-async def list_announcements(_: CurrentUser, db: DbSession) -> list[AnnouncementOut]:
-    """当前生效的公告（未过期），按 pinned → level → 时间排序。"""
+async def list_announcements(me: CurrentUser, db: DbSession) -> list[AnnouncementOut]:
+    """当前生效的公告（未过期），按 pinned → level → 时间排序。
+    管理员可见全部公告；普通成员只见 audience='all' 或 'students' 的公告。
+    """
     today = date.today()
-    rows = list((await db.execute(select(Announcement))).scalars())
-    active = [a for a in rows if a.expires_at is None or a.expires_at >= today]
-    active.sort(key=ann_sort_key)
-    return [announcement_out(a) for a in active]
+    q = select(Announcement).where(
+        or_(Announcement.expires_at.is_(None), Announcement.expires_at >= today)
+    )
+    if me.role != "admin":
+        q = q.where(Announcement.audience.in_(("all", "students")))
+    rows = list((await db.execute(q)).scalars())
+    rows.sort(key=ann_sort_key)
+    return [announcement_out(a) for a in rows]
 
 
 @router.post("/announcements", response_model=AnnouncementOut, status_code=status.HTTP_201_CREATED)
-async def publish_announcement(body: AnnouncementCreate, admin: AdminUser, db: DbSession) -> AnnouncementOut:
+async def publish_announcement(
+    body: AnnouncementCreate, admin: AdminUser, db: DbSession, tasks: BackgroundTasks
+) -> AnnouncementOut:
     ann = Announcement(
         title=body.title.strip(), body=body.body.strip(), level=body.level,
         pinned=body.pinned, audience=body.audience,
@@ -119,6 +129,20 @@ async def publish_announcement(body: AnnouncementCreate, admin: AdminUser, db: D
     db.add(ann)
     await db.commit()
     await db.refresh(ann)
+
+    # 向目标受众发站内通知
+    q = select(User).where(User.disabled.is_(False))
+    if body.audience == "students":
+        q = q.where(User.role == "member")
+    users = list((await db.execute(q)).scalars())
+    for u in users:
+        await notify(
+            db, user_id=u.id,
+            title=f"新公告：{ann.title}",
+            body=ann.body[:100] + ("…" if len(ann.body) > 100 else ""),
+            type="info", tasks=tasks,
+        )
+
     return announcement_out(ann)
 
 
@@ -182,6 +206,11 @@ async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> lis
     按日期 upsert：表里有该日期则更新、没有则新增；表里多出的日期删除。
     匹配到日期的会议**保留其在线会议信息**（online_*），避免重排丢失已预约的腾讯会议。
     """
+    dates = [mi.date for mi in body.meetings]
+    if len(dates) != len(set(dates)):
+        from collections import Counter
+        dups = [str(d) for d, cnt in Counter(dates).items() if cnt > 1]
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"排期中存在重复日期：{', '.join(dups)}")
     existing = {
         m.date: m
         for m in (

@@ -22,14 +22,15 @@ import type { Me } from "../auth";
     const { data: all = [] } = useAnnouncements();
     const [dismissed, setDismissed] = React.useState(() => { try { return JSON.parse(localStorage.getItem(DISMISS_KEY) || "[]"); } catch (e) { return []; } });
     const drop = (id) => { const next = [...new Set([...dismissed, id])]; setDismissed(next); try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next)); } catch (e) {} };
-    const list = all.filter((a) => a.pinned || !dismissed.includes(a.id));
+    const list = all.filter((a) => {
+      if (a.expiresAt && new Date(a.expiresAt) < new Date()) return false;
+      return a.pinned || !dismissed.includes(a.id);
+    });
 
     const [idx, setIdx] = React.useState(0);
     const n = list.length;
     const cur = Math.min(idx, Math.max(0, n - 1));
     const go = (i) => setIdx(((i % n) + n) % n);
-    // keep index valid as the list shrinks (dismiss)
-    React.useEffect(() => { if (idx > n - 1) setIdx(Math.max(0, n - 1)); }, [n]);
     if (!n) return null;
 
     const item = list[cur];
@@ -47,15 +48,15 @@ import type { Me } from "../auth";
               {/* dot indicators */}
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 {list.map((x, i) => (
-                  <button key={x.id} onClick={() => go(i)} aria-label={`第 ${i + 1} 条`}
+                  <button type="button" key={x.id} onClick={() => go(i)} aria-label={`第 ${i + 1} 条`}
                     style={{ width: i === cur ? 16 : 6, height: 6, padding: 0, border: "none", cursor: "pointer", borderRadius: "var(--radius-pill)", background: i === cur ? "var(--accent)" : "var(--border-strong)", transition: "all var(--dur-fast) var(--ease-out)" }} />
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <button onClick={() => go(cur - 1)} aria-label="上一条" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 2, lineHeight: 0 }}>
+                <button type="button" onClick={() => go(cur - 1)} aria-label="上一条" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 2, lineHeight: 0 }}>
                   <Icon name="chevron-left" style={{ width: 16, height: 16 }} />
                 </button>
-                <button onClick={() => go(cur + 1)} aria-label="下一条" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 2, lineHeight: 0 }}>
+                <button type="button" onClick={() => go(cur + 1)} aria-label="下一条" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 2, lineHeight: 0 }}>
                   <Icon name="chevron-right" style={{ width: 16, height: 16 }} />
                 </button>
               </div>
@@ -66,7 +67,7 @@ import type { Me } from "../auth";
         <div
           onClick={multi ? () => go(cur + 1) : undefined}
           title={multi ? "点击查看下一条" : undefined}
-          style={{ height: 116, display: "flex", gap: 13, alignItems: "flex-start", padding: "14px 16px", background: "var(--surface)", border: "1px solid var(--border-subtle)", borderLeft: `3px solid var(--${mm.tone})`, borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xs)", cursor: multi ? "pointer" : "default", boxSizing: "border-box", overflow: "hidden" }}>
+          style={{ minHeight: 116, display: "flex", gap: 13, alignItems: "flex-start", padding: "14px 16px", background: "var(--surface)", border: "1px solid var(--border-subtle)", borderLeft: `3px solid var(--${mm.tone})`, borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xs)", cursor: multi ? "pointer" : "default", boxSizing: "border-box" }}>
           <span style={{ width: 34, height: 34, flexShrink: 0, borderRadius: "var(--radius-md)", background: `var(--${mm.tone}-soft)`, color: `var(--${mm.tone}-text)`, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name={mm.icon} style={{ width: 17, height: 17 }} />
           </span>
@@ -82,7 +83,7 @@ import type { Me } from "../auth";
             </div>
           </div>
           {!item.pinned && (
-            <button onClick={(e) => { e.stopPropagation(); drop(item.id); }} aria-label="忽略" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 4, lineHeight: 0, flexShrink: 0 }}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); drop(item.id); }} aria-label="忽略" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 4, lineHeight: 0, flexShrink: 0 }}>
               <Icon name="x" style={{ width: 15, height: 15 }} />
             </button>
           )}
@@ -98,8 +99,7 @@ import type { Me } from "../auth";
     // 取真实今天（归一化到 0 点）→ 首页展示下一场即将到来的组会。
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const up = meetings.find((s) => new Date(s.y, s.mo, s.day) >= today)
-      || meetings[meetings.length - 1];
+    const up = [...meetings].sort((a, b) => new Date(a.y, a.mo, a.day).getTime() - new Date(b.y, b.mo, b.day).getTime()).find((s) => new Date(s.y, s.mo, s.day) >= today);
     const m = up && cfg
       ? { date: up.dateLabel, time: up.time || cfg.meetingDefault.time, place: up.place || cfg.meetingDefault.place, online: up.online, presenters: up.presenters }
       : null;
@@ -166,8 +166,8 @@ import type { Me } from "../auth";
               </a>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {m.presenters.map((p, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 13, padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
+              {m.presenters.map((p) => (
+                <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 13, padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
                   <Avatar name={p.name} size="md" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -194,8 +194,8 @@ import type { Me } from "../auth";
                     <div style={{ fontSize: 14, color: "var(--text-strong)", fontWeight: 500 }}>{incoming.from}想和你对调报告</div>
                     <div style={{ fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 8px" }}>{incoming.fromDate} ⇄ {incoming.toDate}</div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <Button size="sm" variant="primary" onClick={() => advance.mutate({ id: incoming.id, next: "accepted", note: `已接受 ${incoming.from} 的对调` }, { onSuccess: () => toast("已接受对调") })}>接受</Button>
-                      <Button size="sm" variant="ghost" onClick={() => advance.mutate({ id: incoming.id, next: "declined", note: `已拒绝 ${incoming.from} 的对调` }, { onSuccess: () => toast("已拒绝对调") })}>拒绝</Button>
+                      <Button size="sm" variant="primary" disabled={advance.isPending} onClick={() => advance.mutate({ id: incoming.id, next: "accepted", note: `已接受 ${incoming.from} 的对调` }, { onSuccess: () => toast("已接受对调"), onError: (e: any) => toast(e?.detail || e?.message || "操作失败，请重试", { tone: "error" }) })}>接受</Button>
+                      <Button size="sm" variant="ghost" disabled={advance.isPending} onClick={() => advance.mutate({ id: incoming.id, next: "declined", note: `已拒绝 ${incoming.from} 的对调` }, { onSuccess: () => toast("已拒绝对调"), onError: (e: any) => toast(e?.detail || e?.message || "操作失败，请重试", { tone: "error" }) })}>拒绝</Button>
                     </div>
                   </div>
                 </div>

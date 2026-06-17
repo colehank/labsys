@@ -139,7 +139,7 @@ import { useIsMobile } from "../lib/useIsMobile";
           <Card padding="none">
             {hasUnreadFeed && (
               <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 14px", borderBottom: "1px solid var(--border-subtle)" }}>
-                <Button size="sm" variant="ghost" loading={markAll.isPending} onClick={() => markAll.mutate()}>全部已读</Button>
+                <Button size="sm" variant="ghost" loading={markAll.isPending} onClick={() => markAll.mutate(undefined as void)}>全部已读</Button>
               </div>
             )}
             {notifs.length ? notifs.map((n) => <NotifItem key={n.id} n={n} onNavigate={onNavigate} advance={advance} markRead={markRead} />)

@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models import RequestKind
 
 
 class RequestEventOut(BaseModel):
     status: str
-    note: str
+    note: str = ""
     at: datetime
 
 
@@ -34,18 +35,27 @@ class RequestOut(BaseModel):
 
 class CreateRequest(BaseModel):
     kind: RequestKind
-    fromDate: str = ""
-    toName: str = ""
-    toDate: str = ""
-    topic: str = ""
-    detail: str = ""
-    reason: str = ""
-    note: str = ""
+    fromDate: str = Field(default="", max_length=32)
+    toName: str = Field(default="", max_length=64)
+    toDate: str = Field(default="", max_length=32)
+    topic: str = Field(default="", max_length=256)
+    detail: str = Field(default="", max_length=256)
+    reason: str = Field(default="", max_length=4096)
+    note: str = Field(default="", max_length=512)
     # 对调专用：发起人/对方各自所在组会的 id，接受后据此真正互换报告人。
     fromMeetingId: str | None = None
     toMeetingId: str | None = None
 
+    @model_validator(mode="after")
+    def swap_requires_fields(self):
+        if self.kind == "swap":
+            if not self.toName:
+                raise ValueError("对调申请必须指定对方姓名")
+            if not self.fromMeetingId or not self.toMeetingId:
+                raise ValueError("对调申请必须指定双方组会")
+        return self
+
 
 class AdvanceRequest(BaseModel):
-    next: str
-    note: str = ""
+    next: Literal["accepted", "declined", "cancelled", "approved", "rejected"]
+    note: str = Field(default="", max_length=512)

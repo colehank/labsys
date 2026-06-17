@@ -1,7 +1,10 @@
 """评选 DTO —— 字段名对齐前端组件（含归一化 nXxx）。"""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class EvalRowOut(BaseModel):
@@ -48,6 +51,7 @@ class ExcellenceOut(BaseModel):
     names: list[str]
     count: int
     published: bool
+    published_at: datetime | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -68,6 +72,7 @@ class ReportOut(BaseModel):
     attendance: dict   # name -> present|leave|absent
     speaks: dict = {}  # name -> 发言次数（管理员录入）
     ratings: dict = {}  # presenter -> {attitude, polish, raters}（成员匿名提交聚合）
+    rated_by: list[str] = []  # 当前用户已评分的报告人姓名列表（服务端按 rater_id 过滤）
 
 
 class RatingSubmit(BaseModel):
@@ -77,10 +82,15 @@ class RatingSubmit(BaseModel):
     logic: float = Field(ge=0, le=5)     # 报告逻辑清晰程度
     top5: list[str] = Field(default=[], max_length=5)
 
+    @field_validator("top5")
+    @classmethod
+    def deduplicate_top5(cls, v: list[str]) -> list[str]:
+        return list(dict.fromkeys(n for n in v if n))
+
 
 class AttendanceSet(BaseModel):
     name: str
-    status: str        # present | leave | absent
+    status: Literal["present", "leave", "absent"]
 
 
 class SpeaksSet(BaseModel):
@@ -93,6 +103,7 @@ class EvalConfigIO(BaseModel):
     filters: dict
     range: dict
     progress_order: list[str] | None = None
+    period: str = ""
 
 
 class PublishExcellence(BaseModel):

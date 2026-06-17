@@ -1,11 +1,12 @@
 import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
-import { useFeedback, useMarkFeedbackRead } from "../api/hooks";
+import { toast } from "../store";
+import { useFeedback, useMarkFeedbackRead, useDeleteFeedback } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
-// AdminFeedback — 匿名意见: 管理员查看成员匿名提交的意见，可标记已读。完全匿名，不含提交者身份。
-  const { Card, Badge, IconButton, ScreenState, EmptyState } = NS;
+// AdminFeedback — 匿名意见: 管理员查看成员匿名提交的意见，可标记已读/删除。完全匿名，不含提交者身份。
+  const { Card, Badge, IconButton, ScreenState, EmptyState, Dialog, Button } = NS;
 
   const fmtTime = (iso: string) => {
     const d = new Date(iso);
@@ -16,6 +17,8 @@ import { useIsMobile } from "../lib/useIsMobile";
     const isMobile = useIsMobile();
     const q = useFeedback();
     const markRead = useMarkFeedbackRead();
+    const deleteFb = useDeleteFeedback();
+    const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
     const list = q.data ?? [];
     const unread = list.filter((f: any) => !f.read).length;
 
@@ -46,14 +49,35 @@ import { useIsMobile } from "../lib/useIsMobile";
                       </div>
                       <p style={{ fontSize: 14, color: "var(--text-body)", lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{f.body}</p>
                     </div>
-                    {!f.read && (
-                      <IconButton size="sm" icon={I("check")} label="标记已读" onClick={() => markRead.mutate(f.id)} />
-                    )}
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      {!f.read && (
+                        <IconButton size="sm" icon={I("check")} label="标记已读"
+                          disabled={markRead.isPending && (markRead.variables as any) === f.id}
+                          onClick={() => markRead.mutate(f.id)} />
+                      )}
+                      <IconButton size="sm" icon={I("trash-2")} label="删除"
+                        disabled={deleteFb.isPending && (deleteFb.variables as any) === f.id}
+                        onClick={() => setDeleteTarget(f.id)} />
+                    </div>
                   </div>
                 ))}
               </div>
             )}
         </Card>
+
+        <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)}
+          title="删除这条意见？" subtitle="删除后无法恢复，发送者不会收到任何通知。"
+          tone="danger" icon={I("trash-2")} width={400}
+          footer={<>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>取消</Button>
+            <Button variant="primary" loading={deleteFb.isPending}
+              onClick={() => deleteTarget && deleteFb.mutate(deleteTarget, {
+                onSuccess: () => { toast("已删除"); setDeleteTarget(null); },
+                onError: (e: any) => toast(e?.message || "删除失败", { tone: "error" }),
+              })}>确认删除</Button>
+          </>}>
+          <p style={{ fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.6 }}>该意见将被永久从系统中移除。</p>
+        </Dialog>
       </div>
     );
   }

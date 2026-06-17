@@ -35,7 +35,7 @@ async def auto_book_pass() -> None:
             .where(Meeting.date >= date.today(), Meeting.date <= horizon)
         )).scalars().all()
         todo = [
-            (m.id, m.date, m.type.value)
+            (m.id, m.date, m.type)
             for m in rows
             if not (m.online_status == "ok" and m.online_url)
         ]

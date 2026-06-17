@@ -8,6 +8,7 @@ import {
   useUpdateEvalConfig,
   usePublishExcellence,
   useExcellence,
+  useConfig,
 } from "../api/hooks";
 import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
@@ -67,7 +68,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
         <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
         <span style={{ fontSize: 11.5, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{label}</span>
-        <input type="range" min="0" max="100" value={Math.round(value * 100)} onChange={(e) => onChange(+e.target.value / 100)}
+        <input type="range" aria-label={label + '权重'} min="0" max="100" value={Math.round(value * 100)} onChange={(e) => onChange(+e.target.value / 100)}
           style={{ flex: 1, minWidth: 40, accentColor: "var(--accent)", height: 3 }} />
         <span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-faint)", width: 30, textAlign: "right" }}>{Math.round(value * 100)}%</span>
       </div>
@@ -84,7 +85,7 @@ import { useIsMobile } from "../lib/useIsMobile";
         </span>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "0 9px", height: 32, border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", flexShrink: 0 }}>
           <span style={{ fontSize: 12, color: "var(--text-faint)" }}>≥</span>
-          <input type="number" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Math.max(min, Math.min(max, +e.target.value || 0)))}
+          <input type="number" aria-label={label + '下限'} min={min} max={max} step={step} value={value} onChange={(e) => onChange(Math.max(min, Math.min(max, +e.target.value || 0)))}
             style={{ width: 44, border: "none", background: "transparent", color: "var(--text-strong)", fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 600, outline: "none", textAlign: "right", MozAppearance: "textfield" }} />
           {suffix && <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{suffix}</span>}
         </div>
@@ -97,17 +98,17 @@ import { useIsMobile } from "../lib/useIsMobile";
     term: { label: "本学期" },
   };
 
-  // 预设区间按“今天”动态推导，避免写死过期日期。
-  const fmtISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  function presetRange(k: string) {
+  const fmtISO = (d: Date) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  // 预设区间：优先读后端 cfg.semester.start；无数据时按月份动态推算兜底（不写死具体日期）。
+  function presetRange(k: string, semesterStart?: string) {
     const now = new Date();
     const to = fmtISO(now);
     if (k === "recent") { const f = new Date(now); f.setDate(f.getDate() - 30); return { from: fmtISO(f), to }; }
-    // 本学期起始：春季学期(2–7 月)≈2/24；秋季学期(8 月–次年 1 月)≈9/1
-    const m = now.getMonth();
+    if (semesterStart) return { from: semesterStart, to };
+    const m = now.getMonth(), yr = now.getFullYear();
     const start = (m >= 1 && m <= 6)
-      ? new Date(now.getFullYear(), 1, 24)
-      : new Date(m === 0 ? now.getFullYear() - 1 : now.getFullYear(), 8, 1);
+      ? new Date(yr, 1, 24)
+      : new Date(m === 0 ? yr - 1 : yr, 8, 1);
     return { from: fmtISO(start), to };
   }
 
@@ -115,7 +116,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const ds = { height: 30, padding: "0 9px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-mono)", fontSize: 12.5, colorScheme: "light dark" };
     const isCustom = !RANGE_PRESETS[range.preset];
     const segBtn = (on, label, onClick) => (
-      <button key={label} onClick={onClick}
+      <button type="button" key={label} onClick={onClick}
         style={{ padding: "5px 12px", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, borderRadius: "var(--radius-sm)", background: on ? "var(--surface)" : "transparent", color: on ? "var(--accent-text)" : "var(--text-muted)", boxShadow: on ? "var(--shadow-xs)" : "none", transition: "all var(--dur-fast) var(--ease-out)" }}>{label}</button>
     );
     return (
@@ -126,9 +127,9 @@ import { useIsMobile } from "../lib/useIsMobile";
         </div>
         {isCustom && (
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <input type="date" value={range.from} onChange={(e) => onFrom(e.target.value)} style={ds} />
+            <input type="date" aria-label="开始日期" value={range.from} onChange={(e) => onFrom(e.target.value)} style={ds} />
             <span style={{ color: "var(--text-faint)", fontSize: 12.5 }}>至</span>
-            <input type="date" value={range.to} onChange={(e) => onTo(e.target.value)} style={ds} />
+            <input type="date" aria-label="结束日期" value={range.to} onChange={(e) => onTo(e.target.value)} style={ds} />
           </div>
         )}
       </div>
@@ -142,6 +143,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const { data: evData } = evQ;
     const { data: meUser } = useMe();
     const { data: cfg } = cfgQ;
+    const { data: semCfg } = useConfig(); // 学期起止日期，用于"本学期"预设区间
     const { data: excellence } = useExcellence();
     const updateConfig = useUpdateEvalConfig();
     const publishExc = usePublishExcellence();
@@ -154,7 +156,12 @@ import { useIsMobile } from "../lib/useIsMobile";
     const sumCols = isMobile ? "1fr" : (detailOpen ? "48px 1fr 52px 52px repeat(5, 1fr) 64px" : "48px 1fr 52px 52px");
     const [pubOpen, setPubOpen] = React.useState(false);
     const [pubCount, setPubCount] = React.useState(5);
-    const [justPublished, setJustPublished] = React.useState(false);
+    const [periodLocal, setPeriodLocal] = React.useState<string | null>(null);
+    const periodTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    React.useEffect(() => {
+      return () => { clearTimeout(periodTimerRef.current ?? undefined); };
+    }, []);
 
     if (evQ.isLoading || cfgQ.isLoading) return <ScreenState loading />;
     if (evQ.isError || cfgQ.isError) return <ScreenState error onRetry={() => { evQ.refetch(); cfgQ.refetch(); }} />;
@@ -171,11 +178,13 @@ import { useIsMobile } from "../lib/useIsMobile";
       filters: cfg.filters,
       range: cfg.range,
       progress_order: cfg.progress_order,
+      period: (cfg as any).period ?? "",
       ...patch,
     });
     const setEvalWeights = (patch: any) => updateConfig.mutate(nextConfig({ weights: { ...cfg.weights, ...patch } }));
     const setEvalFilters = (patch: any) => updateConfig.mutate(nextConfig({ filters: { ...cfg.filters, ...patch } }));
     const setEvalRange = (patch: any) => updateConfig.mutate(nextConfig({ range: { ...cfg.range, ...patch } }));
+    const semesterStart: string | undefined = (semCfg as any)?.semester?.start;
     const resetProgressOrder = () => updateConfig.mutate(nextConfig({ progress_order: null }));
 
     // —— 从后端 rows / merged 派生 survivors / order / mRankAmong（与本地计算等价）——
@@ -191,7 +200,6 @@ import { useIsMobile } from "../lib/useIsMobile";
 
     // —— 最终表现表：入选者按终极名次在前，其余按组会表现在后（淡化）——
     const survSet = new Set(ev.survivors.map((s) => s.name));
-    const finalByName = {}; ev.merged.forEach((m) => { finalByName[m.name] = m.finalRank; });
     const topRows = [
       ...ev.merged.map((m) => ({ ...rowByName[m.name], finalRank: m.finalRank, mRank: m.mRank, pRank: m.pRank, inSurv: true })),
       ...ev.rows.filter((r) => !survSet.has(r.name)).map((r) => ({ ...r, finalRank: null, mRank: null, pRank: null, inSurv: false })),
@@ -214,10 +222,15 @@ import { useIsMobile } from "../lib/useIsMobile";
     };
     const endDrag = () => { setDragItem(null); setLiveOrder(null); };
     const onDropItem = () => {
-      if (liveOrder && dragItem != null) {
-        updateConfig.mutate(nextConfig({ progress_order: liveOrder }), { onSettled: () => setLiveOrder(null) });
-      }
+      const orderToSave = liveOrder;
+      const itemToSave = dragItem;
       setDragItem(null);
+      setLiveOrder(null);
+      if (orderToSave && itemToSave != null) {
+        updateConfig.mutate(nextConfig({ progress_order: orderToSave }), {
+          onError: () => toast("进展排序保存失败", { tone: "error" }),
+        });
+      }
     };
 
     const latest = excellence && excellence.published ? excellence : null;
@@ -228,9 +241,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       publishExc.mutate(pubN, {
         onSuccess: () => {
           setPubOpen(false);
-          setJustPublished(true);
           toast("已发布 · 优秀名单前 " + pubN + " 名");
-          setTimeout(() => setJustPublished(false), 2600);
         },
         onError: () => toast("发布失败，请重试", { tone: "error" }),
       });
@@ -263,11 +274,11 @@ import { useIsMobile } from "../lib/useIsMobile";
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
             <h2 style={{ fontSize: 19, fontWeight: 600, color: "var(--text-strong)" }}>表现统计</h2>
-            <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{excellence?.period} · 区间内 {ev.total} 次组会 · {ev.rows.length} 名成员</span>
+            <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{excellence?.period ? `${excellence.period} · ` : ""}区间内 {ev.total} 次组会 · {ev.rows.length} 名成员</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <RangeControl range={range}
-              onPreset={(k) => { const r = presetRange(k); setEvalRange({ preset: k, from: r.from, to: r.to }); }}
+              onPreset={(k) => { const r = presetRange(k, semesterStart); setEvalRange({ preset: k, from: r.from, to: r.to }); }}
               onCustom={() => setEvalRange({ preset: "custom" })}
               onFrom={(v) => setEvalRange({ from: v, preset: "custom" })}
               onTo={(v) => setEvalRange({ to: v, preset: "custom" })} />
@@ -374,7 +385,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                             <span className="cibol-mono" style={{ fontSize: 11, color: "var(--text-body)", width: 28, flexShrink: 0 }}>{m.raw(r)}</span>
                           </div>
                         ))}
-                        <span className="cibol-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.meeting.toFixed(1)}</span>
+                        <span className="cibol-mono" style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{(r.meeting ?? 0).toFixed(1)}</span>
                       </>}
                     </div>
                   );
@@ -385,11 +396,28 @@ import { useIsMobile } from "../lib/useIsMobile";
         </div>
 
         {/* 设置本次评选标准：组会权重 + 评选过滤 */}
-        <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)}
+        <Dialog open={settingsOpen} onClose={() => { clearTimeout(periodTimerRef.current); setPeriodLocal(null); setSettingsOpen(false); }}
           title="本次评选标准" subtitle="组会权重与评选过滤 · 改动即时生效"
           icon={I("settings-2")} tone="accent" width={520}
-          footer={<Button variant="primary" onClick={() => setSettingsOpen(false)}>完成</Button>}>
+          footer={<Button variant="primary" onClick={() => { clearTimeout(periodTimerRef.current); setPeriodLocal(null); setSettingsOpen(false); }}>完成</Button>}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {/* 评选期名称 */}
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 6 }}>评选期名称</div>
+              <input
+                type="text"
+                placeholder="如：2026 春季 · 第二评选期"
+                value={periodLocal ?? ((cfg as any).period ?? "")}
+                onChange={(e: any) => {
+                  const v = e.target.value;
+                  setPeriodLocal(v);
+                  clearTimeout(periodTimerRef.current);
+                  periodTimerRef.current = setTimeout(() => { updateConfig.mutate(nextConfig({ period: v })); setPeriodLocal(null); }, 500);
+                }}
+                style={{ width: "100%", boxSizing: "border-box", height: 34, padding: "0 10px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontSize: 13.5, fontFamily: "var(--font-sans)", outline: "none" }}
+              />
+              <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>显示在表现统计及优秀名单中</div>
+            </div>
             {/* 组会权重 */}
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -435,10 +463,10 @@ import { useIsMobile } from "../lib/useIsMobile";
                 <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>从终极排名第 1 名起取前 N 名</span>
               </div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <button onClick={() => setPubCount(Math.max(1, pubN - 1))} disabled={pubN <= 1} aria-label="减"
+                <button type="button" onClick={() => setPubCount(Math.max(1, pubN - 1))} disabled={pubN <= 1} aria-label="减"
                   style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-default)", background: "var(--surface)", borderRadius: "var(--radius-sm)", cursor: pubN <= 1 ? "not-allowed" : "pointer", color: "var(--text-muted)", opacity: pubN <= 1 ? 0.5 : 1 }}>{I("minus", { size: 15 })}</button>
                 <span className="cibol-mono" style={{ minWidth: 28, textAlign: "center", fontSize: 18, fontWeight: 700, color: "var(--text-strong)", fontVariantNumeric: "tabular-nums" }}>{pubN}</span>
-                <button onClick={() => setPubCount(Math.min(ev.merged.length, pubN + 1))} disabled={pubN >= ev.merged.length} aria-label="加"
+                <button type="button" onClick={() => setPubCount(Math.min(ev.merged.length, pubN + 1))} disabled={pubN >= ev.merged.length} aria-label="加"
                   style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-default)", background: "var(--surface)", borderRadius: "var(--radius-sm)", cursor: pubN >= ev.merged.length ? "not-allowed" : "pointer", color: "var(--text-muted)", opacity: pubN >= ev.merged.length ? 0.5 : 1 }}>{I("plus", { size: 15 })}</button>
                 <span style={{ fontSize: 12.5, color: "var(--text-faint)", marginLeft: 2 }}>/ {ev.merged.length} 入选</span>
               </div>
