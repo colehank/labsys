@@ -3,6 +3,7 @@ import * as NS from "../ds";
 import { I } from "../lib/icons";
 import { useExcellenceAll } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
+import { toast } from "../store";
 
 const { Avatar, Button, ScreenState, EmptyState } = NS;
 
@@ -15,6 +16,7 @@ type Excellence = {
   perfect_attendance?: string[];
   award_excellence?: number;
   award_attendance?: number;
+  note?: string;
   published: boolean;
   published_at?: string | null;
 };
@@ -109,20 +111,48 @@ function BonusTable({ history, isMobile }: { history: Excellence[]; isMobile: bo
   }
   const rows = [...map.values()].sort((a, b) => b.total - a.total);
 
+  // 按月/评选周期导出做账表（#10）：明细（姓名/奖项/金额/周期/发放状态/备注）+ 按人汇总。
+  const exportBonusCSV = () => {
+    const esc = (v: any) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const lines: string[] = [];
+    lines.push("做账明细");
+    lines.push(["评选周期", "起止", "姓名", "奖项类型", "金额", "发放状态", "备注"].join(","));
+    for (const e of history) {
+      const awdExc = e.award_excellence ?? 1000;
+      const awdAtt = e.award_attendance ?? 100;
+      const span = `${e.from ?? ""}~${e.to ?? ""}`;
+      for (const n of e.names || []) lines.push([e.period, span, n, "优秀奖", awdExc, "待发放", e.note ?? ""].map(esc).join(","));
+      for (const n of e.perfect_attendance || []) lines.push([e.period, span, n, "全勤奖", awdAtt, "待发放", ""].map(esc).join(","));
+    }
+    lines.push("");
+    lines.push("按人汇总（一人多奖合并）");
+    lines.push(["姓名", "全勤奖次数", "优秀奖次数", "合计金额"].join(","));
+    for (const r of rows) lines.push([r.name, r.attCount, r.excCount, r.total].map(esc).join(","));
+    lines.push(["合计", "", "", rows.reduce((s, r) => s + r.total, 0)].join(","));
+    const csv = "﻿" + lines.join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `奖金做账表_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("已导出做账表");
+  };
+
   const hCell: React.CSSProperties = { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-faint)" as any };
   const GRID = isMobile ? "1fr 1fr 1fr 1fr" : "180px 1fr 1fr 1fr";
 
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-xs)", overflow: "hidden" }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px" }}>
         <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--terracotta-500)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{I("coins", { size: 13 })}</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", flex: 1 }}>奖金汇总</span>
-        <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{rows.length} 人获奖</span>
-        <span style={{ color: "var(--text-faint)", transition: "transform var(--dur-fast)", transform: open ? "rotate(180deg)" : "rotate(0deg)", display: "inline-flex" }}>{I("chevron-down", { size: 16 })}</span>
-      </button>
+        <button type="button" onClick={() => setOpen((v) => !v)}
+          style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", flex: 1 }}>奖金汇总</span>
+          <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{rows.length} 人获奖</span>
+          <span style={{ color: "var(--text-faint)", transition: "transform var(--dur-fast)", transform: open ? "rotate(180deg)" : "rotate(0deg)", display: "inline-flex" }}>{I("chevron-down", { size: 16 })}</span>
+        </button>
+        <Button size="sm" variant="ghost" iconLeft={I("download")} onClick={exportBonusCSV} disabled={rows.length === 0}>导出做账表</Button>
+      </div>
 
       {open && (
         <div style={{ borderTop: "1px solid var(--border-subtle)" }}>

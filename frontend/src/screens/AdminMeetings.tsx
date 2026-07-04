@@ -48,6 +48,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       slots.push({ id: "s" + (UID++), iso, date: m.dateLabel || fmt(new Date(iso + "T00:00:00")), cancelled: m.status === "cancelled" });
       groups.push({
         id: "g" + (UID++), time: m.time || "", place: m.place || "", type: m.type || "", host: m.host || "",
+        template: m.template || "正式报告", scored: m.scored !== false,
         presenters: (m.presenters || []).map((p) => ({ name: p.name, topic: p.topic || "", skipped: false })),
       });
     });
@@ -380,13 +381,21 @@ import { useIsMobile } from "../lib/useIsMobile";
             host: c.group.host || "",
             time: c.group.time || "",   // 空 = 沿用全局默认（成员端回退渲染）
             place: c.group.place || "",
+            template: c.group.template || "正式报告",
+            scored: c.group.scored !== false,   // 默认参与评分；仅考勤/团建等置 false（#8）
             presenters: (c.group.presenters || [])
               .filter((p: any) => !p.skipped)
               .map((p: any) => ({ name: p.name, topic: p.topic || "", kind })),
           };
         });
       if (!meetings.length) { toast("排期为空，先生成排期再保存", { tone: "error" }); return; }
-      saveSchedule.mutate(meetings, {
+      // 学期隔离（#1）：仅在当前学期起止范围内全量替换，范围外（其它学期）组会一律保留，
+      // 从根上杜绝「排下学期把本学期连数据一起删掉」。
+      saveSchedule.mutate({
+        meetings,
+        scope_from: cfg?.semester?.start || undefined,
+        scope_to: cfg?.semester?.end || undefined,
+      }, {
         onSuccess: () => {
           seededFromReal.current = false;
           toast(`排期已保存并更新（${meetings.length} 场组会）`, { tone: "success" });
@@ -583,6 +592,20 @@ import { useIsMobile } from "../lib/useIsMobile";
                         <datalist id={`mtypes-${g.id}`}>
                           {["进展汇报", "文献精读", "团建", "AI Agent工作坊", "工作坊"].map((t) => <option key={t} value={t} />)}
                         </datalist>
+                      </div>
+                      {/* 评分模板 / 是否参与评分（#8）：非正式活动不进评分入口、不计报告分 */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
+                        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>评分模板</span>
+                        <select value={g.template || "正式报告"}
+                          onChange={(e) => { const v = e.target.value; setMeta(g.id, "template", v); setMeta(g.id, "scored", v === "正式报告"); }}
+                          style={{ height: 34, padding: "0 10px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 13.5, colorScheme: "light dark" }}>
+                          {["正式报告", "工作坊", "团建", "仅考勤"].map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-muted)", cursor: "pointer" }}>
+                          <input type="checkbox" checked={g.scored !== false} onChange={(e) => setMeta(g.id, "scored", e.target.checked)} />
+                          参与评分
+                        </label>
+                        <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{g.scored !== false ? "计入报告评分与表现统计" : "不评分，仅记录出勤"}</span>
                       </div>
                     </div>
                   )}

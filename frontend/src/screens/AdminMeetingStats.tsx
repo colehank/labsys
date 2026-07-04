@@ -140,16 +140,23 @@ import { useQueryClient } from "@tanstack/react-query";
                 if (attE.length === 0 && spkE.length === 0) { toast("无改动"); return; }
                 setSaving(true);
                 try {
-                  await Promise.all([
-                    ...attE.map(([name, status]) => setAtt.mutateAsync({ key, name, status: status as string })),
-                    ...spkE.map(([name, count]) => setSpk.mutateAsync({ key, name, count: count as number })),
-                  ]);
+                  // 串行提交：原先 Promise.all 会把整册成员的出勤/发言几十个写请求同时打出，
+                  // 并发写同一场组会易触发 DB 写竞争与连接压力 → 「保存失败」（反馈 #5）。
+                  // 逐条提交更稳，失败时也能定位到具体成员。
+                  for (const [name, status] of attE) {
+                    await setAtt.mutateAsync({ key, name, status: status as string });
+                  }
+                  for (const [name, count] of spkE) {
+                    await setSpk.mutateAsync({ key, name, count: count as number });
+                  }
                   toast("已保存 · 本次组会出勤与发言次数");
                   await qc.invalidateQueries({ queryKey: ["eval"] });
                   setAttEdits((prev) => { const n = { ...prev }; delete n[key]; return n; });
                   setSpkEdits((prev) => { const n = { ...prev }; delete n[key]; return n; });
-                } catch {
-                  toast("保存失败", { tone: "error" });
+                } catch (e: any) {
+                  // 透传后端具体原因，而非笼统「保存失败」（反馈 #13 错误提示细化）。
+                  const detail = e?.detail || e?.message || "请稍后重试";
+                  toast(`保存失败：${detail}`, { tone: "error" });
                 } finally {
                   setSaving(false);
                 }

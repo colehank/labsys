@@ -155,7 +155,9 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [detailOpen, setDetailOpen] = React.useState(false);
     const sumCols = isMobile ? "1fr" : (detailOpen ? "48px 1fr 52px 52px repeat(5, 1fr) 64px" : "48px 1fr 52px 52px");
     const [pubOpen, setPubOpen] = React.useState(false);
-    const [pubCount, setPubCount] = React.useState(5);
+    // #7 手动确认名单：pubNames = 勾选的姓名集合（可剔除靠前、补选靠后）；pubNote = 调整原因。
+    const [pubNames, setPubNames] = React.useState<Set<string>>(new Set());
+    const [pubNote, setPubNote] = React.useState("");
     const [periodLocal, setPeriodLocal] = React.useState<string | null>(null);
     const periodTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -236,16 +238,22 @@ import { useIsMobile } from "../lib/useIsMobile";
     };
 
     const latest = excellence && excellence.published ? excellence : null;
-    const pubN = Math.max(1, Math.min(pubCount | 0, ev.merged.length));
-    const pubPreview = ev.merged.slice(0, pubN);
+    // 勾选名单按 merged 终极排名顺序输出（排名仅决定展示顺序，不再是硬性入选约束）。
+    const orderedPub = ev.merged.filter((m) => pubNames.has(m.name)).map((m) => m.name);
+    const togglePub = (name: string) => setPubNames((s) => { const n = new Set(s); n.has(name) ? n.delete(name) : n.add(name); return n; });
+    const openPublish = () => {
+      const n = latest ? latest.count : Math.min(5, ev.merged.length);
+      const init = latest?.names?.length ? latest.names : ev.merged.slice(0, n).map((m) => m.name);
+      setPubNames(new Set(init));
+      setPubNote(latest?.note || "");
+      setPubOpen(true);
+    };
     const doPublish = () => {
       if (publishExc.isPending) return;
-      publishExc.mutate(pubN, {
-        onSuccess: () => {
-          setPubOpen(false);
-          toast("已发布 · 优秀名单前 " + pubN + " 名");
-        },
-        onError: () => toast("发布失败，请重试", { tone: "error" }),
+      if (orderedPub.length === 0) { toast("请至少勾选 1 人", { tone: "error" }); return; }
+      publishExc.mutate({ count: orderedPub.length, names: orderedPub, note: pubNote }, {
+        onSuccess: () => { setPubOpen(false); toast("已发布 · 优秀名单 " + orderedPub.length + " 人"); },
+        onError: (e: any) => toast("发布失败：" + (e?.detail || e?.message || "请重试"), { tone: "error" }),
       });
     };
 
@@ -286,7 +294,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               onTo={(v) => setEvalRange({ to: v, preset: "custom" })} />
             <Button size="sm" variant="secondary" iconLeft={I("settings-2")} onClick={() => setSettingsOpen(true)}>设置标准</Button>
             <Button size="sm" variant="ghost" iconLeft={I("download")} onClick={exportCSV} disabled={topRows.length === 0}>导出</Button>
-            <Button size="sm" variant="primary" iconLeft={I("award")} onClick={() => { setPubCount(latest ? latest.count : 5); setPubOpen(true); }} disabled={ev.merged.length === 0}>发布优秀</Button>
+            <Button size="sm" variant="primary" iconLeft={I("award")} onClick={openPublish} disabled={ev.merged.length === 0}>发布优秀</Button>
           </div>
         </div>
 
@@ -460,43 +468,42 @@ import { useIsMobile } from "../lib/useIsMobile";
           </div>
         </Dialog>
 
-        {/* 发布优秀 — filter 几人 + 预览 */}
+        {/* 发布优秀 — 手动确认名单（勾选/剔除/补选 + 原因），排名仅作参考（#7） */}
         <Dialog open={pubOpen} onClose={() => setPubOpen(false)}
-          title="发布优秀评级" subtitle={`${range.from} → ${range.to} · 取终极排名前 N 名`}
-          icon={I("award")} tone="warning" width={460}
+          title="发布优秀评级" subtitle={`${range.from} → ${range.to} · 排名仅供参考，最终名单由你确认`}
+          icon={I("award")} tone="warning" width={480}
           footer={<>
             <Button variant="ghost" onClick={() => setPubOpen(false)}>取消</Button>
-            <Button variant="primary" iconLeft={I("award")} onClick={doPublish}>发布前 {pubN} 名</Button>
+            <Button variant="primary" iconLeft={I("award")} onClick={doPublish} disabled={orderedPub.length === 0 || publishExc.isPending}>发布 {orderedPub.length} 人</Button>
           </>}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* 发布几人 filter */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "12px 14px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)" }}>发布人数</span>
-                <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>从终极排名第 1 名起取前 N 名</span>
-              </div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <button type="button" onClick={() => setPubCount(Math.max(1, pubN - 1))} disabled={pubN <= 1} aria-label="减"
-                  style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-default)", background: "var(--surface)", borderRadius: "var(--radius-sm)", cursor: pubN <= 1 ? "not-allowed" : "pointer", color: "var(--text-muted)", opacity: pubN <= 1 ? 0.5 : 1 }}>{I("minus", { size: 15 })}</button>
-                <span className="cibol-mono" style={{ minWidth: 28, textAlign: "center", fontSize: 18, fontWeight: 700, color: "var(--text-strong)", fontVariantNumeric: "tabular-nums" }}>{pubN}</span>
-                <button type="button" onClick={() => setPubCount(Math.min(ev.merged.length, pubN + 1))} disabled={pubN >= ev.merged.length} aria-label="加"
-                  style={{ width: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-default)", background: "var(--surface)", borderRadius: "var(--radius-sm)", cursor: pubN >= ev.merged.length ? "not-allowed" : "pointer", color: "var(--text-muted)", opacity: pubN >= ev.merged.length ? 0.5 : 1 }}>{I("plus", { size: 15 })}</button>
-                <span style={{ fontSize: 12.5, color: "var(--text-faint)", marginLeft: 2 }}>/ {ev.merged.length} 入选</span>
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-faint)" }}>勾选获优秀成员 · 已选 {orderedPub.length}/{ev.merged.length}</span>
+              <button type="button" onClick={() => setPubNames(new Set(ev.merged.slice(0, Math.min(5, ev.merged.length)).map((m) => m.name)))}
+                style={{ fontSize: 12, color: "var(--accent-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>重置为前 5 名</button>
             </div>
-            {/* 预览将发布名单 */}
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-faint)", marginBottom: 8 }}>将获优秀</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" }}>
-                {pubPreview.map((m, i) => (
-                  <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderRadius: "var(--radius-md)", background: i < 3 ? "var(--amber-soft, var(--accent-soft))" : "var(--surface-sunken)" }}>
-                    <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontSize: 12, fontWeight: 700, color: i < 3 ? "#fff" : "var(--text-muted)", background: i < 3 ? ["var(--amber-500)", "var(--slate-400)", "var(--terracotta-400)"][i] : "var(--surface-hover)", fontVariantNumeric: "tabular-nums" }}>{m.finalRank}</span>
+            {/* 可勾选名单 —— 全部入选者，可剔除靠前 / 补选靠后 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 240, overflowY: "auto" }}>
+              {ev.merged.map((m) => {
+                const on = pubNames.has(m.name);
+                return (
+                  <button type="button" key={m.name} onClick={() => togglePub(m.name)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: "var(--radius-md)", border: "1px solid " + (on ? "var(--accent-soft-bd)" : "var(--border-subtle)"), background: on ? "var(--accent-soft)" : "var(--surface)", cursor: "pointer", textAlign: "left", width: "100%" }}>
+                    <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: "var(--radius-sm)", border: "1.5px solid " + (on ? "var(--accent-text)" : "var(--border-default)"), background: on ? "var(--accent-text)" : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>{on ? I("check", { size: 12 }) : null}</span>
+                    <span className="cibol-mono" style={{ width: 22, fontSize: 12, color: "var(--text-faint)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>#{m.finalRank}</span>
                     <Avatar name={m.name} size="xs" />
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-strong)", flex: 1 }}>{m.name}</span>
                     <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-faint)" }}>合并分 {m.score.toFixed(1)}</span>
-                  </div>
-                ))}
-              </div>
+                  </button>
+                );
+              })}
+            </div>
+            {/* 调整原因 —— 手动增删名单时说明 */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-faint)", marginBottom: 6 }}>调整原因（可选）</div>
+              <textarea value={pubNote} onChange={(e) => setPubNote(e.target.value)} rows={2} maxLength={255}
+                placeholder="如：跳过第 2 名（长期缺席），补选第 6 名（进展突出）"
+                style={{ width: "100%", boxSizing: "border-box", resize: "vertical", padding: "8px 10px", fontSize: 13, fontFamily: "var(--font-sans)", color: "var(--text-strong)", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }} />
             </div>
           </div>
         </Dialog>

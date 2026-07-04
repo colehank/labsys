@@ -263,7 +263,10 @@ import type { Me } from "../auth";
       const j = i + dir; if (j < 0 || j >= t.length) return t;
       const a = [...t]; [a[i], a[j]] = [a[j], a[i]]; return a;
     });
-    const done = att > 0 && pol > 0 && log > 0 && chosen.length >= Math.min(5, candidates.length);
+    // 提交门槛只要求三项报告评分完成；讨论 Top 5 可留空、可不选满（反馈 #3/#11：
+    // 原先强制选满 min(5, 候选数)，候选不足或不想选满时按钮永久置灰 → 「无法提交打分结果」）。
+    const missing = [att > 0 ? null : "报告态度", pol > 0 ? null : "制作精良", log > 0 ? null : "逻辑清晰"].filter(Boolean);
+    const done = missing.length === 0;
 
     return (
       <Card padding="none" style={{ overflow: "visible" }}>
@@ -359,7 +362,7 @@ import type { Me } from "../auth";
         {/* footer — per-report submit */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: "1px solid var(--border-subtle)" }}>
           <span style={{ flex: 1, fontSize: 12.5, color: "var(--text-faint)" }}>
-            {done ? "评分匿名提交，报告人看不到具体打分人。" : "完成三项评分并选满讨论 Top 5 后可提交。"}
+            {done ? "三项评分已完成，讨论 Top 5 可选填。评分匿名提交，报告人看不到具体打分人。" : `还需完成：${missing.join("、")}。讨论 Top 5 可留空，不必选满。`}
           </span>
           <Button size="sm" variant="primary" iconLeft={I("check")} disabled={!done} onClick={() => setConfirm(true)}>提交本报告评分</Button>
         </div>
@@ -404,13 +407,20 @@ import type { Me } from "../auth";
     // 评分对象 = 今天或最近已发生、且有报告人的那场（排除团建/工作坊/取消等空场）；
     // 都还没发生则取最近一场即将到来的，避免误把评选期最后一场当「今日组会」。
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const ratable = reports.filter((r: any) => (r.presenters || []).length > 0);
+    // 仅「参与评分」且有报告人的场进入评分入口；工作坊/团建/仅考勤（scored=false）不评分（#8）。
+    const ratable = reports.filter((r: any) => (r.presenters || []).length > 0 && r.scored !== false);
     const ts = (r: any) => new Date(r.y, r.mo, r.day).getTime();
     const past = ratable.filter((r: any) => ts(r) <= today.getTime());
     const meeting: any = past.length
       ? past[past.length - 1]
       : (ratable.length ? ratable[0] : null);
     const isToday = !!meeting && ts(meeting) === today.getTime();
+    // #2：今天若有组会但不是当前评分场（非评分活动 / 尚无报告人），说明「为什么不是今天」，
+    // 避免首页「今天有组会」与评分页「最近组会」不一致造成困惑。
+    const todayM = (meetingsData as Meeting[]).find((m) => m.y === today.getFullYear() && m.mo === today.getMonth() && m.day === today.getDate());
+    const todayHint = todayM && todayM.id !== meeting?.key
+      ? `今天的「${todayM.type}」${todayM.scored === false ? "不参与评分" : "暂无报告人或未开放评分"}，先为最近一场评分。`
+      : "";
     const mtg = (meetingsData as Meeting[]).find((m) => m.id === meeting?.key);
     const presenters = (meeting?.presenters || []).map((name: string) => ({
       name,
@@ -428,16 +438,19 @@ import type { Me } from "../auth";
     }
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: "var(--accent-soft)", border: "1px solid var(--accent-soft-bd)", borderRadius: "var(--radius-md)" }}>
-          {I("clock", { size: 16, style: { color: "var(--accent-text)" } })}
-          <span style={{ fontSize: 13.5, color: "var(--accent-text)" }}>{isToday ? "今日组会" : "最近组会"}·{meeting.dateLabel} · 为本场报告人评分</span>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 16px", background: "var(--accent-soft)", border: "1px solid var(--accent-soft-bd)", borderRadius: "var(--radius-md)" }}>
+          {I("clock", { size: 16, style: { color: "var(--accent-text)", marginTop: 1, flexShrink: 0 } })}
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 13.5, color: "var(--accent-text)" }}>{isToday ? "今日组会" : "最近组会"}·{meeting.dateLabel} · 为本场报告人评分</span>
+            {todayHint && <span style={{ fontSize: 12, color: "var(--accent-text)", opacity: 0.8 }}>{todayHint}</span>}
+          </div>
         </div>
 
         {pending.map(({ p, i }) => (
           <ReportRating key={p.name} index={i} presenter={p}
             candidates={presentNames.filter((n) => n !== p.name)}
             isPending={submitRating.isPending}
-            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, logic: vals.logic, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => new Set([...s, `${meeting.key}__${p.name}`])); }, onError: () => toast("提交失败，请重试", { tone: "error" }) }); }} />
+            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, logic: vals.logic, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => new Set([...s, `${meeting.key}__${p.name}`])); }, onError: (e: any) => toast(`提交失败：${e?.detail || e?.message || "请稍后重试"}`, { tone: "error" }) }); }} />
         ))}
 
         {pending.length === 0 && (
