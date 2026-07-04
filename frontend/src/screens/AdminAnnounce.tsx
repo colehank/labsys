@@ -35,7 +35,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       if (!valid || publish.isPending) return;
       // author 留空 —— 后端按当前登录管理员真实姓名填充（管理员 · {name}），不写死。
       publish.mutate(
-        { title: f.title, body: f.body, level: f.level as "info" | "important" | "urgent", pinned: f.pinned, audience: f.audience, author: "", expiresAt: f.expiresAt || null },
+        { title: f.title, body: f.body, level: f.level as "info" | "important" | "urgent", pinned: f.pinned, audience: f.audience as "all" | "students", author: "", expiresAt: f.expiresAt || null },
         {
           onSuccess: () => { toast("已发布"); setF(empty); onPublish && onPublish(); },
           onError: (e: any) => toast(e?.detail || e?.message || "发布失败，请重试", { tone: "error" }),
