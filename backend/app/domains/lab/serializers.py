@@ -31,6 +31,7 @@ def meeting_out(m: Meeting) -> MeetingOut:
     return MeetingOut(
         id=m.id, y=d.year, mo=mo0, day=d.day, mdLabel=md, dateLabel=label,
         type=m.type, tone=tone, status=m.status.value,
+        template=m.template or "正式报告", scored=m.scored,
         host=m.host or "",
         time=m.time or "", place=m.place or "", online=online,
         presenters=[

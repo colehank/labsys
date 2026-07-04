@@ -192,11 +192,17 @@ class MeetingIn(BaseModel):
     host: str = ""               # 主持人（排期指定，可空）
     time: str = ""
     place: str = ""
+    template: str = "正式报告"    # 评分模板：正式报告 / 工作坊 / 团建 / 仅考勤
+    scored: bool = True          # 是否参与正式评分
     presenters: list[PresenterIn] = []
 
 
 class ScheduleIn(BaseModel):
     meetings: list[MeetingIn]
+    # 学期隔离（反馈 #1）：仅在 [scope_from, scope_to] 范围内做全量替换；范围外的组会
+    # 属于其它学期，一律保留。不传 scope 时退回旧的全表替换语义（兼容）。
+    scope_from: date | None = None
+    scope_to: date | None = None
 
 
 @router.put("/meetings/schedule", response_model=list[MeetingOut])
@@ -228,15 +234,23 @@ async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> lis
         m.host = mi.host
         m.time = mi.time
         m.place = mi.place
+        m.template = mi.template or "正式报告"
+        m.scored = mi.scored
         # presenters 关系 cascade=all,delete-orphan → 整体替换
         m.presenters = [
             Presenter(name=p.name, topic=p.topic, kind=p.kind, ord=i)
             for i, p in enumerate(mi.presenters)
         ]
-    # 删除不在新排期里的日期
+    # 删除不在新排期里的日期——但仅限本次操作的学期范围内（scope）。范围外组会属于其它
+    # 学期，保留不动，避免「排下学期把本学期连数据一起删掉」（反馈 #1，按学期隔离）。
     for d, m in existing.items():
-        if d not in seen:
-            await db.delete(m)
+        if d in seen:
+            continue
+        if body.scope_from and d < body.scope_from:
+            continue
+        if body.scope_to and d > body.scope_to:
+            continue
+        await db.delete(m)
     await db.commit()
     rows = list(
         (

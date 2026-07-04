@@ -77,6 +77,10 @@ class Meeting(UUIDMixin, TimestampMixin, Base):
     status: Mapped[MeetingStatus] = mapped_column(
         Enum(MeetingStatus, name="meeting_status"), default=MeetingStatus.scheduled
     )
+    # 评分模板（决定录入/评分表单形态）：正式报告 / 工作坊 / 团建 / 仅考勤（自由文本，管理员可扩展）。
+    template: Mapped[str] = mapped_column(String(32), default="正式报告", server_default="正式报告")
+    # 是否参与正式评分。工作坊/团建/仅考勤等非正式活动置 False，不进「待评组会」、不算报告分。
+    scored: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # 在线会议（系统自动创建；失败则 status != ok，需管理员设置）
     online_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
     online_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
