@@ -431,6 +431,9 @@ import type { Me } from "../auth";
     const meetingAtt = (meeting?.attendance || {}) as Record<string, string>;
     const presentNames = allNames.filter((n) => !meetingAtt[n] || meetingAtt[n] === "present");
     const pending = presenters.map((p, i) => ({ p, i })).filter(({ p }) => !submitted.has(`${meeting?.key}__${p.name}`));
+    // #11 提交后可改：已提交的报告人单列出来，点「修改」移回待评、重评会覆盖上次提交。
+    const donePresenters = presenters.map((p, i) => ({ p, i })).filter(({ p }) => submitted.has(`${meeting?.key}__${p.name}`));
+    const reopen = (name: string) => setSubmitted((s) => { const n = new Set(s); n.delete(`${meeting?.key}__${name}`); return n; });
     if (reportsQ.isLoading || evQ.isLoading) return <ScreenState loading />;
     if (reportsQ.isError) return <ScreenState error onRetry={() => reportsQ.refetch()} />;
     if (!meeting) {
@@ -454,12 +457,29 @@ import type { Me } from "../auth";
         ))}
 
         {pending.length === 0 && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "56px 20px", textAlign: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "40px 20px 24px", textAlign: "center" }}>
             <span style={{ width: 48, height: 48, borderRadius: "var(--radius-lg)", background: "var(--success-soft)", color: "var(--success-text)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
               {I("check-check", { size: 24 })}
             </span>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)" }}>本次组会评分已全部提交</div>
-            <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>感谢参与，结果将在窗口关闭后统计。</p>
+            <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>如需更正，可在下方点「修改」重新评分（会覆盖上次）。</p>
+          </div>
+        )}
+
+        {/* #11 已提交（可修改）*/}
+        {donePresenters.length > 0 && (
+          <div>
+            <div className="cibol-eyebrow" style={{ marginBottom: 8 }}>已提交 · 可修改</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {donePresenters.map(({ p }) => (
+                <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-md)", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)" }}>
+                  <Avatar name={p.name} size="xs" />
+                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
+                  <Badge tone="success" size="sm" dot>已评</Badge>
+                  <Button size="xs" variant="ghost" iconLeft={I("pencil")} onClick={() => reopen(p.name)}>修改</Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

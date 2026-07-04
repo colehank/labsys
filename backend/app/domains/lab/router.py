@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
+from app.domains.audit.service import write_audit
 from app.domains.lab.serializers import ann_sort_key, announcement_out, meeting_out
 from app.domains.notify.service import notify
 from app.models import (
@@ -206,7 +207,7 @@ class ScheduleIn(BaseModel):
 
 
 @router.put("/meetings/schedule", response_model=list[MeetingOut])
-async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> list[MeetingOut]:
+async def replace_schedule(body: ScheduleIn, admin: AdminUser, db: DbSession) -> list[MeetingOut]:
     """整体保存组会排期（管理员）。
 
     按日期 upsert：表里有该日期则更新、没有则新增；表里多出的日期删除。
@@ -224,12 +225,14 @@ async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> lis
         ).scalars()
     }
     seen: set[date] = set()
+    added = 0
     for mi in body.meetings:
         seen.add(mi.date)
         m = existing.get(mi.date)
         if m is None:
             m = Meeting(date=mi.date, status=MeetingStatus.scheduled)
             db.add(m)
+            added += 1
         m.type = mi.type or MeetingType.progress.value   # 自由文本类型，管理员自定义
         m.host = mi.host
         m.time = mi.time
@@ -243,6 +246,7 @@ async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> lis
         ]
     # 删除不在新排期里的日期——但仅限本次操作的学期范围内（scope）。范围外组会属于其它
     # 学期，保留不动，避免「排下学期把本学期连数据一起删掉」（反馈 #1，按学期隔离）。
+    removed = 0
     for d, m in existing.items():
         if d in seen:
             continue
@@ -251,6 +255,10 @@ async def replace_schedule(body: ScheduleIn, _: AdminUser, db: DbSession) -> lis
         if body.scope_to and d > body.scope_to:
             continue
         await db.delete(m)
+        removed += 1
+    scope = f"{body.scope_from}~{body.scope_to}" if body.scope_from or body.scope_to else "全学期"
+    await write_audit(db, actor=admin.name, action="save_schedule",
+                      summary=f"保存排期（范围 {scope}）：共 {len(body.meetings)} 场，新增 {added}、删除 {removed}")
     await db.commit()
     rows = list(
         (

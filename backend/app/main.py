@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.domains.apikeys.router import router as apikeys_router
+from app.domains.audit.router import router as audit_router
 from app.domains.auth.router import router as auth_router
 from app.domains.booking.router import router as booking_router
 from app.domains.evals.router import router as evals_router
@@ -60,7 +61,7 @@ async def health() -> dict[str, str]:
 # 各域路由统一挂在 /api 下
 for r in (auth_router, users_router, lab_router, requests_router, servers_router,
           credentials_router, notify_router, evals_router, apikeys_router, booking_router,
-          feedback_router):
+          feedback_router, audit_router):
     app.include_router(r, prefix=settings.api_prefix)
 
 # WebSSH 实时端点（WebSocket，挂在 /ws 下，不带 api 前缀以匹配反代规则）

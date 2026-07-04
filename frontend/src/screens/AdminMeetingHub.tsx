@@ -6,9 +6,10 @@ import { AdminMeetings } from "./AdminMeetings";
 import { AdminMeetingStats } from "./AdminMeetingStats";
 import { AdminStats } from "./AdminStats";
 import { AdminRecords } from "./AdminRecords";
+import { AuditLog } from "./AuditLog";
 import { useIsMobile } from "../lib/useIsMobile";
 
-const SCREENS: Record<string, React.ComponentType<any>> = { AdminMeetings, AdminMeetingStats, AdminStats, AdminRecords };
+const SCREENS: Record<string, React.ComponentType<any>> = { AdminMeetings, AdminMeetingStats, AdminStats, AdminRecords, AuditLog };
 
 // AdminMeetingHub — 组会中心: 把「排期 → 数据录入 → 表现评选」这条同源流水线
 // 合并到一个带 Tab 的工作台，替代原先三个独立的管理入口。
@@ -20,6 +21,7 @@ const SCREENS: Record<string, React.ComponentType<any>> = { AdminMeetings, Admin
     { id: "record", label: "数据录入", key: "AdminMeetingStats" },
     { id: "rank", label: "表现评选", key: "AdminStats" },
     { id: "records", label: "表现记录", key: "AdminRecords" },
+    { id: "audit", label: "操作日志", key: "AuditLog" },
   ];
 
   function AdminMeetingHub() {

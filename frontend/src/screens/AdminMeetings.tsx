@@ -367,6 +367,31 @@ import { useIsMobile } from "../lib/useIsMobile";
       setNewDate("");
     };
 
+    // #6 单场改日期：改这场日期，整体保持按日期有序、报告内容跟随该场移动（不打乱其它场配对）。
+    const changeDate = (slotId, newIso) => {
+      if (!newIso) return;
+      if (slots.some((s) => s.id !== slotId && !s.cancelled && s.iso === newIso)) {
+        toast("该日期已有组会，请换一天", { tone: "error" }); return;
+      }
+      const active = slots.filter((s) => !s.cancelled);
+      const cancelled = slots.filter((s) => s.cancelled);
+      let pairs = groups.map((g, i) => ({ slot: active[i], group: g })).filter((p) => p.slot);
+      pairs = pairs.map((p) => p.slot.id === slotId
+        ? { ...p, slot: { ...p.slot, iso: newIso, date: fmt(new Date(newIso + "T00:00:00")) } }
+        : p);
+      pairs.sort((a, b) => a.slot.iso.localeCompare(b.slot.iso));
+      const newSlots = [...pairs.map((p) => p.slot), ...cancelled].sort((a, b) => (a.iso || "").localeCompare(b.iso || ""));
+      setSlots(newSlots);
+      setGroups(pairs.map((p) => p.group));
+    };
+    // #6 交换相邻两场顺序：两场日期不动，互换各自报告内容（安全，只重排 groups）。
+    const swapAdjacent = (groupId, dir) => {
+      const idx = groups.findIndex((g) => g.id === groupId);
+      const j = idx + dir;
+      if (idx < 0 || j < 0 || j >= groups.length) return;
+      const ng = [...groups]; [ng[idx], ng[j]] = [ng[j], ng[idx]]; setGroups(ng);
+    };
+
     const saveSchedule = useSaveSchedule();
     // 把当前排期（时间线里真实日期的会议）整理成后端要的格式并保存
     const onSaveSchedule = () => {
@@ -526,6 +551,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               }
               const g = item.group, slot = item.slot;
               const open = openId === g.id;
+              const gi = groups.findIndex((x) => x.id === g.id);   // #6 交换用：组在队列中的位置
               const active = g.presenters.filter((p) => !p.skipped);
               return (
                 <div key={g.id} style={{ border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
@@ -562,6 +588,17 @@ import { useIsMobile } from "../lib/useIsMobile";
                   </div>
                   {open && (
                     <div style={{ padding: "2px 14px 12px", borderTop: "1px solid var(--border-subtle)" }}>
+                      {/* #6 本场日期 / 交换顺序 */}
+                      {!slot.pending && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", padding: "11px 0 3px" }}>
+                          <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>本场日期</span>
+                          <input type="date" value={slot.iso} onChange={(e) => changeDate(slot.id, e.target.value)}
+                            style={{ height: 32, padding: "0 9px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 13, colorScheme: "light dark" }} />
+                          <span style={{ fontSize: 12.5, color: "var(--text-muted)", marginLeft: 6 }}>交换顺序</span>
+                          <Button size="xs" variant="ghost" iconLeft={I("arrow-up")} disabled={gi <= 0} onClick={() => swapAdjacent(g.id, -1)}>与上一场</Button>
+                          <Button size="xs" variant="ghost" iconLeft={I("arrow-down")} disabled={gi < 0 || gi >= groups.length - 1} onClick={() => swapAdjacent(g.id, 1)}>与下一场</Button>
+                        </div>
+                      )}
                       {g.presenters.map((p, pi) => (
                         <PresenterRow key={`${g.id}-${pi}`} p={p} idx={pi} total={g.presenters.length} roster={roster}
                           onTopic={(v) => setTopic(g.id, pi, v)} onSkip={() => toggleSkip(g.id, pi)}

@@ -1,5 +1,6 @@
 """ORM 模型聚合 —— Alembic autogenerate 与应用都从这里导入 Base。"""
 from app.models.apikey import ApiKey
+from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.evaluation import (
     Attendance,
@@ -55,4 +56,5 @@ __all__ = [
     "EvalConfig",
     "Excellence",
     "Feedback",
+    "AuditLog",
 ]
