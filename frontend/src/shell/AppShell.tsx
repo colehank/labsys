@@ -232,7 +232,10 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
   const incomingSwaps = (mineReqs as any[]).filter((r) => r.incoming && r.kind === "swap" && r.status === "pending").length;
   const unreadNotif = (notifFeed as any[]).filter((n) => !n.read).length + incomingSwaps;
   const badgeCount = unreadNotif;
-  const [collapsed, setCollapsed] = React.useState(true);
+  // 侧栏默认展开（图标旁带文字），提升首次使用者对「组会中心 / 管理员视图」等入口的可发现性
+  // （反馈 #13）；用户手动收起后记住选择。
+  const [collapsed, setCollapsed] = React.useState(() => localStorage.getItem("cibol.rail") === "1");
+  React.useEffect(() => { localStorage.setItem("cibol.rail", collapsed ? "1" : "0"); }, [collapsed]);
   const isMobile = useIsMobile();
   const [moreOpen, setMoreOpen] = React.useState(false);
 
@@ -248,21 +251,6 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
       })]
     : NAV;
 
-  // ── 移动端布局：内容全宽 + 底部 Tab 栏 ──
-  if (isMobile) {
-    return (
-      <div style={{ minHeight: "100vh", background: "var(--canvas)" }}>
-        <main style={{ minHeight: "100vh", paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))" }}>{children}</main>
-        <MobileTabBar active={active} onNavigate={onNavigate} admin={admin} badge={badgeCount} onOpenMore={() => setMoreOpen(true)} />
-        <MobileMoreSheet
-          open={moreOpen} onClose={() => setMoreOpen(false)} admin={admin}
-          onNavigate={onNavigate} onToggleAdmin={onToggleAdmin} onOpenPanel={onOpenPanel} onLogout={onLogout}
-          me={me} reqCount={reqCount} unread={badgeCount} fbUnread={fbCount}
-        />
-      </div>
-    );
-  }
-
   const bottomActions = (
     <>
       <BottomAction icon={I(admin ? "shield-check" : "shield")} label={admin ? "管理员视图" : "成员视图"} collapsed={collapsed} active={admin} onClick={onToggleAdmin} />
@@ -271,19 +259,34 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
 
   const footer = <AvatarMenu collapsed={collapsed} me={me} onOpenPanel={onOpenPanel} onLogout={onLogout} unread={badgeCount} />;
 
+  // 两套布局合并为同一棵树：children 始终在同一 React 位置，避免跨断点时卸载重挂（会丢失终端 session）。
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--canvas)" }}>
-      <Sidebar
-        items={nav}
-        active={active}
-        onSelect={onNavigate}
-        collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed((c) => !c)}
-        logoSrc={links.mark}
-        bottomActions={bottomActions}
-        footer={footer}
-      />
-      <main style={{ flex: 1, overflowY: "auto", minWidth: 0 }}>{children}</main>
+    <div style={{ display: "flex", height: isMobile ? "auto" : "100vh", minHeight: isMobile ? "100vh" : undefined, overflow: isMobile ? "visible" : "hidden", background: "var(--canvas)" }}>
+      {!isMobile && (
+        <Sidebar
+          items={nav}
+          active={active}
+          onSelect={onNavigate}
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((c) => !c)}
+          logoSrc={links.mark}
+          bottomActions={bottomActions}
+          footer={footer}
+        />
+      )}
+      <main style={{ flex: 1, overflowY: isMobile ? "visible" : "auto", minWidth: 0, minHeight: isMobile ? "100vh" : undefined, paddingBottom: isMobile ? "calc(64px + env(safe-area-inset-bottom, 0px))" : undefined }}>
+        {children}
+      </main>
+      {isMobile && (
+        <>
+          <MobileTabBar active={active} onNavigate={onNavigate} admin={admin} badge={badgeCount} onOpenMore={() => setMoreOpen(true)} />
+          <MobileMoreSheet
+            open={moreOpen} onClose={() => setMoreOpen(false)} admin={admin}
+            onNavigate={onNavigate} onToggleAdmin={onToggleAdmin} onOpenPanel={onOpenPanel} onLogout={onLogout}
+            me={me} reqCount={reqCount} unread={badgeCount} fbUnread={fbCount}
+          />
+        </>
+      )}
     </div>
   );
 }

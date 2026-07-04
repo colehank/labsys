@@ -183,13 +183,17 @@ import { useIsMobile } from "../lib/useIsMobile";
       period: (cfg as any).period ?? "",
       ...patch,
     });
-    const setEvalWeights = (patch: any) => updateConfig.mutate(nextConfig({ weights: { ...cfg.weights, ...patch } }));
-    const setEvalFilters = (patch: any) => updateConfig.mutate(nextConfig({ filters: { ...cfg.filters, ...patch } }));
+    // 统一提交配置：失败时透传后端具体原因，避免评选标准/区间保存静默失败（反馈 #12）。
+    const saveCfg = (patch: any) => updateConfig.mutate(nextConfig(patch), {
+      onError: (e: any) => toast("保存失败：" + (e?.detail || e?.message || "请稍后重试"), { tone: "error" }),
+    });
+    const setEvalWeights = (patch: any) => saveCfg({ weights: { ...cfg.weights, ...patch } });
+    const setEvalFilters = (patch: any) => saveCfg({ filters: { ...cfg.filters, ...patch } });
     const awardExcellence: number = (cfg as any).award_excellence ?? 1000;
     const awardAttendance: number = (cfg as any).award_attendance ?? 100;
-    const setEvalRange = (patch: any) => updateConfig.mutate(nextConfig({ range: { ...cfg.range, ...patch } }));
+    const setEvalRange = (patch: any) => saveCfg({ range: { ...cfg.range, ...patch } });
     const semesterStart: string | undefined = (semCfg as any)?.semester?.start;
-    const resetProgressOrder = () => updateConfig.mutate(nextConfig({ progress_order: null }));
+    const resetProgressOrder = () => saveCfg({ progress_order: null });
 
     // —— 从后端 rows / merged 派生 survivors / order / mRankAmong（与本地计算等价）——
     const rowByName: Record<string, any> = {};
@@ -232,7 +236,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       setLiveOrder(null);
       if (orderToSave && itemToSave != null) {
         updateConfig.mutate(nextConfig({ progress_order: orderToSave }), {
-          onError: () => toast("进展排序保存失败", { tone: "error" }),
+          onError: (e: any) => toast("进展排序保存失败：" + (e?.detail || e?.message || "请稍后重试"), { tone: "error" }),
         });
       }
     };
@@ -422,7 +426,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                   const v = e.target.value;
                   setPeriodLocal(v);
                   clearTimeout(periodTimerRef.current);
-                  periodTimerRef.current = setTimeout(() => { updateConfig.mutate(nextConfig({ period: v })); setPeriodLocal(null); }, 500);
+                  periodTimerRef.current = setTimeout(() => { saveCfg({ period: v }); setPeriodLocal(null); }, 500);
                 }}
                 style={{ width: "100%", boxSizing: "border-box", height: 34, padding: "0 10px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontSize: 13.5, fontFamily: "var(--font-sans)", outline: "none" }}
               />
@@ -459,9 +463,9 @@ import { useIsMobile } from "../lib/useIsMobile";
               <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>奖金设置</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <FilterField label="全勤奖" color="var(--sage-500)" value={awardAttendance} suffix="元" min={0} step={50}
-                  onChange={(v) => updateConfig.mutate(nextConfig({ award_attendance: v }))} />
+                  onChange={(v) => saveCfg({ award_attendance: v })} />
                 <FilterField label="优秀奖" color="var(--amber-500)" value={awardExcellence} suffix="元" min={0} step={100}
-                  onChange={(v) => updateConfig.mutate(nextConfig({ award_excellence: v }))} />
+                  onChange={(v) => saveCfg({ award_excellence: v })} />
               </div>
               <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>发布时快照，修改不影响历史记录</div>
             </div>
