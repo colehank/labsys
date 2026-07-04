@@ -53,6 +53,7 @@ class ExcellenceOut(BaseModel):
     perfect_attendance: list[str] = []
     award_excellence: int = 1000
     award_attendance: int = 100
+    note: str = ""            # 手动确认名单时的调整原因
     published: bool
     published_at: datetime | None = None
 
@@ -71,6 +72,8 @@ class ReportOut(BaseModel):
     day: int
     dateLabel: str
     type: str
+    template: str = "正式报告"  # 评分模板（前端据此渲染录入/评分表单）
+    scored: bool = True          # 是否参与正式评分（False = 仅考勤等，评分入口跳过）
     presenters: list[str]
     attendance: dict   # name -> present|leave|absent
     speaks: dict = {}  # name -> 发言次数（管理员录入）
@@ -113,3 +116,16 @@ class EvalConfigIO(BaseModel):
 
 class PublishExcellence(BaseModel):
     count: int = 5
+    names: list[str] | None = None  # 手动确认的名单（勾选/剔除/补选）；None = 按终极排名取前 count 名
+    note: str = ""                  # 调整原因（手动增删名单时填写）
+
+
+class VoteDetailOut(BaseModel):
+    """管理员审核用：某场组会的单张评分选票明细。"""
+    id: str
+    rater: str          # 评分人姓名
+    presenter: str
+    attitude: float
+    polish: float
+    logic: float
+    top5: list[str] = []

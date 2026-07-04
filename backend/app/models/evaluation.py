@@ -90,4 +90,6 @@ class Excellence(UUIDMixin, Base):
     perfect_attendance: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     award_excellence: Mapped[int] = mapped_column(Integer, default=1000, server_default="1000")
     award_attendance: Mapped[int] = mapped_column(Integer, default=100, server_default="100")
+    # 手动确认名单时填写的调整原因（排名仅参考，老师可跳过/补选，附说明）。
+    note: Mapped[str] = mapped_column(String(255), default="", server_default="")
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
