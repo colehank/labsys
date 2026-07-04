@@ -1,0 +1,410 @@
+# Instincts generated from https://github.com/colehank/labsys
+# Generated: 2026-07-04T11:55:53.357Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: labsys-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat
+
+## Evidence
+
+- 3 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat(ux): 侧栏默认展开+记忆(#13) + 评选配置保存错误透传(#12), feat(#14): 管理操作审计日志(只记录,不撤销)
+
+---
+id: labsys-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Commit Length
+
+## Action
+
+Keep commit messages concise (~42 characters)
+
+## Evidence
+
+- Average commit message length: 42 chars
+- Based on 3 commits
+
+---
+id: labsys-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: labsys-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: labsys-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: labsys-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: labsys-workflow-add-backend-feature-with-model-and-api
+trigger: "when doing add backend feature with model and api"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Workflow Add Backend Feature With Model And Api
+
+## Action
+
+Follow the add-backend-feature-with-model-and-api workflow:
+1. Create new model file in backend/app/models/
+2. Update backend/app/models/__init__.py to include the new model
+3. Create Alembic migration script in backend/alembic/versions/
+4. Implement service logic in backend/app/domains/<feature>/service.py
+5. Implement API router in backend/app/domains/<feature>/router.py
+6. Update backend/app/main.py to include the new router
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: backend/alembic/versions/*.py, backend/app/models/*.py, backend/app/models/__init__.py
+
+---
+id: labsys-workflow-add-frontend-screen-or-tab
+trigger: "when doing add frontend screen or tab"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/colehank/labsys
+---
+
+# Labsys Workflow Add Frontend Screen Or Tab
+
+## Action
+
+Follow the add-frontend-screen-or-tab workflow:
+1. Create or update screen component in frontend/src/screens/
+2. Update API hooks in frontend/src/api/hooks.ts
+3. Update or regenerate API schema in frontend/src/api/schema.ts and openapi.json
+4. Wire up navigation or tabs in existing screens
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: frontend/src/screens/*.tsx, frontend/src/api/hooks.ts, frontend/src/api/schema.ts
+
+---
+id: labsys-instinct-file-naming-camelCase
+trigger: "When creating a new Python file in the repository"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct File Naming CamelCase
+
+## Action
+
+Name the file using camelCase (e.g., myNewFile.py)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.files
+
+---
+id: labsys-instinct-function-naming-camelCase
+trigger: "When defining a new function in Python code"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Function Naming CamelCase
+
+## Action
+
+Use camelCase for the function name (e.g., processData)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: labsys-instinct-class-naming-pascalCase
+trigger: "When defining a new class in Python code"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Class Naming PascalCase
+
+## Action
+
+Use PascalCase for the class name (e.g., DataProcessor)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: labsys-instinct-constant-naming-screaming-snake-case
+trigger: "When defining a constant in Python code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Constant Naming Screaming Snake Case
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for the constant name (e.g., MAX_SIZE)
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: labsys-instinct-import-style-relative
+trigger: "When importing modules in Python code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Import Style Relative
+
+## Action
+
+Use relative imports (e.g., from .module import X)
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: labsys-instinct-export-style-named
+trigger: "When exporting functions or classes from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Export Style Named
+
+## Action
+
+Use named exports rather than default exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: labsys-instinct-test-location-separate
+trigger: "When adding tests for backend or frontend code"
+confidence: 0.75
+domain: testing
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Test Location Separate
+
+## Action
+
+Place tests in a separate directory from source code
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+
+---
+id: labsys-instinct-python-error-handling-try-catch
+trigger: "When handling errors in Python code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Python Error Handling Try Catch
+
+## Action
+
+Use try-except blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style
+
+---
+id: labsys-instinct-git-commit-conventional-feat
+trigger: "When committing a new feature"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Git Commit Conventional Feat
+
+## Action
+
+Use the conventional commit format starting with 'feat' (e.g., feat(scope): description)
+
+## Evidence
+
+- Seen in commit: feat(ux): 侧栏默认展开+记忆(#13)
+- Pattern in commits.prefixes
+
+---
+id: labsys-instinct-git-commit-average-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Git Commit Average Length
+
+## Action
+
+Keep the commit message concise (around 42 characters on average)
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: labsys-instinct-add-backend-feature-workflow
+trigger: "When introducing a new backend entity with CRUD or query API"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Add Backend Feature Workflow
+
+## Action
+
+Follow the workflow: create model file → update __init__.py → create Alembic migration → implement service logic → implement API router → update main.py to include the new router
+
+## Evidence
+
+- Workflow: add-backend-feature-with-model-and-api
+- Example commit sequences
+
+---
+id: labsys-instinct-add-frontend-screen-workflow
+trigger: "When exposing a new feature or data view in the frontend UI"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: colehank/labsys
+---
+
+# Labsys Instinct Add Frontend Screen Workflow
+
+## Action
+
+Follow the workflow: create/update screen component → update API hooks → update/regenerate API schema and openapi.json → wire up navigation/tabs
+
+## Evidence
+
+- Workflow: add-frontend-screen-or-tab
+- Example commit sequences
+
