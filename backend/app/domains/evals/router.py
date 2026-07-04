@@ -14,6 +14,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 
 from app.core.deps import AdminUser, CurrentUser, DbSession
+from app.domains.audit.service import write_audit
 from app.domains.evals.engine import compute_eval, rank_series_for
 from app.domains.evals.store import load_eval_data
 from app.models import Attendance, Discussion, Excellence, Meeting, Presenter, Rating, RatingVote, User
@@ -285,7 +286,7 @@ async def get_config(_: AdminUser, db: DbSession) -> EvalConfigIO:
 
 
 @router.put("/config", response_model=EvalConfigIO)
-async def put_config(body: EvalConfigIO, _: AdminUser, db: DbSession) -> EvalConfigIO:
+async def put_config(body: EvalConfigIO, admin: AdminUser, db: DbSession) -> EvalConfigIO:
     data = await load_eval_data(db)
     cfg = data["config_row"]
     if cfg is None:
@@ -297,6 +298,8 @@ async def put_config(body: EvalConfigIO, _: AdminUser, db: DbSession) -> EvalCon
     cfg.period = body.period
     cfg.award_excellence = body.award_excellence
     cfg.award_attendance = body.award_attendance
+    await write_audit(db, actor=admin.name, action="update_eval_config",
+                      summary=f"更新评选标准（区间 {body.range.get('from', '')}~{body.range.get('to', '')}）")
     await db.commit()
     return body
 
@@ -323,7 +326,7 @@ async def excellence_all(_: CurrentUser, db: DbSession) -> list[ExcellenceOut]:
 
 # ── 管理员：发布优秀名单 ──
 @router.post("/excellence", response_model=ExcellenceOut, status_code=status.HTTP_201_CREATED)
-async def publish_excellence(body: PublishExcellence, _: AdminUser, db: DbSession) -> ExcellenceOut:
+async def publish_excellence(body: PublishExcellence, admin: AdminUser, db: DbSession) -> ExcellenceOut:
     data = await load_eval_data(db)
     period = data.get("period", "")
     existing = (await db.execute(
@@ -360,6 +363,9 @@ async def publish_excellence(body: PublishExcellence, _: AdminUser, db: DbSessio
             note=body.note, published_at=now,
         )
         db.add(exc)
+    await write_audit(db, actor=admin.name, action="publish_excellence",
+                      summary=f"发布优秀名单 {len(names)} 人（{period or '未命名评选期'}）：{'、'.join(names) or '空'}",
+                      detail={"names": names, "note": body.note})
     await db.commit()
     return ExcellenceOut(
         period=exc.period, from_=exc.from_, to=exc.to,
@@ -396,12 +402,15 @@ async def list_votes(key: str, _: AdminUser, db: DbSession) -> list[VoteDetailOu
 
 # ── 管理员：删除无效选票并重算（删除即「退回」——该成员可重新提交，反馈 #9）──
 @router.delete("/votes/{vote_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_vote(vote_id: str, _: AdminUser, db: DbSession) -> None:
+async def delete_vote(vote_id: str, admin: AdminUser, db: DbSession) -> None:
     v = await db.get(RatingVote, vote_id)
     if v is None:
         return
     meeting_id = v.meeting_id
+    presenter = v.presenter
     await db.delete(v)
     await db.flush()
     await _recompute_meeting_eval(db, meeting_id)
+    await write_audit(db, actor=admin.name, action="delete_vote",
+                      summary=f"退回一条对「{presenter}」的评分")
     await db.commit()
