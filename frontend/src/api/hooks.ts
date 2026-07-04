@@ -424,6 +424,17 @@ export function usePublishExcellence() {
   });
 }
 
+// ── 操作日志（#14）──
+export type AuditLog = components["schemas"]["AuditLogOut"];
+
+export function useAuditLogs(enabled = true) {
+  return useQuery({
+    queryKey: ["audit-logs"],
+    enabled,
+    queryFn: () => unwrap(api.GET("/api/audit-logs")),
+  });
+}
+
 // ── 管理员评分审核（#9）──
 export type VoteDetail = components["schemas"]["VoteDetailOut"];
 
