@@ -2,14 +2,14 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useEvalCompute, useEvalReports, useSetAttendance, useSetSpeaks, useMeetings } from "../api/hooks";
+import { useEvalCompute, useEvalReports, useSetAttendance, useSetSpeaks, useMeetings, useReportVotes, useDeleteVote } from "../api/hooks";
 import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
 import { useQueryClient } from "@tanstack/react-query";
 
 // AdminMeetingStats — 组会统计: 管理员逐次组会核对「出勤」。
 // 报告评分（态度/精良）与讨论参与来自成员匿名评分，此处只读 —— 单一数据源，不重复录入。
-  const { Card, Avatar, Badge, Button, ScreenState, EmptyState } = NS;
+  const { Card, Avatar, Badge, Button, Dialog, ScreenState, EmptyState } = NS;
 
   const ATT = [
     { key: "present", label: "出勤", tone: "success", icon: "check" },
@@ -50,6 +50,7 @@ import { useQueryClient } from "@tanstack/react-query";
     const { data: meUser } = useMe();
     const setAtt = useSetAttendance();
     const setSpk = useSetSpeaks();
+    const delVote = useDeleteVote();
 
     const rows = compute?.rows ?? [];
     const reports = reportData ?? [];
@@ -64,6 +65,7 @@ import { useQueryClient } from "@tanstack/react-query";
       }
     }, [reports.length]);
     const [saving, setSaving] = React.useState(false);
+    const [auditOpen, setAuditOpen] = React.useState(false);  // #9 评分审核弹窗
 
     // 出勤 / 发言次数本地态：以各会次后端值为种子，管理员可逐人核对 / 录入。
     const [attEdits, setAttEdits] = React.useState<Record<string, Record<string, string>>>({});
@@ -88,6 +90,8 @@ import { useQueryClient } from "@tanstack/react-query";
     const mdLabelOf = (rr: any) => rr.mo != null ? `${rr.mo + 1}/${String(rr.day ?? 1).padStart(2, "0")}` : (rr.dateLabel || "—");
 
     const r = reports[sel];
+    const votesQ = useReportVotes(r?.key ?? null, auditOpen);
+    const votes = (votesQ.data ?? []) as any[];
 
     // 报告人评分（态度/精良）由成员匿名提交、后端聚合后随 report 下发，此处只读展示。
     const ratings = ((r?.ratings || {}) as Record<string, { attitude: number; polish: number; logic: number; raters: number }>);
@@ -224,7 +228,7 @@ import { useQueryClient } from "@tanstack/react-query";
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", borderBottom: "1px solid var(--border-subtle)" }}>
               <span style={{ width: 15, height: 15, display: "inline-flex", color: "var(--text-faint)" }}>{I("star", { size: 15 })}</span>
               <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)" }}>报告人评分 · 成员提交</span>
-              <span style={{ fontSize: 11.5, color: "var(--text-faint)", marginLeft: "auto" }}>只读</span>
+              <Button size="xs" variant="ghost" iconLeft={I("list-checks")} style={{ marginLeft: "auto" }} onClick={() => setAuditOpen(true)}>审核明细</Button>
             </div>
             {r.presenters.map((pn, i) => {
               const rt = ratings[pn] || { attitude: 0, polish: 0, logic: 0, raters: 0 };
@@ -284,6 +288,35 @@ import { useQueryClient } from "@tanstack/react-query";
             })}
           </div>
         </Card>
+
+        {/* #9 评分审核弹窗 —— 逐张匿名选票明细，可删除/退回异常评分（删后成员可重填）*/}
+        <Dialog open={auditOpen} onClose={() => setAuditOpen(false)}
+          title="评分审核" subtitle={`${r?.dateLabel ?? ""} · 共 ${votes.length} 张选票`}
+          icon={I("list-checks")} tone="accent" width={560}
+          footer={<Button variant="ghost" onClick={() => setAuditOpen(false)}>关闭</Button>}>
+          {votesQ.isLoading ? (
+            <div style={{ padding: "32px 0", textAlign: "center", fontSize: 13, color: "var(--text-faint)" }}>加载中…</div>
+          ) : votes.length === 0 ? (
+            <EmptyState compact title="暂无评分提交" description="本场组会还没有成员提交评分。" style={{ padding: "20px 0" }} />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 400, overflowY: "auto" }}>
+              {votes.map((v) => (
+                <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-md)", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)" }}>
+                  <Avatar name={v.rater} size="xs" />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)" }}>{v.rater} <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>评 {v.presenter}</span></div>
+                    <div className="cibol-mono" style={{ fontSize: 11.5, color: "var(--text-muted)" }}>态度 {v.attitude?.toFixed(1)} · 精良 {v.polish?.toFixed(1)} · 逻辑 {v.logic?.toFixed(1)}{(v.top5 || []).length ? ` · Top5: ${v.top5.join("、")}` : ""}</div>
+                  </div>
+                  <Button size="xs" variant="ghost" iconLeft={I("trash-2")} loading={delVote.isPending}
+                    onClick={() => delVote.mutate(v.id, {
+                      onSuccess: () => { toast("已删除该评分 · 该成员可重新提交"); votesQ.refetch(); },
+                      onError: (e: any) => toast("删除失败：" + (e?.detail || e?.message || "请重试"), { tone: "error" }),
+                    })}>退回</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Dialog>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 12.5, color: "var(--text-faint)" }}>
           <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>
