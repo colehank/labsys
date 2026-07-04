@@ -8,7 +8,9 @@ from app.models.evaluation import (
     Excellence,
     PeerBaseline,
     Rating,
+    RatingVote,
 )
+from app.models.feedback import Feedback
 from app.models.lab import (
     AnnLevel,
     Announcement,
@@ -48,7 +50,9 @@ __all__ = [
     "Attendance",
     "Discussion",
     "Rating",
+    "RatingVote",
     "PeerBaseline",
     "EvalConfig",
     "Excellence",
+    "Feedback",
 ]

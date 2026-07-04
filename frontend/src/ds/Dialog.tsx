@@ -1,8 +1,20 @@
 import React from "react";
 
+const FOCUSABLE = [
+  "button:not([disabled])",
+  "[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(", ");
+
 /**
  * CIBOL Dialog — centered modal with scrim. Header (title/subtitle), body,
  * and a footer action row. Controlled via `open`.
+ *
+ * A11y: focus trap, auto-focus on open, focus restore on close,
+ * ESC via onKeyDown (not window), aria-labelledby on dialog role.
  */
 export function Dialog({
   open,
@@ -15,14 +27,51 @@ export function Dialog({
   icon = null,
   tone = "neutral",
 }: any) {
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const returnFocusRef = React.useRef<Element | null>(null);
+  const titleId = React.useId();
+
+  // Capture which element had focus before the dialog opened.
   React.useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => e.key === "Escape" && onClose && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+    if (open) returnFocusRef.current = document.activeElement;
+  }, [open]);
+
+  // Auto-focus first focusable element inside the dialog on open.
+  React.useEffect(() => {
+    if (!open || !dialogRef.current) return;
+    const els = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+    (els[0] || dialogRef.current).focus();
+  }, [open]);
+
+  // Restore focus to the trigger element when dialog closes.
+  React.useEffect(() => {
+    if (!open && returnFocusRef.current instanceof HTMLElement) {
+      returnFocusRef.current.focus();
+      returnFocusRef.current = null;
+    }
+  }, [open]);
 
   if (!open) return null;
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onClose?.();
+      return;
+    }
+    if (e.key !== "Tab" || !dialogRef.current) return;
+    const focusable = Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)
+    );
+    if (!focusable.length) { e.preventDefault(); return; }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  };
 
   const tones = {
     neutral: "var(--surface-sunken)", accent: "var(--accent-soft)",
@@ -44,10 +93,15 @@ export function Dialog({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
         onClick={(e) => e.stopPropagation()}
         style={{
+          outline: "none",
           width: "100%", maxWidth: width, maxHeight: "calc(100vh - 48px)", overflowY: "auto",
           background: "var(--surface-raised)", border: "var(--border-w) solid var(--border-subtle)",
           borderRadius: "var(--radius-xl)", boxShadow: "var(--shadow-xl)",
@@ -65,7 +119,7 @@ export function Dialog({
             </span>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {title && <h2 style={{ fontSize: "var(--text-xl)", fontWeight: "var(--fw-semibold)", color: "var(--text-strong)", margin: 0 }}>{title}</h2>}
+            {title && <h2 id={titleId} style={{ fontSize: "var(--text-xl)", fontWeight: "var(--fw-semibold)", color: "var(--text-strong)", margin: 0 }}>{title}</h2>}
             {subtitle && <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", margin: "5px 0 0", lineHeight: "var(--lh-normal)" }}>{subtitle}</p>}
           </div>
         </div>
@@ -79,10 +133,6 @@ export function Dialog({
           }}>{footer}</div>
         )}
       </div>
-      <style>{`
-        @keyframes cibol-fade { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes cibol-pop { from { opacity: 0; transform: translateY(8px) scale(0.98) } to { opacity: 1; transform: none } }
-      `}</style>
     </div>
   );
 }

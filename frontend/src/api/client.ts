@@ -2,6 +2,7 @@
 // 类型来自 schema.ts（openapi-typescript 由后端 OpenAPI 生成，勿手改）。
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./schema";
+import { toast } from "../store";
 
 // dev 走 Vite 代理（见 vite.config.ts）；prod 同源 /api。
 const BASE_URL = "/";
@@ -45,20 +46,28 @@ async function tryRefresh(): Promise<boolean> {
   return refreshing;
 }
 
+// 在 body stream 被 fetch 消费前保存 clone，用于 401 重放。
+const requestClones = new WeakMap<Request, Request>();
+
 const authMiddleware: Middleware = {
   async onRequest({ request }) {
+    requestClones.set(request, request.clone());
     const at = tokens.access;
     if (at) request.headers.set("Authorization", `Bearer ${at}`);
     return request;
   },
   async onResponse({ request, response }) {
-    // 401 → 尝试刷新一次并重放原请求。
+    const clone = requestClones.get(request);
+    requestClones.delete(request);
+    // 401 → 尝试刷新一次并重放原请求（含原始 body）。
     if (response.status === 401 && !request.url.includes("/auth/")) {
       if (await tryRefresh()) {
-        const retry = new Request(request, {});
-        retry.headers.set("Authorization", `Bearer ${tokens.access}`);
+        const retry = new Request(clone ?? request, {
+          headers: { ...Object.fromEntries((clone ?? request).headers.entries()), Authorization: `Bearer ${tokens.access}` },
+        });
         return fetch(retry);
       }
+      toast("登录已过期，请重新登录", { tone: "error" });
       tokens.clear();
     }
     return response;

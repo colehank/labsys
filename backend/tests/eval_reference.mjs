@@ -35,14 +35,14 @@ reports.forEach((r) => {
     discussion[r.id][name] = disc;
   });
   r.presenters.forEach((pn) => {
-    ratings[r.id][pn] = { attitude: 3 + (evalH(pn + r.id, 5) % 21) / 10, polish: 3 + (evalH(pn + r.id, 9) % 21) / 10, raters: 9 + (evalH(pn + r.id, 3) % 8) };
+    ratings[r.id][pn] = { attitude: 3 + (evalH(pn + r.id, 5) % 21) / 10, polish: 3 + (evalH(pn + r.id, 9) % 21) / 10, logic: 3 + (evalH(pn + r.id, 11) % 21) / 10, raters: 9 + (evalH(pn + r.id, 3) % 8) };
   });
 });
 const peerBaseline = {};
-MEMBERS.forEach((name) => { peerBaseline[name] = { attitude: 3 + (evalH(name, 5) % 21) / 10, polish: 3 + (evalH(name, 9) % 21) / 10 }; });
+MEMBERS.forEach((name) => { peerBaseline[name] = { attitude: 3 + (evalH(name, 5) % 21) / 10, polish: 3 + (evalH(name, 9) % 21) / 10, logic: 3 + (evalH(name, 11) % 21) / 10 }; });
 
-const weights = { attitude: 0.25, polish: 0.25, attendance: 0.25, discussion: 0.25 };
-const filters = { attitudeMin: 0, polishMin: 0, attMin: 100, discMin: 4 };
+const weights = { attitude: 0.2, polish: 0.2, logic: 0.2, attendance: 0.2, discussion: 0.2 };
+const filters = { attitudeMin: 0, polishMin: 0, logicMin: 0, attMin: 100, discMin: 4 };
 const range = { from: "2026-04-19", to: "2026-06-07" };
 
 function computeEval(rg) {
@@ -50,26 +50,27 @@ function computeEval(rg) {
   const rs = reports.filter((r) => (!rg.from || isoOf(r) >= rg.from) && (!rg.to || isoOf(r) <= rg.to));
   const total = rs.length || 1;
   const rows = MEMBERS.map((name) => {
-    let present = 0, discuss = 0, aSum = 0, aN = 0, pSum = 0, pN = 0;
+    let present = 0, discuss = 0, aSum = 0, aN = 0, pSum = 0, pN = 0, lSum = 0, lN = 0;
     rs.forEach((r) => {
       if (attendance[r.id][name] === "present") present++;
       discuss += discussion[r.id][name] || 0;
       const rt = ratings[r.id][name];
-      if (rt) { aSum += rt.attitude; aN++; pSum += rt.polish; pN++; }
+      if (rt) { aSum += rt.attitude; aN++; pSum += rt.polish; pN++; lSum += (rt.logic || 0); lN++; }
     });
     const base = peerBaseline[name];
     const attitude = aN ? aSum / aN : base.attitude;
     const polish = pN ? pSum / pN : base.polish;
-    return { name, attitude, polish, attRate: Math.round((present / total) * 100), discuss, reported: aN };
+    const logic = lN ? lSum / lN : (base.logic || 0);
+    return { name, attitude, polish, logic, attRate: Math.round((present / total) * 100), discuss, reported: aN };
   });
   const norm = (key, nk) => { const vals = rows.map((r) => r[key]); const mn = Math.min(...vals), mx = Math.max(...vals); rows.forEach((r) => { r[nk] = mx > mn ? ((r[key] - mn) / (mx - mn)) * 100 : 100; }); };
-  norm("attitude", "nAttitude"); norm("polish", "nPolish"); norm("attRate", "nAtt"); norm("discuss", "nDisc");
-  const w = weights, sw = (w.attitude + w.polish + w.attendance + w.discussion) || 1;
-  rows.forEach((r) => { r.meeting = (w.attitude * r.nAttitude + w.polish * r.nPolish + w.attendance * r.nAtt + w.discussion * r.nDisc) / sw; });
+  norm("attitude", "nAttitude"); norm("polish", "nPolish"); norm("logic", "nLogic"); norm("attRate", "nAtt"); norm("discuss", "nDisc");
+  const w = weights, sw = (w.attitude + w.polish + (w.logic || 0) + w.attendance + w.discussion) || 1;
+  rows.forEach((r) => { r.meeting = (w.attitude * r.nAttitude + w.polish * r.nPolish + (w.logic || 0) * r.nLogic + w.attendance * r.nAtt + w.discussion * r.nDisc) / sw; });
   const byMeeting = [...rows].sort((a, b) => b.meeting - a.meeting);
   byMeeting.forEach((r, i) => { r.meetingRank = i + 1; });
   const f = filters;
-  const survivors = byMeeting.filter((r) => r.attitude >= f.attitudeMin && r.polish >= f.polishMin && r.attRate >= f.attMin && r.discuss >= f.discMin);
+  const survivors = byMeeting.filter((r) => r.attitude >= f.attitudeMin && r.polish >= f.polishMin && (r.logic >= (f.logicMin || 0)) && r.attRate >= f.attMin && r.discuss >= f.discMin);
   const survNames = survivors.map((r) => r.name);
   let order = survNames.slice();
   const progressRank = {}; order.forEach((n, i) => { progressRank[n] = i + 1; });

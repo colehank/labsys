@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models import AnnLevel
 
@@ -29,11 +30,11 @@ class ConfigOut(BaseModel):
 
 # ── 公告 ──
 class AnnouncementCreate(BaseModel):
-    title: str
-    body: str = ""
+    title: Annotated[str, Field(min_length=1, max_length=128)]
+    body: Annotated[str, Field(max_length=10000)] = ""
     level: AnnLevel = AnnLevel.info
     pinned: bool = False
-    audience: str = "all"
+    audience: Literal["all", "students"] = "all"
     author: str = ""
     expiresAt: date | None = None
 
@@ -76,6 +77,9 @@ class MeetingOut(BaseModel):
     type: str
     tone: str        # accent | info
     status: str
+    template: str = "正式报告"  # 评分模板：正式报告 / 工作坊 / 团建 / 仅考勤
+    scored: bool = True          # 是否参与正式评分（非正式活动为 False）
+    host: str = ""   # 主持人（排期指定，可空）
     time: str = ""   # 本场时间；空串 = 沿用全局默认（meetingDefault.time）
     place: str = ""  # 本场地点；空串 = 沿用全局默认（meetingDefault.place）
     online: OnlineMeetingOut | None = None

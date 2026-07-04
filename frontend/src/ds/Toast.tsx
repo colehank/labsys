@@ -27,8 +27,13 @@ export function Toast({
     "info": <><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
   };
 
+  const isUrgent = tone === "danger" || tone === "warning";
   return (
-    <div style={{
+    <div
+      role="alert"
+      aria-live={isUrgent ? "assertive" : "polite"}
+      aria-atomic="true"
+      style={{
       display: "flex", alignItems: "flex-start", gap: 11, width: "100%", maxWidth: 380,
       padding: "12px 14px", background: t.bg,
       border: `var(--border-w) solid ${t.bd}`, borderRadius: "var(--radius-md)",

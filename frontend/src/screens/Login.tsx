@@ -135,9 +135,10 @@ import { useLogin } from "../auth";
           <div className="cibol-rise" style={{ animationDelay: ".64s", width: "100%", display: "flex", flexDirection: "column", gap: 13, marginTop: 32 }}>
             <Input label="邮箱" type="email" placeholder="name@example.com" value={email} onChange={(e: any) => setEmail(e.target.value)} iconLeft={I("at-sign")} autoComplete="username" />
             <Input label="密码" type="password" placeholder="请输入密码" value={password} onChange={(e: any) => setPassword(e.target.value)} iconLeft={I("lock")} autoComplete="current-password" error={login.isError ? "邮箱或密码错误" : undefined} />
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-              <Checkbox label="记住此设备" defaultChecked />
-              <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 13 }}>忘记密码</a>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginTop: 2 }}>
+              {/* 无自助找回流程：密码由管理员在「成员管理」重置，避免死链接误导。 */}
+              <button type="button" onClick={() => toast("请联系实验室管理员重置密码")}
+                style={{ fontSize: 13, color: "var(--accent-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>忘记密码？</button>
             </div>
             <div className="cibol-login-cta" style={{ marginTop: 8 }}>
               <Button type="submit" variant="primary" fullWidth size="lg" iconRight={I("arrow-right")} disabled={login.isPending || !email.trim() || !password} onClick={submit}>{login.isPending ? "登录中…" : "进入系统"}</Button>

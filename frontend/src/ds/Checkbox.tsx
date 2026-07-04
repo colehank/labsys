@@ -45,16 +45,16 @@ export function Checkbox({
   );
 
   return (
-    <label htmlFor={fieldId} style={{
+    <span style={{
       display: "inline-flex", alignItems: "center", gap: 9,
       cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1, ...style,
-    }}>
+    }} onClick={!disabled ? toggle : undefined}>
       <button type="button" role="checkbox" aria-checked={indeterminate ? "mixed" : on}
-        id={fieldId} disabled={disabled} onClick={toggle}
+        aria-label={label} id={fieldId} disabled={disabled} onClick={(e) => e.stopPropagation()}
         style={{ padding: 0, border: "none", background: "none", cursor: "inherit", display: "inline-flex" }}>
         {box}
       </button>
       {label && <span style={{ fontSize: "var(--text-md)", color: "var(--text-body)" }}>{label}</span>}
-    </label>
+    </span>
   );
 }

@@ -58,7 +58,7 @@ export function RequestTracker({ req, compact, collapsible }: { req: any; compac
   const head = REQ_HEAD[req.kind] || REQ_HEAD.swap;
   const success = req.status === "accepted" || req.status === "approved";
   const fail = ["declined", "rejected", "cancelled"].includes(req.status);
-  const allowed = (REQ_FLOW[req.kind] || ({} as any)).transitions[req.status] || [];
+  const allowed = (REQ_FLOW[req.kind] || REQ_FLOW.swap).transitions[req.status] || [];
   const last = req.history[req.history.length - 1];
   const fmt = (iso: string) => { const x = new Date(iso); return `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 

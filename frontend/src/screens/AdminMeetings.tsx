@@ -19,6 +19,7 @@ import { useIsMobile } from "../lib/useIsMobile";
   // 取消某个日期 → 该日期不再开会，报告人队列顺延到后续日期（必要时在末尾追加补开日期）。
   function genSchedule(startISO, intervalDays, perSession, endISO, roster, weekday = null) {
     const slots = [], groups = [];
+    if (!roster || !roster.length) return { slots, groups };  // 无成员时不生成，避免 idx % 0 = NaN 崩溃
     let d = new Date(startISO + "T00:00:00");
     // 指定了周几（每周/每两周模式）→ 把起始日对齐到 ≥ start 的第一个该周几，
     // 之后按 interval（7/14 的倍数）累加，所有场次都落在同一周几。
@@ -44,9 +45,10 @@ import { useIsMobile } from "../lib/useIsMobile";
     const slots = [], groups = [];
     sorted.forEach((m) => {
       const iso = `${m.y}-${String(m.mo + 1).padStart(2, "0")}-${String(m.day).padStart(2, "0")}`;
-      slots.push({ id: "s" + (UID++), iso, date: m.dateLabel || fmt(new Date(iso + "T00:00:00")), cancelled: false });
+      slots.push({ id: "s" + (UID++), iso, date: m.dateLabel || fmt(new Date(iso + "T00:00:00")), cancelled: m.status === "cancelled" });
       groups.push({
-        id: "g" + (UID++), time: m.time || "", place: m.place || "",
+        id: "g" + (UID++), time: m.time || "", place: m.place || "", type: m.type || "", host: m.host || "",
+        template: m.template || "正式报告", scored: m.scored !== false,
         presenters: (m.presenters || []).map((p) => ({ name: p.name, topic: p.topic || "", skipped: false })),
       });
     });
@@ -68,7 +70,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     }
     guard = 0;
     while (activeCount() < groupCount && guard++ < 80) {
-      const lastIso = s.length ? s[s.length - 1].iso : "2026-06-14";
+      const lastIso = s.length ? s[s.length - 1].iso : isoLocal(new Date());
       const ni = isoAfter(lastIso, interval);
       s.push({ id: "m" + (UID++), iso: ni, date: fmt(new Date(ni + "T00:00:00")), cancelled: false, makeup: true });
     }
@@ -87,7 +89,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     return (
       <div style={{ display: "inline-flex", padding: 3, gap: 2, background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
         {options.map((o) => (
-          <button key={o.value} onClick={() => onChange(o.value)}
+          <button type="button" key={o.value} onClick={() => onChange(o.value)}
             style={{
               padding: "6px 12px", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13,
               fontWeight: 600, borderRadius: "var(--radius-sm)",
@@ -114,10 +116,10 @@ import { useIsMobile } from "../lib/useIsMobile";
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {/* order controls */}
           <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
-            <button onClick={() => onMove(-1)} disabled={idx === 0} title="上移" style={{ border: "none", background: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "var(--border-default)" : "var(--text-faint)", padding: 0, lineHeight: 0 }}>
+            <button type="button" onClick={() => onMove(-1)} disabled={idx === 0} title="上移" style={{ border: "none", background: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "var(--border-default)" : "var(--text-faint)", padding: 0, lineHeight: 0 }}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
             </button>
-            <button onClick={() => onMove(1)} disabled={idx === total - 1} title="下移" style={{ border: "none", background: "none", cursor: idx === total - 1 ? "default" : "pointer", color: idx === total - 1 ? "var(--border-default)" : "var(--text-faint)", padding: 0, lineHeight: 0 }}>
+            <button type="button" onClick={() => onMove(1)} disabled={idx === total - 1} title="下移" style={{ border: "none", background: "none", cursor: idx === total - 1 ? "default" : "pointer", color: idx === total - 1 ? "var(--border-default)" : "var(--text-faint)", padding: 0, lineHeight: 0 }}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
             </button>
           </div>
@@ -134,7 +136,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                 <IconButton size="sm" icon={I("x")} label="取消" onClick={() => { setDraft(p.topic); setEditTopic(false); }} />
               </div>
             ) : (
-              <button onClick={() => !p.skipped && setEditTopic(true)} disabled={p.skipped}
+              <button type="button" onClick={() => !p.skipped && setEditTopic(true)} disabled={p.skipped}
                 style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", border: "none", background: "none", cursor: p.skipped ? "default" : "pointer", padding: "4px 0", textAlign: "left" }}>
                 <span style={{ fontSize: 13, color: p.topic ? "var(--text-body)" : "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>
                   {p.topic || "未设置主题 · 由成员自填"}
@@ -182,7 +184,7 @@ import { useIsMobile } from "../lib/useIsMobile";
           footer={<Button variant="primary" onClick={() => setOpen(false)}>知道了</Button>}>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
             {items.map(([ic, t, d], i) => (
-              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <div key={ic} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ width: 16, height: 16, color: "var(--accent)", flexShrink: 0, marginTop: 2, display: "inline-flex" }}>{I(ic)}</span>
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{t}</div>
@@ -217,10 +219,13 @@ import { useIsMobile } from "../lib/useIsMobile";
             )}
           </div>
           <Segmented value={on ? "on" : "off"}
-            onChange={(v) => update.mutate(v === "on", {
-              onSuccess: () => toast(v === "on" ? "已开启自动预约" : "已关闭自动预约"),
-              onError: () => toast("操作失败", { tone: "error" }),
-            })}
+            onChange={(v) => {
+              if (v === "on" && !enabled) { toast("请先在服务器配置预约凭据再开启", { tone: "error" }); return; }
+              update.mutate(v === "on", {
+                onSuccess: () => toast(v === "on" ? "已开启自动预约" : "已关闭自动预约"),
+                onError: (e: any) => toast(e?.detail || "操作失败", { tone: "error" }),
+              });
+            }}
             options={[{ value: "off", label: "关闭" }, { value: "on", label: "开启" }]} />
         </div>
       </Card>
@@ -248,7 +253,7 @@ import { useIsMobile } from "../lib/useIsMobile";
             toast("学期与地点已保存", { tone: "success" });
             onClose();
           },
-          onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }),
+          onError: (e: any) => toast(e?.detail || e?.message || "保存失败", { tone: "error" }),
         },
       );
     };
@@ -288,10 +293,13 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [customDays, setCustomDays] = React.useState(10);
     const [countMode, setCountMode] = React.useState("2");
     const [customCount, setCustomCount] = React.useState(4);
-    const [start, setStart] = React.useState("2026-06-14");
+    const [start, setStart] = React.useState("");
     const [end, setEnd] = React.useState("");
-    React.useEffect(() => { if (cfg?.semester?.end) setEnd((e) => e || cfg.semester.end); }, [cfg]);
-    const [weekday, setWeekday] = React.useState(() => new Date("2026-06-14T00:00:00").getDay()); // 0=周日，默认与 start 同星期
+    React.useEffect(() => {
+      if (cfg?.semester?.start) setStart((s) => s || cfg.semester.start);
+      if (cfg?.semester?.end) setEnd((e) => e || cfg.semester.end);
+    }, [cfg]);
+    const [weekday, setWeekday] = React.useState(0); // 加载后从 cfg.semester.start 更新
     const interval = freq === "custom" ? Math.max(1, Number(customDays)) : Number(freq);
     const perSession = countMode === "custom" ? Math.max(1, Number(customCount)) : Number(countMode);
 
@@ -300,24 +308,36 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [openId, setOpenId] = React.useState<any>(null);
     const [newDate, setNewDate] = React.useState("");
     const [addOpen, setAddOpen] = React.useState(false);
-    const seeded = React.useRef(false);
+    const seededFromReal = React.useRef(false);
 
     // 排期表数据源 = 已保存的真实排期（与组会日历同源）；只有在一场都没有时（学期初），
     // 才用默认参数生成一份草稿供管理员在「排期设置」里调整后保存。
+    // seededFromReal 只在有真实排期时置 true，roster 先到时生成草稿但不阻塞真实排期加载。
     React.useEffect(() => {
-      if (seeded.current) return;
+      if (cfg?.semester?.start) {
+        setWeekday(new Date(cfg.semester.start + "T00:00:00").getDay());
+      }
       if (meetings.length) {
-        seeded.current = true;
+        // 真实排期到达：总是覆盖（无论之前是否已用草稿填充）
+        seededFromReal.current = true;
         const g = meetingsToSchedule(meetings);
         setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
-      } else if (roster.length) {
-        seeded.current = true;
-        const g = genSchedule("2026-06-14", 7, 2, "2027-01-16", roster, 0);
+      } else if (!seededFromReal.current && roster.length && cfg) {
+        // 无真实排期（学期初）且尚未从真实数据初始化过：生成草稿
+        const s = cfg.semester?.start || isoLocal(new Date());
+        const e = cfg.semester?.end || (() => { const d = new Date(); d.setMonth(d.getMonth() + 6); return isoLocal(d); })();
+        const wd = s ? new Date(s + "T00:00:00").getDay() : 0;
+        const g = genSchedule(s, 7, 2, e, roster, wd);
         setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
       }
-    }, [meetings, roster]);
+    }, [meetings, roster, cfg]);
 
-    const regenerate = () => { const g = genSchedule(start, interval, perSession, end, roster, freq === "custom" ? null : weekday); setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id); };
+    const regenerate = () => {
+      if (!roster.length) { toast("暂无成员，无法生成排期", { tone: "error" }); return; }
+      if (!start || !end) { toast("请先配置学期起止日期再生成排期", { tone: "error" }); return; }
+      const g = genSchedule(start, interval, perSession, end, roster, freq === "custom" ? null : weekday);
+      setSlots(g.slots); setGroups(g.groups); setOpenId(g.groups[0] && g.groups[0].id);
+    };
     const patchGroup = (gid, fn) => setGroups((gs) => gs.map((g) => (g.id === gid ? fn(g) : g)));
     const setTopic = (gid, pi, v) => patchGroup(gid, (g) => ({ ...g, presenters: g.presenters.map((p, i) => (i === pi ? { ...p, topic: v } : p)) }));
     const toggleSkip = (gid, pi) => patchGroup(gid, (g) => ({ ...g, presenters: g.presenters.map((p, i) => (i === pi ? { ...p, skipped: !p.skipped } : p)) }));
@@ -353,20 +373,33 @@ import { useIsMobile } from "../lib/useIsMobile";
       const meetings = timeline
         .filter((c: any) => c.type === "meeting" && c.slot && !c.slot.pending && c.slot.iso && c.slot.iso !== "9999")
         .map((c: any, idx: number) => {
-          const kind = idx % 2 === 0 ? "进展汇报" : "文献精读";
+          // 优先沿用该场已有类型；仅新建草稿（无 type）才按时间线奇偶兜底，避免重排后类型乱跳。
+          const kind = c.group.type || (idx % 2 === 0 ? "进展汇报" : "文献精读");
           return {
             date: c.slot.iso,
             type: kind,
+            host: c.group.host || "",
             time: c.group.time || "",   // 空 = 沿用全局默认（成员端回退渲染）
             place: c.group.place || "",
+            template: c.group.template || "正式报告",
+            scored: c.group.scored !== false,   // 默认参与评分；仅考勤/团建等置 false（#8）
             presenters: (c.group.presenters || [])
               .filter((p: any) => !p.skipped)
               .map((p: any) => ({ name: p.name, topic: p.topic || "", kind })),
           };
         });
       if (!meetings.length) { toast("排期为空，先生成排期再保存", { tone: "error" }); return; }
-      saveSchedule.mutate(meetings, {
-        onSuccess: () => toast(`排期已保存并更新（${meetings.length} 场组会）`, { tone: "success" }),
+      // 学期隔离（#1）：仅在当前学期起止范围内全量替换，范围外（其它学期）组会一律保留，
+      // 从根上杜绝「排下学期把本学期连数据一起删掉」。
+      saveSchedule.mutate({
+        meetings,
+        scope_from: cfg?.semester?.start || undefined,
+        scope_to: cfg?.semester?.end || undefined,
+      }, {
+        onSuccess: () => {
+          seededFromReal.current = false;
+          toast(`排期已保存并更新（${meetings.length} 场组会）`, { tone: "success" });
+        },
         onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }),
       });
     };
@@ -506,12 +539,21 @@ import { useIsMobile } from "../lib/useIsMobile";
                       <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{slot.pending ? "顺延待排" : slot.date.split(" ")[1]}</div>
                     </div>
                     <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
-                      {active.length ? active.map((p) => (
-                        <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <Avatar name={p.name} size="xs" />
-                          <span style={{ fontSize: 13, color: "var(--text-body)" }}>{p.name}</span>
+                      {active.length
+                        ? active.map((p) => (
+                          <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <Avatar name={p.name} size="xs" />
+                            <span style={{ fontSize: 13, color: "var(--text-body)" }}>{p.name}</span>
+                          </span>
+                        ))
+                        : g.type && !["进展汇报", "文献精读"].includes(g.type)
+                          ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)" }}>{g.type}</span>
+                          : <span style={{ fontSize: 13, color: "var(--warning-text)" }}>待安排报告人</span>}
+                      {g.host && (
+                        <span title="主持人" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600, color: "var(--accent-text)", background: "var(--accent-soft)", padding: "2px 7px", borderRadius: "var(--radius-pill)" }}>
+                          {I("mic", { size: 11 })}主持 {g.host}
                         </span>
-                      )) : <span style={{ fontSize: 13, color: "var(--warning-text)" }}>待安排报告人</span>}
+                      )}
                     </div>
                     {!slot.pending && (
                       <IconButton size="sm" icon={I("calendar-x")} label="取消组会" onClick={(e) => { e.stopPropagation(); cancelSlot(slot.id); }} />
@@ -521,24 +563,49 @@ import { useIsMobile } from "../lib/useIsMobile";
                   {open && (
                     <div style={{ padding: "2px 14px 12px", borderTop: "1px solid var(--border-subtle)" }}>
                       {g.presenters.map((p, pi) => (
-                        <PresenterRow key={pi} p={p} idx={pi} total={g.presenters.length} roster={roster}
+                        <PresenterRow key={`${g.id}-${pi}`} p={p} idx={pi} total={g.presenters.length} roster={roster}
                           onTopic={(v) => setTopic(g.id, pi, v)} onSkip={() => toggleSkip(g.id, pi)}
                           onSwap={(name) => swap(g.id, pi, name)} onRemove={() => removeP(g.id, pi)}
                           onMove={(dir) => moveP(g.id, pi, dir)} />
                       ))}
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 12, marginTop: 4, borderTop: "1px solid var(--border-subtle)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 12, marginTop: 4, borderTop: "1px solid var(--border-subtle)", flexWrap: "wrap" }}>
                         <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>添加报告人</span>
                         <div style={{ width: 180 }}>
                           <Select size="sm" placeholder="选择成员…" value=""
                             onChange={(e) => { if (e.target.value) addP(g.id, e.target.value); }}
                             options={roster.filter((m) => !g.presenters.some((p) => p.name === m.name)).map((m) => ({ value: m.name, label: m.role ? `${m.name} · ${m.role}` : m.name }))} />
                         </div>
+                        <span style={{ fontSize: 12.5, color: "var(--text-muted)", marginLeft: 8 }}>主持人</span>
+                        <div style={{ width: 180 }}>
+                          <Select size="sm" placeholder="未指定" value={g.host || ""}
+                            onChange={(e) => setMeta(g.id, "host", e.target.value)}
+                            options={[{ value: "", label: "未指定" }, ...roster.map((m) => ({ value: m.name, label: m.role ? `${m.name} · ${m.role}` : m.name }))]} />
+                        </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10, paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
+                        <Input size="sm" label="类型（可自定义）" value={g.type || ""} placeholder="进展汇报 / 文献精读 / 团建…" iconLeft={I("tag")} list={`mtypes-${g.id}`}
+                          onChange={(e) => setMeta(g.id, "type", e.target.value)} />
                         <Input size="sm" label="本场时间（留空 = 默认）" value={g.time || ""} placeholder={cfg?.meetingDefault?.time || "全局默认"} iconLeft={I("clock")}
                           onChange={(e) => setMeta(g.id, "time", e.target.value)} />
                         <Input size="sm" label="本场地点（留空 = 默认）" value={g.place || ""} placeholder={cfg?.meetingDefault?.place || "全局默认"} iconLeft={I("map-pin")}
                           onChange={(e) => setMeta(g.id, "place", e.target.value)} />
+                        <datalist id={`mtypes-${g.id}`}>
+                          {["进展汇报", "文献精读", "团建", "AI Agent工作坊", "工作坊"].map((t) => <option key={t} value={t} />)}
+                        </datalist>
+                      </div>
+                      {/* 评分模板 / 是否参与评分（#8）：非正式活动不进评分入口、不计报告分 */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", paddingTop: 12, marginTop: 8, borderTop: "1px solid var(--border-subtle)" }}>
+                        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>评分模板</span>
+                        <select value={g.template || "正式报告"}
+                          onChange={(e) => { const v = e.target.value; setMeta(g.id, "template", v); setMeta(g.id, "scored", v === "正式报告"); }}
+                          style={{ height: 34, padding: "0 10px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 13.5, colorScheme: "light dark" }}>
+                          {["正式报告", "工作坊", "团建", "仅考勤"].map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-muted)", cursor: "pointer" }}>
+                          <input type="checkbox" checked={g.scored !== false} onChange={(e) => setMeta(g.id, "scored", e.target.checked)} />
+                          参与评分
+                        </label>
+                        <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{g.scored !== false ? "计入报告评分与表现统计" : "不评分，仅记录出勤"}</span>
                       </div>
                     </div>
                   )}

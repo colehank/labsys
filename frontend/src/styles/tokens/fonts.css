@@ -4,9 +4,20 @@
    Latin:  Source Sans 3     (harmonizes with Noto Sans SC)
    Serif:  Source Serif 4    (elegant display numerals / quotes)
    Mono:   JetBrains Mono    (terminal, keys, code, tabular data)
+   Icons:  Symbols Nerd Font Mono  (terminal Nerd Font icons/glyphs)
 
    NOTE: loaded from Google Fonts for now. For production,
    self-host the WOFF2 binaries and replace these @import lines.
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* Nerd Font Symbols Only — 仅覆盖私有区 (PUA) 字形，不干扰正文字符。
+   用户本地若已装 JetBrainsMono Nerd Font 则优先走本地，本字体作兜底。 */
+@font-face {
+  font-family: "Symbols Nerd Font Mono";
+  src: url("/fonts/SymbolsNerdFontMono-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}

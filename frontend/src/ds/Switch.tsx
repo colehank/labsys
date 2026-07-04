@@ -32,6 +32,7 @@ export function Switch({
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label={label}
       id={fieldId}
       disabled={disabled}
       onClick={toggle}
@@ -55,12 +56,12 @@ export function Switch({
 
   if (!label) return <span style={style}>{control}</span>;
   return (
-    <label htmlFor={fieldId} style={{
+    <span aria-hidden="true" style={{
       display: "inline-flex", alignItems: "center", gap: 10,
       cursor: disabled ? "not-allowed" : "pointer", ...style,
-    }}>
+    }} onClick={toggle}>
       {control}
       <span style={{ fontSize: "var(--text-md)", color: "var(--text-body)" }}>{label}</span>
-    </label>
+    </span>
   );
 }

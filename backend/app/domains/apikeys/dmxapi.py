@@ -28,10 +28,14 @@ async def account_balance() -> dict | None:
         "Authorization": f"Bearer {settings.dmxapi_system_token}",
         "Rix-Api-User": settings.dmxapi_user_id,
     }
-    async with httpx.AsyncClient(timeout=10) as c:
-        r = await c.get(f"{settings.dmxapi_base}/api/user/self", headers=headers)
-        r.raise_for_status()
-        quota = (r.json().get("data") or {}).get("quota")
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(f"{settings.dmxapi_base}/api/user/self", headers=headers)
+            r.raise_for_status()
+            quota = (r.json().get("data") or {}).get("quota")
+    except (httpx.HTTPError, ValueError):
+        # 上游超时/5xx/响应非 JSON 时降级为 None，调用方据此隐藏余额而非整页 500。
+        return None
     return {"quota": quota, "rmb": quota_to_rmb(quota)}
 
 
@@ -40,10 +44,14 @@ async def token_balance(sk: str) -> dict | None:
     if not settings.dmxapi_enabled or not sk:
         return None
     headers = {"Accept": "application/json", "Rix-Api-User": settings.dmxapi_user_id}
-    async with httpx.AsyncClient(timeout=10) as c:
-        r = await c.get(f"{settings.dmxapi_base}/api/token/key/{sk}", headers=headers)
-        r.raise_for_status()
-        d = r.json()
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(f"{settings.dmxapi_base}/api/token/key/{sk}", headers=headers)
+            r.raise_for_status()
+            d = r.json()
+    except (httpx.HTTPError, ValueError):
+        # 上游异常时降级为 None，成员用量条隐藏而非整个密钥列表 500。
+        return None
     used = d.get("used_quota")
     remain = d.get("remain_quota")
     return {

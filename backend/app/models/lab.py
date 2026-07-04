@@ -53,6 +53,8 @@ class Announcement(UUIDMixin, TimestampMixin, Base):
 
 
 class MeetingType(str, enum.Enum):
+    """常用类型预设（仅作默认/上色参考）；type 列为自由文本，管理员可自定义任意类型
+    （进展汇报 / 文献精读 / 团建 / 工作坊 …）。"""
     progress = "进展汇报"
     literature = "文献精读"
 
@@ -66,13 +68,19 @@ class Meeting(UUIDMixin, TimestampMixin, Base):
     """一次组会（整学期排期，每周一次）。"""
     __tablename__ = "meetings"
 
-    date: Mapped[date] = mapped_column(Date, index=True)
-    type: Mapped[MeetingType] = mapped_column(Enum(MeetingType, name="meeting_type"))
+    date: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    # 自由文本类型（管理员自定义）；预设见 MeetingType
+    type: Mapped[str] = mapped_column(String(32), default=MeetingType.progress.value)
+    host: Mapped[str] = mapped_column(String(64), default="")   # 主持人（排期时指定，可空）
     place: Mapped[str] = mapped_column(String(128), default="")
     time: Mapped[str] = mapped_column(String(32), default="")
     status: Mapped[MeetingStatus] = mapped_column(
         Enum(MeetingStatus, name="meeting_status"), default=MeetingStatus.scheduled
     )
+    # 评分模板（决定录入/评分表单形态）：正式报告 / 工作坊 / 团建 / 仅考勤（自由文本，管理员可扩展）。
+    template: Mapped[str] = mapped_column(String(32), default="正式报告", server_default="正式报告")
+    # 是否参与正式评分。工作坊/团建/仅考勤等非正式活动置 False，不进「待评组会」、不算报告分。
+    scored: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # 在线会议（系统自动创建；失败则 status != ok，需管理员设置）
     online_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
     online_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -92,7 +100,7 @@ class Presenter(UUIDMixin, Base):
     meeting_id: Mapped[str] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(64))     # 姓名快照（兼容外部成员）
-    topic: Mapped[str] = mapped_column(String(256), default="")
+    topic: Mapped[str] = mapped_column(Text, default="")   # 主题 / 完整文献引用（含 DOI，可很长）
     kind: Mapped[str] = mapped_column(String(32), default="")   # 进展汇报 / 文献精读
     minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     ord: Mapped[int] = mapped_column(Integer, default=0)

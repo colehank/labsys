@@ -20,7 +20,7 @@ export function TopBar({
         {breadcrumb.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)", color: "var(--text-faint)", marginBottom: 1 }}>
             {breadcrumb.map((b, i) => (
-              <React.Fragment key={i}>
+              <React.Fragment key={b + i}>
                 {i > 0 && <span style={{ opacity: 0.6 }}>/</span>}
                 <span style={{ color: i === breadcrumb.length - 1 ? "var(--text-muted)" : "var(--text-faint)" }}>{b}</span>
               </React.Fragment>

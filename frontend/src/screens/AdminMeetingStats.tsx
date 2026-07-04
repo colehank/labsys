@@ -2,13 +2,14 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useEvalCompute, useEvalReports, useSetAttendance, useSetSpeaks } from "../api/hooks";
+import { useEvalCompute, useEvalReports, useSetAttendance, useSetSpeaks, useMeetings, useReportVotes, useDeleteVote } from "../api/hooks";
 import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
+import { useQueryClient } from "@tanstack/react-query";
 
 // AdminMeetingStats — 组会统计: 管理员逐次组会核对「出勤」。
 // 报告评分（态度/精良）与讨论参与来自成员匿名评分，此处只读 —— 单一数据源，不重复录入。
-  const { Card, Avatar, Badge, Button, ScreenState, EmptyState } = NS;
+  const { Card, Avatar, Badge, Button, Dialog, ScreenState, EmptyState } = NS;
 
   const ATT = [
     { key: "present", label: "出勤", tone: "success", icon: "check" },
@@ -42,19 +43,29 @@ import { useIsMobile } from "../lib/useIsMobile";
 
   function AdminMeetingStats() {
     const isMobile = useIsMobile();
+    const qc = useQueryClient();
     const { data: compute } = useEvalCompute();
     const reportQ = useEvalReports();
     const reportData = reportQ.data;
     const { data: meUser } = useMe();
     const setAtt = useSetAttendance();
     const setSpk = useSetSpeaks();
+    const delVote = useDeleteVote();
 
     const rows = compute?.rows ?? [];
     const reports = reportData ?? [];
     const members = rows.map((r) => r.name);
 
-    const [sel, setSel] = React.useState(0); // 默认最近一次（末位），加载后校正
-    React.useEffect(() => { setSel(Math.max(0, reports.length - 1)); }, [reports.length]);
+    const [sel, setSel] = React.useState(0);
+    const initializedRef = React.useRef(false);
+    React.useEffect(() => {
+      if (!initializedRef.current && reports.length > 0) {
+        initializedRef.current = true;
+        setSel(reports.length - 1);
+      }
+    }, [reports.length]);
+    const [saving, setSaving] = React.useState(false);
+    const [auditOpen, setAuditOpen] = React.useState(false);  // #9 评分审核弹窗
 
     // 出勤 / 发言次数本地态：以各会次后端值为种子，管理员可逐人核对 / 录入。
     const [attEdits, setAttEdits] = React.useState<Record<string, Record<string, string>>>({});
@@ -76,13 +87,17 @@ import { useIsMobile } from "../lib/useIsMobile";
       return { ...seed, ...(spkEdits[key] || {}) };
     };
 
-    const mdLabelOf = (rr: { mo: number; day: number }) => `${rr.mo + 1}/${String(rr.day).padStart(2, "0")}`;
+    const mdLabelOf = (rr: any) => rr.mo != null ? `${rr.mo + 1}/${String(rr.day ?? 1).padStart(2, "0")}` : (rr.dateLabel || "—");
 
     const r = reports[sel];
+    const votesQ = useReportVotes(r?.key ?? null, auditOpen);
+    const votes = (votesQ.data ?? []) as any[];
 
-    // 报告人评分（态度/精良）由成员匿名提交，此处只读；后端暂未下发明细，缺省为空。
-    const ratings: Record<string, { attitude: number; polish: number; raters: number }> = {};
-    const cancelled = false;
+    // 报告人评分（态度/精良）由成员匿名提交、后端聚合后随 report 下发，此处只读展示。
+    const ratings = ((r?.ratings || {}) as Record<string, { attitude: number; polish: number; logic: number; raters: number }>);
+    // cancelled 状态从 meetings 交叉查询得出（ReportOut 本身不含 status 字段）
+    const { data: meetings = [] } = useMeetings();
+    const cancelled = r ? meetings.find((m) => m.id === r.key)?.status === "cancelled" : false;
 
     // 当前报告汇总
     const att = r ? attendanceOf(r.key) : {};
@@ -119,19 +134,36 @@ import { useIsMobile } from "../lib/useIsMobile";
             <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>核对每次组会出勤、录入发言次数 · 报告评分由成员提交</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <Button size="sm" variant="primary" iconLeft={I("check")} disabled={cancelled || setAtt.isPending || setSpk.isPending}
-              onClick={() => {
+            <Button size="sm" variant="primary" iconLeft={I("check")} disabled={cancelled || saving}
+              onClick={async () => {
+                if (cancelled) { toast("已取消的组会不可录入数据", { tone: "error" }); return; }
                 const key = reports[sel]?.key;
-                if (!key) return;
+                if (!key || saving) return;
                 const attE = Object.entries(attEdits[key] || {});
                 const spkE = Object.entries(spkEdits[key] || {});
                 if (attE.length === 0 && spkE.length === 0) { toast("无改动"); return; }
-                Promise.all([
-                  ...attE.map(([name, status]) => setAtt.mutateAsync({ key, name, status: status as string })),
-                  ...spkE.map(([name, count]) => setSpk.mutateAsync({ key, name, count: count as number })),
-                ])
-                  .then(() => toast("已保存 · 本次组会出勤与发言次数"))
-                  .catch(() => toast("保存失败", { tone: "error" }));
+                setSaving(true);
+                try {
+                  // 串行提交：原先 Promise.all 会把整册成员的出勤/发言几十个写请求同时打出，
+                  // 并发写同一场组会易触发 DB 写竞争与连接压力 → 「保存失败」（反馈 #5）。
+                  // 逐条提交更稳，失败时也能定位到具体成员。
+                  for (const [name, status] of attE) {
+                    await setAtt.mutateAsync({ key, name, status: status as string });
+                  }
+                  for (const [name, count] of spkE) {
+                    await setSpk.mutateAsync({ key, name, count: count as number });
+                  }
+                  toast("已保存 · 本次组会出勤与发言次数");
+                  await qc.invalidateQueries({ queryKey: ["eval"] });
+                  setAttEdits((prev) => { const n = { ...prev }; delete n[key]; return n; });
+                  setSpkEdits((prev) => { const n = { ...prev }; delete n[key]; return n; });
+                } catch (e: any) {
+                  // 透传后端具体原因，而非笼统「保存失败」（反馈 #13 错误提示细化）。
+                  const detail = e?.detail || e?.message || "请稍后重试";
+                  toast(`保存失败：${detail}`, { tone: "error" });
+                } finally {
+                  setSaving(false);
+                }
               }}>保存</Button>
           </div>
         </div>
@@ -140,10 +172,11 @@ import { useIsMobile } from "../lib/useIsMobile";
         <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "12px 0 14px" }}>
           {reports.map((rr, i) => {
             const on = i === sel;
-            const a = attendanceOf(rr.key);
-            const filled = members.some((n) => a[n]);
+            const backendAtt = (rr.attendance || {}) as Record<string, string>;
+            const backendSpk = (rr.speaks || {}) as Record<string, number>;
+            const filled = Object.keys(backendAtt).length > 0 || Object.keys(backendSpk).length > 0;
             return (
-              <button key={rr.key} onClick={() => setSel(i)}
+              <button type="button" key={rr.key} onClick={() => setSel(i)}
                 style={{
                   flexShrink: 0, display: "flex", flexDirection: "column", gap: 4, padding: "10px 14px", textAlign: "left", cursor: "pointer",
                   border: `1px solid ${on ? "var(--accent)" : "var(--border-subtle)"}`,
@@ -195,16 +228,16 @@ import { useIsMobile } from "../lib/useIsMobile";
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", borderBottom: "1px solid var(--border-subtle)" }}>
               <span style={{ width: 15, height: 15, display: "inline-flex", color: "var(--text-faint)" }}>{I("star", { size: 15 })}</span>
               <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-faint)" }}>报告人评分 · 成员提交</span>
-              <span style={{ fontSize: 11.5, color: "var(--text-faint)", marginLeft: "auto" }}>只读</span>
+              <Button size="xs" variant="ghost" iconLeft={I("list-checks")} style={{ marginLeft: "auto" }} onClick={() => setAuditOpen(true)}>审核明细</Button>
             </div>
             {r.presenters.map((pn, i) => {
-              const rt = ratings[pn] || { attitude: 0, polish: 0, raters: 0 };
+              const rt = ratings[pn] || { attitude: 0, polish: 0, logic: 0, raters: 0 };
               return (
                 <div key={pn} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 20px", borderTop: i ? "1px solid var(--border-subtle)" : "none" }}>
                   <Avatar name={pn} size="sm" />
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{pn}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-                    {([["报告态度", rt.attitude, "var(--terracotta-500)"], ["制作精良", rt.polish, "var(--amber-500)"]] as [string, number, string][]).map(([lb, v, c]) => (
+                    {([["报告态度", rt.attitude, "var(--terracotta-500)"], ["制作精良", rt.polish, "var(--amber-500)"], ["逻辑清晰", rt.logic, "var(--terracotta-400)"]] as [string, number, string][]).map(([lb, v, c]) => (
                       <div key={lb} style={{ display: "flex", alignItems: "center", gap: 7 }}>
                         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{lb}</span>
                         <span className="cibol-mono" style={{ fontSize: 14, fontWeight: 700, color: c }}>{v ? v.toFixed(1) : "—"}</span>
@@ -255,6 +288,35 @@ import { useIsMobile } from "../lib/useIsMobile";
             })}
           </div>
         </Card>
+
+        {/* #9 评分审核弹窗 —— 逐张匿名选票明细，可删除/退回异常评分（删后成员可重填）*/}
+        <Dialog open={auditOpen} onClose={() => setAuditOpen(false)}
+          title="评分审核" subtitle={`${r?.dateLabel ?? ""} · 共 ${votes.length} 张选票`}
+          icon={I("list-checks")} tone="accent" width={560}
+          footer={<Button variant="ghost" onClick={() => setAuditOpen(false)}>关闭</Button>}>
+          {votesQ.isLoading ? (
+            <div style={{ padding: "32px 0", textAlign: "center", fontSize: 13, color: "var(--text-faint)" }}>加载中…</div>
+          ) : votes.length === 0 ? (
+            <EmptyState compact title="暂无评分提交" description="本场组会还没有成员提交评分。" style={{ padding: "20px 0" }} />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 400, overflowY: "auto" }}>
+              {votes.map((v) => (
+                <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: "var(--radius-md)", background: "var(--surface-sunken)", border: "1px solid var(--border-subtle)" }}>
+                  <Avatar name={v.rater} size="xs" />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)" }}>{v.rater} <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>评 {v.presenter}</span></div>
+                    <div className="cibol-mono" style={{ fontSize: 11.5, color: "var(--text-muted)" }}>态度 {v.attitude?.toFixed(1)} · 精良 {v.polish?.toFixed(1)} · 逻辑 {v.logic?.toFixed(1)}{(v.top5 || []).length ? ` · Top5: ${v.top5.join("、")}` : ""}</div>
+                  </div>
+                  <Button size="xs" variant="ghost" iconLeft={I("trash-2")} loading={delVote.isPending}
+                    onClick={() => delVote.mutate(v.id, {
+                      onSuccess: () => { toast("已删除该评分 · 该成员可重新提交"); votesQ.refetch(); },
+                      onError: (e: any) => toast("删除失败：" + (e?.detail || e?.message || "请重试"), { tone: "error" }),
+                    })}>退回</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Dialog>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 12.5, color: "var(--text-faint)" }}>
           <span style={{ width: 14, height: 14, display: "inline-flex" }}>{I("info", { size: 14 })}</span>

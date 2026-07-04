@@ -99,17 +99,17 @@ async def seed_lab(db: AsyncSession) -> None:
         while d <= end:
             is_progress = n % 2 == 0
             per = 2 if n % 3 == 0 else 1
-            mtype = MeetingType.progress if is_progress else MeetingType.literature
+            mtype = (MeetingType.progress if is_progress else MeetingType.literature).value
 
             # 报告人
             rows: list[tuple[str, str, str, int | None]] = []
             if d == date(2026, 6, 14):
                 rows = list(FIRST_PRESENTERS)
             elif d in SEEDED_TOPICS_BY_DATE:
-                rows = [(nm, tp, mtype.value, None) for nm, tp in SEEDED_TOPICS_BY_DATE[d]]
+                rows = [(nm, tp, mtype, None) for nm, tp in SEEDED_TOPICS_BY_DATE[d]]
             else:
                 for k in range(per):
-                    rows.append((ROSTER[ri % len(ROSTER)], "", mtype.value, None))
+                    rows.append((ROSTER[ri % len(ROSTER)], "", mtype, None))
                     ri += 1
 
             online = ONLINE_BY_DATE.get(d)

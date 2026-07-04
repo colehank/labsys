@@ -37,6 +37,11 @@ async def get_settings(_: AdminUser, db: DbSession) -> BookingSettings:
 
 @router.put("/settings", response_model=BookingSettings)
 async def update_settings(body: AutoBookUpdate, _: AdminUser, db: DbSession) -> BookingSettings:
+    if body.auto_book and not settings.booking_enabled:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="凭据未配置，无法开启自动预约（请先设置 CIBOL_BOOKING_ACCOUNT / CIBOL_BOOKING_PASSWORD）",
+        )
     cfg = (await db.execute(select(LabConfig))).scalars().first()
     if cfg is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="缺少实验室配置")
@@ -60,7 +65,8 @@ async def book_one(meeting_id: str, _: AdminUser) -> MeetingOut:
     except LookupError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="组会不存在") from None
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"预约失败：{exc}") from exc
+        short = str(exc).split("\n")[0][:200]
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"预约失败：{short}") from exc
 
 
 @router.post("/run-auto", status_code=status.HTTP_202_ACCEPTED)

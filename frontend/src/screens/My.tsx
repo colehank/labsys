@@ -3,7 +3,7 @@ import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
 import type { Me } from "../auth";
-import { useUpdateMe, useMyCredentials, useSaveCredential, useDeleteCredential, useEvalCompute, useChangePassword } from "../api/hooks";
+import { useUpdateMe, useMyCredentials, useSaveCredential, useDeleteCredential, useEvalCompute, useChangePassword, useSubmitFeedback } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // My — 我的: a mature settings experience.
@@ -67,13 +67,15 @@ import { useIsMobile } from "../lib/useIsMobile";
     const updateMe = useUpdateMe();
     React.useEffect(() => { setName(me.name); }, [me.name]);
     const saveName = () => {
-      updateMe.mutate({ name }, { onSuccess: () => { setOpen(null); toast("已保存"); } });
+      if (updateMe.isPending) return;
+      if (!name.trim()) { toast("姓名不能为空", { tone: "error" }); return; }
+      updateMe.mutate({ name: name.trim() }, { onSuccess: () => { setOpen(null); toast("已保存"); } });
     };
     return (
       <Pane title="账户资料" desc="你的基本信息，组内可见。" embedded={embedded}>
         <Row icon="user" label="姓名" value={me.name} open={open === "name"} onToggle={() => setOpen(open === "name" ? null : "name")}>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", maxWidth: 420 }}>
-            <Input label="姓名" value={name} onChange={(e: any) => setName(e.target.value)} iconLeft={I("user")} />
+            <Input label="姓名" value={name} onChange={(e: any) => setName(e.target.value)} iconLeft={I("user")} onKeyDown={(e: any) => { if (e.key === "Enter") saveName(); }} />
             <Button variant="primary" onClick={saveName} disabled={updateMe.isPending}>保存</Button>
           </div>
         </Row>
@@ -98,10 +100,16 @@ import { useIsMobile } from "../lib/useIsMobile";
     const reset = () => { setAdding(false); setEditId(null); setU(""); setP(""); };
     const save = () => {
       if (!u.trim()) { toast("请填写账号", { tone: "error" }); return; }
+      if (!p) { toast("请填写密码", { tone: "error" }); return; }
+      if (p.length < 6) { toast("密码至少 6 位", { tone: "error" }); return; }
       saveCred.mutate({ username: u.trim(), password: p },
         { onSuccess: () => { reset(); toast("已保存"); }, onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }) });
     };
-    const del = (id: string) => delCred.mutate(id, { onSuccess: () => toast("已删除") });
+    const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
+    const del = (id: string) => delCred.mutate(id, {
+      onSuccess: () => { setDeleteConfirmId(null); toast("已删除"); },
+      onError: (e: any) => toast(e?.message || "删除失败", { tone: "error" }),
+    });
     if (!feature) return <p style={{ fontSize: 13, color: "var(--text-faint)" }}>后端未启用账密加密，暂不能保存。</p>;
     const fieldBox = { display: "flex", flexDirection: "column" as const, gap: 10, maxWidth: 380 };
     return (
@@ -114,7 +122,14 @@ import { useIsMobile } from "../lib/useIsMobile";
                 <span className="cibol-mono" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{c.username}</span>
                 <Badge tone="success" size="sm" dot>已保存</Badge>
                 <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-                  <Button size="sm" variant="ghost" onClick={() => del(c.id)} disabled={delCred.isPending}>删除</Button>
+                  {deleteConfirmId === c.id ? (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => setDeleteConfirmId(null)}>取消</Button>
+                      <Button size="sm" variant="primary" onClick={() => del(c.id)} disabled={delCred.isPending}>确认删除</Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => setDeleteConfirmId(c.id)} disabled={delCred.isPending && deleteConfirmId === c.id}>删除</Button>
+                  )}
                   <Button size="sm" variant={isEdit ? "ghost" : "secondary"} onClick={() => { if (isEdit) reset(); else { setAdding(false); setEditId(c.id); setU(c.username); setP(""); } }}>{isEdit ? "收起" : "改密码"}</Button>
                 </div>
               </div>
@@ -150,20 +165,24 @@ import { useIsMobile } from "../lib/useIsMobile";
     const changePw = useChangePassword();
     const [oldPw, setOldPw] = React.useState("");
     const [newPw, setNewPw] = React.useState("");
-    const canSubmit = oldPw.length > 0 && newPw.length >= 6 && !changePw.isPending;
+    const [confirmPw, setConfirmPw] = React.useState("");
+    const pwMismatch = confirmPw.length > 0 && newPw !== confirmPw;
+    const canSubmit = oldPw.length > 0 && newPw.length >= 6 && newPw === confirmPw && !changePw.isPending;
     const submitPw = () => {
       if (!canSubmit) return;
       changePw.mutate({ old_password: oldPw, new_password: newPw }, {
-        onSuccess: () => { toast("登录密码已更新"); setOldPw(""); setNewPw(""); setOpen(null); },
-        onError: (e: any) => toast(e?.message || "密码修改失败"),
+        onSuccess: () => { toast("登录密码已更新"); setOldPw(""); setNewPw(""); setConfirmPw(""); setOpen(null); },
+        onError: (e: any) => toast(e?.message || "密码修改失败", { tone: "error" }),
       });
     };
     return (
       <Pane title="安全" desc="登录密码与服务器账密。" embedded={embedded}>
         <Row icon="lock" label="登录密码" value="点击修改" open={open === "pw"} onToggle={() => setOpen(open === "pw" ? null : "pw")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 380 }}>
-            <Input label="当前密码" type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
-            <Input label="新密码" type="password" hint="至少 6 位，再长一点更稳。" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+            <Input label="当前密码" type="password" autoComplete="current-password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} />
+            <Input label="新密码" type="password" autoComplete="new-password" hint="至少 6 位，再长一点更稳。" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+            <Input label="确认新密码" type="password" autoComplete="new-password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}
+              hint={pwMismatch ? "两次输入不一致" : undefined} />
             <Button variant="primary" style={{ alignSelf: "flex-start" }} disabled={!canSubmit} onClick={submitPw}>{changePw.isPending ? "更新中…" : "更新密码"}</Button>
           </div>
         </Row>
@@ -239,21 +258,32 @@ import { useIsMobile } from "../lib/useIsMobile";
       timing: saved[it.id]?.timing ?? (it.timingDefault || null),
       scope: saved[it.id]?.scope ?? (it.scopeDefault || null),
     }])));
-    // 持久化：把当前开关 + 每项配置写入 settings.notify。
-    const persist = (en: any, c: any) => {
-      const notify = Object.fromEntries(allItems.map((it) => [it.id, { on: en[it.id], ...c[it.id] }]));
-      updateMe.mutate({ settings: { ...(me.settings as any), notify } }, { onSuccess: () => toast("已保存") });
+    const toggleEnabled = (id: string) => {
+      const prevEnabled = enabled;
+      const nextEnabled = { ...enabled, [id]: !enabled[id] };
+      setEnabled(nextEnabled);
+      const notify = Object.fromEntries(allItems.map((it) => [it.id, { on: nextEnabled[it.id], ...cfg[it.id] }]));
+      updateMe.mutate(
+        { settings: { ...(me.settings as any), notify } },
+        {
+          onSuccess: () => toast("已保存"),
+          onError: () => { setEnabled(prevEnabled); toast("保存失败", { tone: "error" }); },
+        },
+      );
     };
-    const setItemCfg = (id, patch) => setCfg((c) => {
-      const next = { ...c, [id]: { ...c[id], ...patch } };
-      persist(enabled, next);
-      return next;
-    });
-    const toggleEnabled = (id: string) => setEnabled((e) => {
-      const next = { ...e, [id]: !e[id] };
-      persist(next, cfg);
-      return next;
-    });
+    const setItemCfg = (id: string, patch: any) => {
+      const prevCfg = cfg;
+      const nextCfg = { ...cfg, [id]: { ...cfg[id], ...patch } };
+      setCfg(nextCfg);
+      const notify = Object.fromEntries(allItems.map((it) => [it.id, { on: enabled[it.id], ...nextCfg[it.id] }]));
+      updateMe.mutate(
+        { settings: { ...(me.settings as any), notify } },
+        {
+          onSuccess: () => toast("已保存"),
+          onError: () => { setCfg(prevCfg); toast("保存失败", { tone: "error" }); },
+        },
+      );
+    };
 
     return (
       <Pane title="通知提醒" desc="设置本系统的所有提醒类型，按需展开调整每一种提醒。" embedded={embedded}>
@@ -282,21 +312,21 @@ import { useIsMobile } from "../lib/useIsMobile";
                           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)" }}>{it.title}</div>
                           <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>{it.desc}</div>
                         </button>
-                        <Switch checked={on} onChange={() => toggleEnabled(it.id)} />
+                        <Switch checked={on} onChange={() => toggleEnabled(it.id)} disabled={updateMe.isPending} />
                       </div>
                       {open && (
                         <div style={{ padding: "2px 16px 18px 50px", display: "flex", flexDirection: "column", gap: 14, animation: "cibol-fade var(--dur-base) var(--ease-out)" }}>
                           <NotifyField label="提醒方式">
-                            <Seg value={c.channel} onChange={(v) => setItemCfg(it.id, { channel: v })} options={["站内", "邮件", "站内 + 邮件"]} />
+                            <Seg value={c.channel} onChange={(v) => setItemCfg(it.id, { channel: v })} options={["站内", "邮件", "站内 + 邮件"]} disabled={updateMe.isPending} />
                           </NotifyField>
                           {it.timing && (
                             <NotifyField label="提前时间">
-                              <Seg value={c.timing} onChange={(v) => setItemCfg(it.id, { timing: v })} options={it.timing} />
+                              <Seg value={c.timing} onChange={(v) => setItemCfg(it.id, { timing: v })} options={it.timing} disabled={updateMe.isPending} />
                             </NotifyField>
                           )}
                           {it.scope && (
                             <NotifyField label="范围">
-                              <Seg value={c.scope} onChange={(v) => setItemCfg(it.id, { scope: v })} options={it.scope} />
+                              <Seg value={c.scope} onChange={(v) => setItemCfg(it.id, { scope: v })} options={it.scope} disabled={updateMe.isPending} />
                             </NotifyField>
                           )}
                           {!on && (
@@ -319,15 +349,25 @@ import { useIsMobile } from "../lib/useIsMobile";
   }
 
   function Feedback({ embedded }: any) {
+    const [text, setText] = React.useState("");
+    const submitFb = useSubmitFeedback();
+    const send = () => {
+      const body = text.trim();
+      if (!body || submitFb.isPending) return;
+      submitFb.mutate(body, {
+        onSuccess: () => { toast("已匿名提交，谢谢你的反馈"); setText(""); },
+        onError: () => toast("提交失败，请重试", { tone: "error" }),
+      });
+    };
     return (
       <Pane title="匿名意见" desc="完全匿名，PI 看不到是谁提的。" embedded={embedded}>
         <div style={{ padding: "8px 0 4px" }}>
-          <Textarea placeholder="对组会安排、实验室运行有什么想法？" rows={5} maxLength={500} />
+          <Textarea placeholder="对组会安排、实验室运行有什么想法？" rows={5} maxLength={500} value={text} onChange={(e: any) => setText(e.target.value)} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
             <span style={{ fontSize: 12.5, color: "var(--text-faint)", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Icon name="shield-check" style={{ width: 14, height: 14 }} />提交后不记录任何身份信息
             </span>
-            <Button variant="primary" iconLeft={I("send")}>匿名提交</Button>
+            <Button variant="primary" iconLeft={I("send")} disabled={!text.trim() || submitFb.isPending} onClick={send}>匿名提交</Button>
           </div>
         </div>
       </Pane>
@@ -339,11 +379,11 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [group, setGroup] = React.useState("account");
     const [open, setOpen] = React.useState(null);
     const go = (g) => { setGroup(g); setOpen(null); };
-    // 真实总分排名：按组会总分降序，找到本人名次（无数据时不显示）。
+    // 终极排名：来自后端 Borda 合并结果（merged.finalRank），不是单项组会排名。
     const { data: ev } = useEvalCompute();
-    const ranked = React.useMemo(() => [...(ev?.rows || [])].sort((a, b) => b.meeting - a.meeting), [ev]);
-    const myRank = ranked.findIndex((r) => r.name === me.name) + 1;
-    const rankTotal = ranked.length;
+    const myMerged = ev?.merged?.find((m: any) => m.name === me.name);
+    const myRank = myMerged?.finalRank ?? 0;
+    const rankTotal = ev?.rows?.length ?? 0;
 
     return (
       <div style={{ maxWidth: embedded ? "none" : 940, margin: "0 auto", padding: embedded ? (isMobile ? "16px 14px 24px" : "22px 24px 32px") : (isMobile ? "16px 14px 40px" : "24px 32px 56px") }}>
@@ -357,7 +397,7 @@ import { useIsMobile } from "../lib/useIsMobile";
           </div>
           {myRank > 0 && (
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 18 }}>
-            <button onClick={() => onNavigate("meetings", { tab: "rank" })}
+            <button type="button" onClick={() => onNavigate("meetings", { tab: "rank" })}
               style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 16px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--surface)", cursor: "pointer" }}>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-faint)" }}>总分排名</div>
@@ -379,7 +419,7 @@ import { useIsMobile } from "../lib/useIsMobile";
             {GROUPS.map((g) => {
               const on = g.id === group;
               return (
-                <button key={g.id} onClick={() => go(g.id)}
+                <button type="button" key={g.id} onClick={() => go(g.id)}
                   style={{
                     display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", border: "none",
                     borderRadius: "var(--radius-md)", cursor: "pointer", textAlign: "left",
@@ -396,8 +436,8 @@ import { useIsMobile } from "../lib/useIsMobile";
             <div style={{ height: 1, background: "var(--border-subtle)", margin: "10px 12px", display: embedded ? "none" : "block" }} />
             {!embedded && <>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-faint)", padding: "4px 12px 6px" }}>快捷入口</div>
-            {([["组会请假", "calendar-off", () => onNavigate("meetings")], ["我的 API 密钥", "key-round", () => onNavigate("api")], ["服务器终端", "terminal", () => onNavigate("server")]] as [string, string, () => void][]).map(([t, ic, fn], i) => (
-              <button key={i} onClick={fn}
+            {([["组会请假", "calendar-off", () => onNavigate("meetings")], ["我的 API 密钥", "key-round", () => onNavigate("api")], ["服务器终端", "terminal", () => onNavigate("server")]] as [string, string, () => void][]).map(([t, ic, fn]) => (
+              <button key={t} type="button" onClick={fn}
                 style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 12px", border: "none", borderRadius: "var(--radius-md)", cursor: "pointer", textAlign: "left", background: "transparent", color: "var(--text-muted)", fontFamily: "var(--font-sans)", fontSize: 13.5 }}>
                 <Icon name={ic} style={{ width: 16, height: 16, color: "var(--text-faint)" }} />
                 <span style={{ flex: 1 }}>{t}</span>

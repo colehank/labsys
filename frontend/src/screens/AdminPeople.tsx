@@ -19,20 +19,23 @@ import { useIsMobile } from "../lib/useIsMobile";
     return e?.message || fallback;
   }
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   // 权限选择（用户 / 管理员）。值对齐后端 Role：member / admin。
-  function PermPicker({ perm, setPerm }: any) {
+  function PermPicker({ perm, setPerm, disabled }: any) {
     return (
       <div>
         <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500, color: "var(--text-body)" }}>权限</label>
         <div style={{ display: "flex", gap: 8 }}>
           {[["member", "用户"], ["admin", "管理员"]].map(([v, t]) => (
-            <button key={v} type="button" onClick={() => setPerm(v)}
+            <button key={v} type="button" onClick={() => !disabled && setPerm(v)}
               style={{
-                flex: 1, height: 40, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600,
+                flex: 1, height: 40, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600,
                 borderRadius: "var(--radius-md)",
                 border: `1px solid ${perm === v ? "var(--accent)" : "var(--border-default)"}`,
                 background: perm === v ? "var(--accent-soft)" : "var(--surface)",
                 color: perm === v ? "var(--accent-text)" : "var(--text-muted)",
+                opacity: disabled ? 0.5 : 1,
                 transition: "all var(--dur-fast) var(--ease-out)",
               }}>{t}</button>
           ))}
@@ -50,12 +53,14 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [perm, setPerm] = React.useState("member");
     React.useEffect(() => { if (open) { setName(""); setEmail(""); setPassword(""); setTitle(""); setPerm("member"); } }, [open]);
     const submit = () => {
-      if (!name.trim() || !email.trim() || !password) { toast("请填写姓名、邮箱、密码", { tone: "error" }); return; }
+      if (!name.trim()) { toast("请填写姓名", { tone: "error" }); return; }
+      if (!EMAIL_RE.test(email.trim())) { toast("邮箱格式不正确", { tone: "error" }); return; }
+      if (password.length < 6) { toast("密码至少 6 位", { tone: "error" }); return; }
       create.mutate(
         { name: name.trim(), email: email.trim(), password, title: title.trim(), role: perm as any },
         {
           onSuccess: () => { toast("已添加用户 · " + name.trim(), { tone: "success" }); onClose(); },
-          onError: (e: any) => toast(e?.message || "添加失败", { tone: "error" }),
+          onError: (e: any) => toast(errMsg(e, "添加失败"), { tone: "error" }),
         },
       );
     };
@@ -74,7 +79,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     );
   }
 
-  function EditUserDialog({ member, onClose }: any) {
+  function EditUserDialog({ member, onClose, adminCount, me }: any) {
     const update = useAdminUpdateUser();
     const [name, setName] = React.useState("");
     const [email, setEmail] = React.useState("");
@@ -86,13 +91,18 @@ import { useIsMobile } from "../lib/useIsMobile";
       setName(member.name); setEmail(member.email); setTitle(member.title || ""); setPerm(member.role); setPassword("");
     }, [member]);
     if (!member) return null;
+    const isMe = !!(me && member.id === me.id);
+    const isLastAdmin = member.role === "admin" && adminCount <= 1;
+    const permDisabled = isMe || isLastAdmin;
+    const permHint = isMe ? "不能修改自己的权限" : isLastAdmin ? "系统最后一位管理员不能降权" : undefined;
     const submit = () => {
-      if (!name.trim() || !email.trim()) { toast("姓名、邮箱必填", { tone: "error" }); return; }
+      if (!name.trim()) { toast("姓名必填", { tone: "error" }); return; }
+      if (!EMAIL_RE.test(email.trim())) { toast("邮箱格式不正确", { tone: "error" }); return; }
       const patch: any = { name: name.trim(), email: email.trim(), title: title.trim(), role: perm };
       if (password) patch.password = password;
       update.mutate({ id: member.id, patch }, {
         onSuccess: () => { toast("已保存 · " + name.trim(), { tone: "success" }); onClose(); },
-        onError: (e: any) => toast(e?.message || "保存失败", { tone: "error" }),
+        onError: (e: any) => toast(errMsg(e, "保存失败"), { tone: "error" }),
       });
     };
     return (
@@ -103,7 +113,8 @@ import { useIsMobile } from "../lib/useIsMobile";
           <Input label="姓名" value={name} onChange={(e: any) => setName(e.target.value)} iconLeft={I("user")} />
           <Input label="邮箱（登录账号）" value={email} onChange={(e: any) => setEmail(e.target.value)} iconLeft={I("at-sign")} autoComplete="off" />
           <Select label="身份" placeholder="选择或留空" value={title} onChange={(e: any) => setTitle(e.target.value)} options={ROLES} />
-          <PermPicker perm={perm} setPerm={setPerm} />
+          <PermPicker perm={perm} setPerm={setPerm} disabled={permDisabled} />
+          {permHint && <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: -8 }}>{permHint}</p>}
           <Input label="重置密码" type="password" placeholder="留空则不修改密码" value={password} onChange={(e: any) => setPassword(e.target.value)} iconLeft={I("lock")} autoComplete="new-password" />
         </div>
       </Dialog>
@@ -126,6 +137,7 @@ import { useIsMobile } from "../lib/useIsMobile";
       || (u.title || "").includes(q)
       || u.email.toLowerCase().includes(q.toLowerCase()));
     const peopleCols = isMobile ? "1fr auto" : "2.4fr 1.4fr 1fr 96px";
+    const adminCount = (users as any[]).filter((u: any) => u.role === "admin" && !u.disabled).length;
 
     const onDelete = (u: any) => {
       del.mutate(u.id, {
@@ -168,6 +180,7 @@ import { useIsMobile } from "../lib/useIsMobile";
             const adminRow = u.role === "admin";
             const isMe = !!(me && u.id === me.id);
             const off = !!u.disabled;
+            const isLastAdmin = adminRow && !off && adminCount <= 1;
             return (
               <div key={u.id} style={{ display: "grid", gridTemplateColumns: peopleCols, gap: isMobile ? 8 : 12, padding: "12px 20px", alignItems: "center", borderBottom: i < list.length - 1 ? "1px solid var(--border-subtle)" : "none", opacity: off ? 0.5 : 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
@@ -188,7 +201,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                   {off ? (
                     <IconButton icon={I("rotate-ccw")} label="恢复账号" size="sm" onClick={() => onRestore(u)} />
                   ) : (
-                    <IconButton icon={I("trash-2")} label={isMe ? "不能删除自己" : "删除"} size="sm" disabled={isMe} onClick={() => !isMe && setConfirm(u)} />
+                    <IconButton icon={I("trash-2")} label={isMe ? "不能删除自己" : isLastAdmin ? "系统最后一位管理员不能删除" : "删除"} size="sm" disabled={isMe || isLastAdmin} onClick={() => !isMe && !isLastAdmin && setConfirm(u)} />
                   )}
                 </div>
               </div>
@@ -197,7 +210,7 @@ import { useIsMobile } from "../lib/useIsMobile";
         </Card>
 
         <AddUserDialog open={adding} onClose={() => setAdding(false)} />
-        <EditUserDialog member={editing} onClose={() => setEditing(null)} />
+        <EditUserDialog member={editing} onClose={() => setEditing(null)} adminCount={adminCount} me={me} />
         <Dialog open={!!confirm} onClose={() => setConfirm(null)} title="删除用户" subtitle={confirm?.name}
           icon={I("trash-2")} tone="danger" width={400}
           footer={<><Button variant="ghost" onClick={() => setConfirm(null)}>取消</Button><Button variant="primary" loading={del.isPending} onClick={() => confirm && onDelete(confirm)}>确认删除</Button></>}>

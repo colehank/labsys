@@ -113,6 +113,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Me
+         * @description 更新本人资料 / 设置（「我的」页）。
+         */
+        patch: operations["update_me_api_users_me_patch"];
+        trace?: never;
+    };
     "/api/users/{user_id}": {
         parameters: {
             query?: never;
@@ -139,26 +159,6 @@ export interface paths {
          * @description 管理员改用户资料 / 权限 / 密码（password 留空则不改）。
          */
         patch: operations["admin_update_user_api_users__user_id__patch"];
-        trace?: never;
-    };
-    "/api/users/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update Me
-         * @description 更新本人资料 / 设置（「我的」页）。
-         */
-        patch: operations["update_me_api_users_me_patch"];
         trace?: never;
     };
     "/api/config": {
@@ -192,6 +192,7 @@ export interface paths {
         /**
          * List Announcements
          * @description 当前生效的公告（未过期），按 pinned → level → 时间排序。
+         *     管理员可见全部公告；普通成员只见 audience='all' 或 'students' 的公告。
          */
         get: operations["list_announcements_api_announcements_get"];
         put?: never;
@@ -662,6 +663,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eval/excellence/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Excellence All */
+        get: operations["excellence_all_api_eval_excellence_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/eval/reports/{key}/votes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Votes
+         * @description 列出某场组会的全部匿名选票明细，供管理员核查异常评分。
+         */
+        get: operations["list_votes_api_eval_reports__key__votes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/eval/votes/{vote_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Vote */
+        delete: operations["delete_vote_api_eval_votes__vote_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/apikeys/mine": {
         parameters: {
             query?: never;
@@ -771,6 +826,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Feedback
+         * @description 管理员查看全部匿名意见，按时间倒序。
+         */
+        get: operations["list_feedback_api_feedback_get"];
+        put?: never;
+        /**
+         * Submit Feedback
+         * @description 任意登录成员匿名提交；不落任何身份信息。
+         */
+        post: operations["submit_feedback_api_feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Unread Count */
+        get: operations["unread_count_api_feedback_unread_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback/{fb_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Feedback Read */
+        post: operations["mark_feedback_read_api_feedback__fb_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback/{fb_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Feedback
+         * @description 管理员删除意见（清理无效/违规条目）。
+         */
+        delete: operations["delete_feedback_api_feedback__fb_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -787,8 +920,11 @@ export interface components {
         };
         /** AdvanceRequest */
         AdvanceRequest: {
-            /** Next */
-            next: string;
+            /**
+             * Next
+             * @enum {string}
+             */
+            next: "accepted" | "declined" | "cancelled" | "approved" | "rejected";
             /**
              * Note
              * @default
@@ -819,8 +955,9 @@ export interface components {
             /**
              * Audience
              * @default all
+             * @enum {string}
              */
-            audience: string;
+            audience: "all" | "students";
             /**
              * Author
              * @default
@@ -895,8 +1032,11 @@ export interface components {
         AttendanceSet: {
             /** Name */
             name: string;
-            /** Status */
-            status: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "present" | "leave" | "absent";
         };
         /** AutoBookUpdate */
         AutoBookUpdate: {
@@ -967,6 +1107,10 @@ export interface components {
              * @default
              */
             note: string;
+            /** Frommeetingid */
+            fromMeetingId?: string | null;
+            /** Tomeetingid */
+            toMeetingId?: string | null;
         };
         /** CredCreate */
         CredCreate: {
@@ -1027,6 +1171,21 @@ export interface components {
             };
             /** Progress Order */
             progress_order?: string[] | null;
+            /**
+             * Period
+             * @default
+             */
+            period: string;
+            /**
+             * Award Excellence
+             * @default 1000
+             */
+            award_excellence: number;
+            /**
+             * Award Attendance
+             * @default 100
+             */
+            award_attendance: number;
         };
         /** EvalRowOut */
         EvalRowOut: {
@@ -1036,6 +1195,8 @@ export interface components {
             attitude: number;
             /** Polish */
             polish: number;
+            /** Logic */
+            logic: number;
             /** Attrate */
             attRate: number;
             /** Discuss */
@@ -1048,6 +1209,8 @@ export interface components {
             nAttitude: number;
             /** Npolish */
             nPolish: number;
+            /** Nlogic */
+            nLogic: number;
             /** Natt */
             nAtt: number;
             /** Ndisc */
@@ -1065,8 +1228,49 @@ export interface components {
             names: string[];
             /** Count */
             count: number;
+            /**
+             * Perfect Attendance
+             * @default []
+             */
+            perfect_attendance: string[];
+            /**
+             * Award Excellence
+             * @default 1000
+             */
+            award_excellence: number;
+            /**
+             * Award Attendance
+             * @default 100
+             */
+            award_attendance: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
             /** Published */
             published: boolean;
+            /** Published At */
+            published_at?: string | null;
+        };
+        /** FeedbackCreate */
+        FeedbackCreate: {
+            /** Body */
+            body: string;
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /** Id */
+            id: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Read */
+            read: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1123,6 +1327,11 @@ export interface components {
              */
             type: string;
             /**
+             * Host
+             * @default
+             */
+            host: string;
+            /**
              * Time
              * @default
              */
@@ -1132,6 +1341,16 @@ export interface components {
              * @default
              */
             place: string;
+            /**
+             * Template
+             * @default 正式报告
+             */
+            template: string;
+            /**
+             * Scored
+             * @default true
+             */
+            scored: boolean;
             /**
              * Presenters
              * @default []
@@ -1158,6 +1377,21 @@ export interface components {
             tone: string;
             /** Status */
             status: string;
+            /**
+             * Template
+             * @default 正式报告
+             */
+            template: string;
+            /**
+             * Scored
+             * @default true
+             */
+            scored: boolean;
+            /**
+             * Host
+             * @default
+             */
+            host: string;
             /**
              * Time
              * @default
@@ -1252,6 +1486,13 @@ export interface components {
              * @default 5
              */
             count: number;
+            /** Names */
+            names?: string[] | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** RankSeriesOut */
         RankSeriesOut: {
@@ -1272,6 +1513,8 @@ export interface components {
             attitude: number;
             /** Polish */
             polish: number;
+            /** Logic */
+            logic: number;
             /**
              * Top5
              * @default []
@@ -1287,6 +1530,8 @@ export interface components {
         ReportOut: {
             /** Key */
             key: string;
+            /** Y */
+            y: number;
             /** Mo */
             mo: number;
             /** Day */
@@ -1295,6 +1540,16 @@ export interface components {
             dateLabel: string;
             /** Type */
             type: string;
+            /**
+             * Template
+             * @default 正式报告
+             */
+            template: string;
+            /**
+             * Scored
+             * @default true
+             */
+            scored: boolean;
             /** Presenters */
             presenters: string[];
             /** Attendance */
@@ -1308,12 +1563,27 @@ export interface components {
             speaks: {
                 [key: string]: unknown;
             };
+            /**
+             * Ratings
+             * @default {}
+             */
+            ratings: {
+                [key: string]: unknown;
+            };
+            /**
+             * Rated By
+             * @default []
+             */
+            rated_by: string[];
         };
         /** RequestEventOut */
         RequestEventOut: {
             /** Status */
             status: string;
-            /** Note */
+            /**
+             * Note
+             * @default
+             */
             note: string;
             /**
              * At
@@ -1387,6 +1657,10 @@ export interface components {
         ScheduleIn: {
             /** Meetings */
             meetings: components["schemas"]["MeetingIn"][];
+            /** Scope From */
+            scope_from?: string | null;
+            /** Scope To */
+            scope_to?: string | null;
         };
         /** SemesterIn */
         SemesterIn: {
@@ -1612,6 +1886,29 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * VoteDetailOut
+         * @description 管理员审核用：某场组会的单张评分选票明细。
+         */
+        VoteDetailOut: {
+            /** Id */
+            id: string;
+            /** Rater */
+            rater: string;
+            /** Presenter */
+            presenter: string;
+            /** Attitude */
+            attitude: number;
+            /** Polish */
+            polish: number;
+            /** Logic */
+            logic: number;
+            /**
+             * Top5
+             * @default []
+             */
+            top5: string[];
+        };
     };
     responses: never;
     parameters: never;
@@ -1813,6 +2110,39 @@ export interface operations {
             };
         };
     };
+    update_me_api_users_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_user_api_users__user_id__delete: {
         parameters: {
             query?: never;
@@ -1856,39 +2186,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserAdminUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_me_api_users_me_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserSettingsUpdate"];
             };
         };
         responses: {
@@ -2848,6 +3145,86 @@ export interface operations {
             };
         };
     };
+    excellence_all_api_eval_excellence_all_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcellenceOut"][];
+                };
+            };
+        };
+    };
+    list_votes_api_eval_reports__key__votes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoteDetailOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_vote_api_eval_votes__vote_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vote_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_keys_api_apikeys_mine_get: {
         parameters: {
             query?: never;
@@ -3032,6 +3409,137 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_feedback_api_feedback_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"][];
+                };
+            };
+        };
+    };
+    submit_feedback_api_feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unread_count_api_feedback_unread_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+        };
+    };
+    mark_feedback_read_api_feedback__fb_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_feedback_api_feedback__fb_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

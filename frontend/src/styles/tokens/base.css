@@ -103,6 +103,12 @@ hr {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- shared keyframe animations ---- */
+@keyframes cibol-spin { to { transform: rotate(360deg) } }
+@keyframes cibol-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes cibol-pop  { from { opacity: 0; transform: translateY(8px) scale(0.98) } to { opacity: 1; transform: none } }
+@keyframes cibol-node-pulse { 0%, 100% { opacity: .25; transform: scale(.8) } 50% { opacity: 1; transform: scale(1) } }
+
 /* ---- brand tile: theme-adaptive CIBOL logo lockup ----
    Light: stone tile + cream mark · Dark: cream tile + stone mark.
    Drop both marks inside; CSS toggles which one shows per data-theme. */

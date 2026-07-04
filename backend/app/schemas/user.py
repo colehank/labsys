@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models import Role
 
@@ -23,7 +23,7 @@ class UserOut(BaseModel):
 
 
 class UserSettingsUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=64)
     title: str | None = None
     ssh_pubkey: str | None = None
     settings: dict | None = None
@@ -32,7 +32,7 @@ class UserSettingsUpdate(BaseModel):
 class UserCreate(BaseModel):
     """管理员新建用户。email 任意合法邮箱（不限域名）。"""
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=128)
     name: str
     title: str = ""
     role: Role = Role.member
@@ -44,7 +44,7 @@ class UserAdminUpdate(BaseModel):
     email: EmailStr | None = None
     title: str | None = None
     role: Role | None = None
-    password: str | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
     disabled: bool | None = None
 
 

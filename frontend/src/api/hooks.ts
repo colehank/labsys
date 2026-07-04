@@ -48,24 +48,29 @@ export function useMeetings() {
   });
 }
 
-// 管理员整体保存组会排期（端点未在 openapi schema 里，走原生 fetch）
+// 管理员整体保存组会排期
 export type ScheduleMeetingIn = {
-  date: string; type: string; time: string; place: string;
+  date: string; type: string; time: string; place: string; host?: string;
+  template?: string; scored?: boolean;
   presenters: { name: string; topic: string; kind: string }[];
 };
+// scope（学期起止）：仅在此范围内全量替换，范围外组会保留 —— 按学期隔离，排下学期不删本学期（#1）。
 export function useSaveSchedule() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (meetings: ScheduleMeetingIn[]) => {
+    mutationFn: async (vars: { meetings: ScheduleMeetingIn[]; scope_from?: string; scope_to?: string }) => {
       const r = await fetch(`/api/meetings/schedule`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens.access}` },
-        body: JSON.stringify({ meetings }),
+        body: JSON.stringify({ meetings: vars.meetings, scope_from: vars.scope_from ?? null, scope_to: vars.scope_to ?? null }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "保存失败");
       return r.json();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["meetings"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["meetings"] });
+      qc.invalidateQueries({ queryKey: ["eval"] });
+    },
   });
 }
 
@@ -125,7 +130,7 @@ export function useDeleteServer() {
   });
 }
 
-// 用户级 SSH 账密（与服务器解耦、可多条、跨服务器共用）。端点未在 openapi schema 里，走原生 fetch。
+// 用户级 SSH 账密（与服务器解耦、可多条、跨服务器共用）。
 export type Cred = { id: string; username: string };
 export type CredList = { feature: boolean; items: Cred[] };
 
@@ -160,14 +165,16 @@ export function useDeleteCredential() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (credId: string) => {
-      await fetch(`/api/credentials/${credId}`, { method: "DELETE", headers: { Authorization: `Bearer ${tokens.access}` } });
+      const r = await fetch(`/api/credentials/${credId}`, { method: "DELETE", headers: { Authorization: `Bearer ${tokens.access}` } });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "删除失败");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["credentials"] }),
   });
 }
 
-// 管理员把服务器账密下发到某成员的账密库（审批 ssh 申请后调用）。端点未在 openapi schema 里，走原生 fetch。
+// 管理员把服务器账密下发到某成员的账密库（审批 ssh 申请后调用）。
 export function useIssueCredential() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (v: { user_name: string; username: string; password: string }) => {
       const r = await fetch(`/api/credentials/issue`, {
@@ -177,19 +184,32 @@ export function useIssueCredential() {
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.detail || "账号下发失败");
     },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["credentials"] }),
   });
 }
 
 // ── 通知 ──
 export function useNotifications() {
-  return useQuery({ queryKey: ["notifications"], queryFn: () => unwrap(api.GET("/api/notifications")) });
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => unwrap(api.GET("/api/notifications")),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  });
 }
 
 export function useMarkAllRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => unwrap(api.POST("/api/notifications/read-all")),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      const prev = qc.getQueryData(["notifications"]);
+      qc.setQueryData(["notifications"], (old: any) => (old as any[])?.map((n) => ({ ...n, read: true })) ?? old);
+      return { prev };
+    },
+    onError: (_err: any, _vars: any, ctx: any) => qc.setQueryData(["notifications"], ctx?.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 }
 
@@ -198,7 +218,14 @@ export function useMarkRead() {
   return useMutation({
     mutationFn: (notifId: string) =>
       unwrap(api.POST("/api/notifications/{notif_id}/read", { params: { path: { notif_id: notifId } } })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+    onMutate: async (notifId: string) => {
+      await qc.cancelQueries({ queryKey: ["notifications"] });
+      const prev = qc.getQueryData(["notifications"]);
+      qc.setQueryData(["notifications"], (old: any) => (old as any[])?.map((n) => n.id === notifId ? { ...n, read: true } : n) ?? old);
+      return { prev };
+    },
+    onError: (_err: any, _id: any, ctx: any) => qc.setQueryData(["notifications"], ctx?.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 }
 
@@ -207,7 +234,11 @@ export function usePublishAnnouncement() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: components["schemas"]["AnnouncementCreate"]) => unwrap(api.POST("/api/announcements", { body })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["announcements"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+      // 后端发布公告时会向目标受众生成站内通知
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
   });
 }
 
@@ -247,7 +278,11 @@ export function useAdminUpdateUser() {
   return useMutation({
     mutationFn: (vars: { id: string; patch: components["schemas"]["UserAdminUpdate"] }) =>
       unwrap(api.PATCH("/api/users/{user_id}", { params: { path: { user_id: vars.id } }, body: vars.patch })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      // 后端 _cascade_rename 会将改名级联到 eval / meeting 数据中
+      qc.invalidateQueries({ queryKey: ["eval"] });
+    },
   });
 }
 
@@ -255,7 +290,10 @@ export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => unwrap(api.DELETE("/api/users/{user_id}", { params: { path: { user_id: id } } })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["eval"] });
+    },
   });
 }
 
@@ -267,7 +305,7 @@ export function useUpdateMe() {
   });
 }
 
-// 修改登录密码（端点未在 openapi schema 里，走原生 fetch）。
+// 修改登录密码。
 export function useChangePassword() {
   return useMutation({
     mutationFn: async (v: { old_password: string; new_password: string }) => {
@@ -286,7 +324,22 @@ export function useIssueKey() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: components["schemas"]["ApiKeyIssue"]) => unwrap(api.POST("/api/apikeys", { body })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["apikeys"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["apikeys"] });
+      qc.invalidateQueries({ queryKey: ["apikeys", "mine"] });
+    },
+  });
+}
+
+export function useDeleteApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (keyId: string) =>
+      unwrap(api.DELETE("/api/apikeys/{key_id}", { params: { path: { key_id: keyId } } })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["apikeys"] });
+      qc.invalidateQueries({ queryKey: ["apikeys", "mine"] });
+    },
   });
 }
 
@@ -307,6 +360,10 @@ export function useExcellence() {
   return useQuery({ queryKey: ["eval", "excellence"], queryFn: () => unwrap(api.GET("/api/eval/excellence")) });
 }
 
+export function useExcellenceAll() {
+  return useQuery({ queryKey: ["eval", "excellence", "all"], queryFn: () => unwrap(api.GET("/api/eval/excellence/all")) });
+}
+
 export function useRankSeries(name: string, from: string, to: string, metric: string) {
   return useQuery({
     queryKey: ["eval", "rank-series", name, from, to, metric],
@@ -325,44 +382,69 @@ export function useEvalReports() {
 export function useSubmitRating() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { key: string; presenter: string; attitude: number; polish: number; top5: string[] }) =>
+    mutationFn: (vars: { key: string; presenter: string; attitude: number; polish: number; logic: number; top5: string[] }) =>
       unwrap(api.POST("/api/eval/reports/{key}/rating", {
         params: { path: { key: vars.key } },
-        body: { presenter: vars.presenter, attitude: vars.attitude, polish: vars.polish, top5: vars.top5 },
+        body: { presenter: vars.presenter, attitude: vars.attitude, polish: vars.polish, logic: vars.logic, top5: vars.top5 },
       })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["eval"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["eval", "reports"] });
+      qc.invalidateQueries({ queryKey: ["eval", "compute"] });
+    },
   });
 }
 
 export function useSetAttendance() {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { key: string; name: string; status: string }) =>
       unwrap(api.POST("/api/eval/reports/{key}/attendance", {
         params: { path: { key: vars.key } },
-        body: { name: vars.name, status: vars.status },
+        body: { name: vars.name, status: vars.status as "present" | "leave" | "absent" },
       })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["eval"] }),
   });
 }
 
 export function useSetSpeaks() {
-  const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { key: string; name: string; count: number }) =>
       unwrap(api.POST("/api/eval/reports/{key}/speaks", {
         params: { path: { key: vars.key } },
         body: { name: vars.name, count: vars.count },
       })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["eval"] }),
   });
 }
 
 export function usePublishExcellence() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (count: number) => unwrap(api.POST("/api/eval/excellence", { body: { count } })),
+    // count = 按排名取前 N；names 非空 = 手动确认名单（勾选/剔除/补选，排名仅参考）；note = 调整原因（#7）。
+    mutationFn: (vars: { count: number; names?: string[] | null; note?: string }) =>
+      unwrap(api.POST("/api/eval/excellence", { body: { count: vars.count, names: vars.names ?? null, note: vars.note ?? "" } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["eval"] }),
+  });
+}
+
+// ── 管理员评分审核（#9）──
+export type VoteDetail = components["schemas"]["VoteDetailOut"];
+
+export function useReportVotes(key: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["eval", "votes", key],
+    enabled: enabled && !!key,
+    queryFn: () => unwrap(api.GET("/api/eval/reports/{key}/votes", { params: { path: { key: key as string } } })),
+  });
+}
+
+export function useDeleteVote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (voteId: string) =>
+      unwrap(api.DELETE("/api/eval/votes/{vote_id}", { params: { path: { vote_id: voteId } } })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["eval", "votes"] });
+      qc.invalidateQueries({ queryKey: ["eval", "reports"] });
+      qc.invalidateQueries({ queryKey: ["eval", "compute"] });
+    },
   });
 }
 
@@ -391,7 +473,7 @@ export function useUpdateBookingSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (auto_book: boolean) => unwrap(api.PUT("/api/booking/settings", { body: { auto_book } })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["booking"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["booking", "settings"] }),
   });
 }
 
@@ -413,7 +495,81 @@ export function useCreateRequest() {
       unwrap(api.POST("/api/requests", {
         body: { fromDate: "", toName: "", toDate: "", topic: "", detail: "", reason: "", note: "", ...body },
       })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["requests"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["requests"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+// ── 匿名意见 ──
+export function useSubmitFeedback() {
+  return useMutation({
+    mutationFn: (body: string) => unwrap(api.POST("/api/feedback", { body: { body } })),
+  });
+}
+
+export function useFeedback(enabled = true) {
+  return useQuery({ queryKey: ["feedback"], queryFn: () => unwrap(api.GET("/api/feedback")), enabled });
+}
+
+export function useMarkFeedbackRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(api.POST("/api/feedback/{fb_id}/read", { params: { path: { fb_id: id } } })),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["feedback"] });
+      const prev = qc.getQueryData(["feedback"]);
+      qc.setQueryData(["feedback"], (old: any) => (old as any[])?.map((f) => f.id === id ? { ...f, read: true } : f) ?? old);
+      return { prev };
+    },
+    onError: (_err: any, _id: any, ctx: any) => qc.setQueryData(["feedback"], ctx?.prev),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["feedback"] });
+      qc.invalidateQueries({ queryKey: ["feedback", "unread-count"] });
+    },
+  });
+}
+
+export function useDeleteFeedback() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`/api/feedback/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${tokens.access}` },
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "删除失败");
+    },
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["feedback"] });
+      const prev = qc.getQueryData(["feedback"]);
+      qc.setQueryData(["feedback"], (old: any) => (old as any[])?.filter((f) => f.id !== id) ?? old);
+      return { prev };
+    },
+    onError: (_err: any, _id: any, ctx: any) => qc.setQueryData(["feedback"], ctx?.prev),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["feedback"] });
+      qc.invalidateQueries({ queryKey: ["feedback", "unread-count"] });
+    },
+  });
+}
+
+export function useRunAutoBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.POST("/api/booking/run-auto")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["meetings"] }),
+  });
+}
+
+export function useFeedbackUnreadCount(enabled = true) {
+  return useQuery({
+    queryKey: ["feedback", "unread-count"],
+    queryFn: () => unwrap(api.GET("/api/feedback/unread-count")),
+    enabled,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -423,13 +579,14 @@ export function useAdvanceRequest() {
     mutationFn: (vars: { id: string; next: string; note?: string }) =>
       unwrap(api.POST("/api/requests/{req_id}/advance", {
         params: { path: { req_id: vars.id } },
-        body: { next: vars.next, note: vars.note ?? "" },
+        body: { next: vars.next as any, note: vars.note ?? "" },
       })),
     onSuccess: () => {
-      // 推进请求会改 requests，且对调通过会改组会排期、审批结果会生成站内通知。
+      // 推进请求会改 requests，对调通过改排期，审批生成站内通知，请假批准影响出勤评分。
       qc.invalidateQueries({ queryKey: ["requests"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["meetings"] });
+      qc.invalidateQueries({ queryKey: ["eval"] });
     },
   });
 }

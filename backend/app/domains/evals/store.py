@@ -19,6 +19,7 @@ from app.models import (
     Discussion,
     EvalConfig,
     Meeting,
+    MeetingStatus,
     Rating,
     User,
 )
@@ -44,7 +45,10 @@ async def _load_meetings(db: AsyncSession) -> list[Meeting]:
     return list(
         (
             await db.execute(
-                select(Meeting).options(selectinload(Meeting.presenters)).order_by(Meeting.date)
+                select(Meeting)
+                .where(Meeting.status != MeetingStatus.cancelled)
+                .options(selectinload(Meeting.presenters))
+                .order_by(Meeting.date)
             )
         ).scalars()
     )
@@ -54,9 +58,10 @@ def _report_dict(m: Meeting) -> dict:
     """把一场 Meeting 转成引擎需要的 report dict（键 = meeting.id）。"""
     return {
         "id": m.id,
+        "y": m.date.year,
         "mo": m.date.month - 1,
         "day": m.date.day,
-        "type": m.type.value,
+        "type": m.type,
         "presenters": [p.name for p in m.presenters],
     }
 
@@ -85,18 +90,16 @@ async def load_eval_data(db: AsyncSession) -> dict:
     speaks: dict = {m.id: {} for m in meetings}
     ratings: dict = {m.id: {} for m in meetings}
 
-    for a in (await db.execute(select(Attendance))).scalars():
-        if a.meeting_id in ids:
-            attendance[a.meeting_id][a.name] = a.status
-    for d in (await db.execute(select(Discussion))).scalars():
-        if d.meeting_id in ids:
-            discussion[d.meeting_id][d.name] = d.points
-            speaks[d.meeting_id][d.name] = d.speaks
-    for rt in (await db.execute(select(Rating))).scalars():
-        if rt.meeting_id in ids:
-            ratings[rt.meeting_id][rt.presenter] = {
-                "attitude": rt.attitude, "polish": rt.polish, "raters": rt.raters,
-            }
+    for a in (await db.execute(select(Attendance).where(Attendance.meeting_id.in_(ids)))).scalars():
+        attendance[a.meeting_id][a.name] = a.status
+    for d in (await db.execute(select(Discussion).where(Discussion.meeting_id.in_(ids)))).scalars():
+        discussion[d.meeting_id][d.name] = d.points
+        speaks[d.meeting_id][d.name] = d.speaks
+    for rt in (await db.execute(select(Rating).where(Rating.meeting_id.in_(ids)))).scalars():
+        ratings[rt.meeting_id][rt.presenter] = {
+            "attitude": rt.attitude, "polish": rt.polish, "logic": rt.logic,
+            "raters": rt.raters,
+        }
 
     # PeerBaseline 已无任何写入方（历史遗留的同行基线维度）；保持空 dict——
     # 引擎对未被评分的成员回退为 0，行为不变，但省掉一次无意义的查询。
@@ -111,6 +114,9 @@ async def load_eval_data(db: AsyncSession) -> dict:
         "filters": cfg.filters if cfg else dict(DEFAULT_FILTERS),
         "rng": cfg.range_ if cfg else dict(DEFAULT_RANGE),
         "progress_order": cfg.progress_order if cfg else None,
+        "period": cfg.period if cfg else "",
+        "award_excellence": cfg.award_excellence if cfg else 1000,
+        "award_attendance": cfg.award_attendance if cfg else 100,
         "config_row": cfg,
         "meetings_rows": meetings,
     }

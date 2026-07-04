@@ -4,7 +4,7 @@
 import React from "react";
 import { Sidebar, Avatar } from "../ds";
 import { I } from "../lib/icons";
-import { useMyRequests, usePendingRequests, useNotifications } from "../api/hooks";
+import { useMyRequests, usePendingRequests, useNotifications, useFeedbackUnreadCount } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 const NAV = [
@@ -22,6 +22,7 @@ const ADMIN_NAV = [
   { id: "people-admin", label: "人员管理", icon: I("users-round") },
   { id: "server-admin", label: "服务器管理", icon: I("server-cog") },
   { id: "announce", label: "通知公告", icon: I("megaphone") },
+  { id: "feedback-admin", label: "匿名意见", icon: I("message-circle") },
 ];
 
 // Avatar → popout menu (通知 / 设置), opens the corresponding panel dialog.
@@ -49,6 +50,8 @@ function AvatarMenu({ collapsed, me, onOpenPanel, onLogout, unread }: any) {
       {open && <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />}
       <button
         type="button"
+        aria-label={`${me.name} 用户菜单`}
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         style={{
           display: "flex", alignItems: "center", gap: 10, width: "100%",
@@ -131,7 +134,7 @@ function MobileTabBar({ active, onNavigate, admin, onOpenMore, badge }: any) {
     { id: "server", label: "服务器", icon: I("terminal") },
     { id: "api", label: "密钥", icon: I("key-round") },
   ];
-  const adminViews = ["approvals", "meeting-hub", "people-admin", "server-admin", "announce"];
+  const adminViews = ["approvals", "meeting-hub", "people-admin", "server-admin", "announce", "feedback-admin"];
   const moreActive = adminViews.includes(active);
   const cell = (key: string, on: boolean, icon: React.ReactNode, label: string, onClick: () => void, dot?: boolean) => (
     <button key={key} type="button" onClick={onClick} style={{
@@ -146,7 +149,7 @@ function MobileTabBar({ active, onNavigate, admin, onOpenMore, badge }: any) {
     </button>
   );
   return (
-    <nav style={{
+    <nav aria-label="主导航" style={{
       position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 60,
       display: "flex", alignItems: "stretch",
       background: "var(--surface)", borderTop: "1px solid var(--border-subtle)",
@@ -158,7 +161,7 @@ function MobileTabBar({ active, onNavigate, admin, onOpenMore, badge }: any) {
   );
 }
 
-function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOpenPanel, onLogout, me, reqCount, unread }: any) {
+function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOpenPanel, onLogout, me, reqCount, unread, fbUnread }: any) {
   if (!open) return null;
   const adminItems = [
     { id: "approvals", label: "审批中心", icon: I("clipboard-check"), badge: reqCount },
@@ -166,6 +169,7 @@ function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOp
     { id: "people-admin", label: "人员管理", icon: I("users-round") },
     { id: "server-admin", label: "服务器管理", icon: I("server-cog") },
     { id: "announce", label: "通知公告", icon: I("megaphone") },
+    { id: "feedback-admin", label: "匿名意见", icon: I("message-circle"), badge: fbUnread || undefined },
   ];
   const row = (icon: React.ReactNode, label: string, onClick: () => void, badge?: any, danger?: boolean) => (
     <button type="button" onClick={() => { onClick(); onClose(); }} style={{
@@ -227,14 +231,21 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
   const { data: notifFeed = [] } = useNotifications();
   const incomingSwaps = (mineReqs as any[]).filter((r) => r.incoming && r.kind === "swap" && r.status === "pending").length;
   const unreadNotif = (notifFeed as any[]).filter((n) => !n.read).length + incomingSwaps;
-  const badgeCount = reqCount + unreadNotif;
+  const badgeCount = unreadNotif;
   const [collapsed, setCollapsed] = React.useState(true);
   const isMobile = useIsMobile();
   const [moreOpen, setMoreOpen] = React.useState(false);
 
+  const { data: feedbackUnread } = useFeedbackUnreadCount(admin);
+  const fbCount: number = (feedbackUnread as any)?.count ?? 0;
+
   // 桌面侧栏审批项徽标用真实待审批数（与移动端一致），不再写死。
   const nav = admin
-    ? [...NAV, ...ADMIN_NAV.map((it) => (it.id === "approvals" ? { ...it, badge: reqCount || undefined } : it))]
+    ? [...NAV, ...ADMIN_NAV.map((it) => {
+        if (it.id === "approvals") return { ...it, badge: reqCount || undefined };
+        if (it.id === "feedback-admin") return { ...it, badge: fbCount || undefined };
+        return it;
+      })]
     : NAV;
 
   // ── 移动端布局：内容全宽 + 底部 Tab 栏 ──
@@ -246,7 +257,7 @@ export function AppShell({ active, onNavigate, links, children, admin, onToggleA
         <MobileMoreSheet
           open={moreOpen} onClose={() => setMoreOpen(false)} admin={admin}
           onNavigate={onNavigate} onToggleAdmin={onToggleAdmin} onOpenPanel={onOpenPanel} onLogout={onLogout}
-          me={me} reqCount={reqCount} unread={badgeCount}
+          me={me} reqCount={reqCount} unread={badgeCount} fbUnread={fbCount}
         />
       </div>
     );

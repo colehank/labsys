@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { usePendingRequests, useProcessedRequests, useAdvanceRequest, useIssueKey, useIssueCredential } from "../api/hooks";
+import { usePendingRequests, useProcessedRequests, useAdvanceRequest, useIssueKey, useIssueCredential, useServers } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 
 // Approvals — 管理员审批中心. 从 store 读取成员提交的申请，需管理员动作的项:
@@ -18,26 +18,30 @@ import { useIsMobile } from "../lib/useIsMobile";
     api: { type: "api", icon: "key-round", tone: "info", title: "API 密钥申请", detail: (r) => r.detail || r.reason || "", budget: (r) => { const m = (r.detail || "").match(/¥\s*(\d+)/); return m ? +m[1] : 100; } },
     ssh: { type: "ssh", icon: "server-cog", tone: "warning", title: "服务器账号申请", detail: (r) => r.detail || r.reason || "", wantUser: (r) => { const m = (r.detail || "").match(/用户名\s*([A-Za-z0-9_]+)/); return m ? m[1] : ""; } },
   };
-  const toCard = (r) => { const u = KIND_UI[r.kind]; return { id: r.id, reqId: r.id, type: u.type, who: r.from, icon: u.icon, tone: u.tone, title: u.title, detail: u.detail(r), budget: u.budget && u.budget(r), wantUser: u.wantUser && u.wantUser(r) }; };
+  const toCard = (r) => { const u = KIND_UI[r.kind]; if (!u) return null; return { id: r.id, reqId: r.id, type: u.type, who: r.from, icon: u.icon, tone: u.tone, title: u.title, detail: u.detail(r), budget: u.budget && u.budget(r), wantUser: u.wantUser && u.wantUser(r) }; };
 
   const randKey = () => "sk-cibol-" + Math.random().toString(36).slice(2, 10) + "…" + Math.random().toString(36).slice(2, 4);
   const randPw = () => Math.random().toString(36).slice(2, 11) + "A7";
 
   function ProvisionDialog({ item, busy, onClose, onConfirm }: any) {
     const isApi = item && item.type === "api";
+    const { data: servers = [] } = useServers();
     const [key, setKey] = React.useState("");
     const [user, setUser] = React.useState(item && item.wantUser || "");
-    const [host, setHost] = React.useState("lab-gpu-03.cibol.lab");
+    const [host, setHost] = React.useState("");
     const [pw, setPw] = React.useState("");
     const [budget, setBudget] = React.useState("");
     React.useEffect(() => {
       if (!item) return;
-      setKey(""); setPw(""); setUser(item.wantUser || ""); setHost("lab-gpu-03.cibol.lab");
-      setBudget(String(item.budget ?? 100));
+      setKey(""); setPw(""); setUser(item.wantUser || "");
+      setHost(""); setBudget(String(item.budget ?? 100));
     }, [item]);
+    React.useEffect(() => {
+      setHost((h) => h || (servers as any[])[0]?.name || "");
+    }, [servers]);
 
     if (!item) return null;
-    const ready = isApi ? key.trim().length > 4 : (user.trim() && pw.trim());
+    const ready = isApi ? key.trim().length > 4 : !!(user.trim() && pw.trim() && host.trim());
     // 把管理员填写的内容回传给审批处理（真实下发用）。
     const submit = () => onConfirm(item, isApi
       ? { upstream_key: key.trim(), budget: Number(budget) || 0 }
@@ -58,7 +62,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-body)" }}>API 密钥</span>
-                  <button onClick={() => setKey(randKey())} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 12.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <button type="button" onClick={() => setKey(randKey())} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 12.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
                     {I("sparkles", { size: 13 })}生成
                   </button>
                 </div>
@@ -72,12 +76,15 @@ import { useIsMobile } from "../lib/useIsMobile";
             </>
           ) : (
             <>
-              <Input label="主机" value={host} onChange={(e) => setHost(e.target.value)} iconLeft={I("server")} />
+              <NS.Select label="主机" value={host} onChange={(e) => setHost(e.target.value)} iconLeft={I("server")}
+                options={(servers as any[]).length
+                  ? (servers as any[]).map((s) => ({ value: s.name, label: s.ip ? `${s.name}  (${s.ip})` : s.name }))
+                  : [{ value: "", label: "暂无可用服务器" }]} />
               <Input label="账号" value={user} onChange={(e) => setUser(e.target.value)} iconLeft={I("user")} />
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-body)" }}>初始密码</span>
-                  <button onClick={() => setPw(randPw())} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 12.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <button type="button" onClick={() => setPw(randPw())} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 12.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
                     {I("sparkles", { size: 13 })}生成
                   </button>
                 </div>
@@ -94,7 +101,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     );
   }
 
-  function RejectDialog({ item, onClose, onConfirm }: any) {
+  function RejectDialog({ item, busy, onClose, onConfirm }: any) {
     const [reason, setReason] = React.useState("");
     React.useEffect(() => { if (item) setReason(""); }, [item]);
     if (!item) return null;
@@ -104,8 +111,8 @@ import { useIsMobile } from "../lib/useIsMobile";
         title="拒绝申请" subtitle={`${item.who} · ${item.title}`}
         icon={I("x")} tone="danger" width={460}
         footer={<>
-          <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button variant="danger" iconLeft={I("x")} onClick={() => onConfirm(item)}>确认拒绝</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>取消</Button>
+          <Button variant="danger" iconLeft={I("x")} disabled={busy} onClick={() => onConfirm(item, reason)}>{busy ? "处理中…" : "确认拒绝"}</Button>
         </>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "10px 12px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
@@ -118,7 +125,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               {QUICK.map((q) => {
                 const on = reason === q;
                 return (
-                  <button key={q} onClick={() => setReason(on ? "" : q)}
+                  <button type="button" key={q} onClick={() => setReason(on ? "" : q)}
                     style={{ height: 28, padding: "0 12px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 500, borderRadius: "var(--radius-pill)", border: `1px solid ${on ? "var(--danger)" : "var(--border-default)"}`, background: on ? "var(--danger-soft)" : "transparent", color: on ? "var(--danger-text)" : "var(--text-muted)", transition: "all var(--dur-fast) var(--ease-out)" }}>{q}</button>
                 );
               })}
@@ -131,15 +138,15 @@ import { useIsMobile } from "../lib/useIsMobile";
   }
 
   // 简单通过确认弹窗（无需填写内容）——用于请假等
-  function ApproveDialog({ item, onClose, onConfirm }: any) {
+  function ApproveDialog({ item, busy, onClose, onConfirm }: any) {
     if (!item) return null;
     return (
       <Dialog open={!!item} onClose={onClose}
         title="通过申请" subtitle={`${item.who} · ${item.title}`}
         icon={I("check")} tone="success" width={440}
         footer={<>
-          <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button variant="primary" iconLeft={I("check")} onClick={() => onConfirm(item)}>确认通过</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>取消</Button>
+          <Button variant="primary" iconLeft={I("check")} disabled={busy} onClick={() => onConfirm(item)}>{busy ? "处理中…" : "确认通过"}</Button>
         </>}>
         <div style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "10px 12px", background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
           {I("info", { size: 15, style: { color: "var(--text-muted)", marginTop: 1 } })}
@@ -210,12 +217,10 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [prov, setProv] = React.useState(null); // 填写式通过 (api/ssh)
     const [confirm, setConfirm] = React.useState(null); // 简单通过 (leave)
     const [reject, setReject] = React.useState(null);
-    const provBusy = issueKey.isPending || issueCred.isPending || advance.isPending;
+    const provBusy = issueKey.isPending || issueCred.isPending;
 
     const onAccept = (card) => { if (card.type === "leave") setConfirm(card); else setProv(card); };
-    const errMsg = (e) => e?.error?.detail || e?.detail || e?.message || "操作失败，请重试";
-    const approve = (card) => { advance.mutate({ id: card.reqId, next: "approved", note: "管理员已通过" }, { onSuccess: () => toast("已通过 · " + card.who + " 的" + card.title), onError: (e) => toast(errMsg(e)) }); };
-    const doReject = (card) => { advance.mutate({ id: card.reqId, next: "rejected", note: "管理员已驳回" }, { onSuccess: () => toast("已拒绝 · " + card.who + " 的" + card.title), onError: (e) => toast(errMsg(e)) }); };
+    const errMsg = (e: any) => e?.detail || e?.message || "操作失败，请重试";
 
     // 审批通过 api/ssh：先真实下发（写入申请人的密钥库 / 账密库），成功后再推进为「已通过」。
     // 下发失败则不推进——避免“标记通过却没真正下发”的假象。
@@ -236,15 +241,15 @@ import { useIsMobile } from "../lib/useIsMobile";
     };
 
     // 真实数据：待审批 = /requests/pending；历史 = /requests/processed。
-    const fmtWhen = (r) => { const h = r.history[r.history.length - 1]; const x = new Date(h.at); return `${x.getMonth() + 1}月${x.getDate()}日`; };
-    const pendingItems = pending.map(toCard);
-    const resolved = processed.map((r) => ({ q: toCard(r), state: r.status === "approved" ? "approve" : "reject", when: fmtWhen(r) }));
+    const fmtWhen = (r) => { const h = r.history?.[r.history.length - 1]; if (!h?.at) return ""; const x = new Date(h.at); return `${x.getMonth() + 1}月${x.getDate()}日`; };
+    const pendingItems = pending.map(toCard).filter(Boolean);
+    const resolved = processed.map((r) => { const q = toCard(r); return q ? { q, state: r.status === "approved" ? "approve" : "reject", when: fmtWhen(r) } : null; }).filter(Boolean);
     const historyItems = resolved;
 
     return (
       <div style={{ maxWidth: 880, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "20px 32px 48px" }}>
         <Tabs active={tab} onChange={setTab} style={{ marginBottom: 18 }}
-          tabs={[{ id: "pending", label: "待审批", badge: pendingItems.length || undefined }, { id: "history", label: "历史", badge: historyItems.length }]} />
+          tabs={[{ id: "pending", label: "待审批", badge: pendingItems.length || undefined }, { id: "history", label: "历史", badge: historyItems.length || undefined }]} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {tab === "pending" && (
@@ -261,20 +266,32 @@ import { useIsMobile } from "../lib/useIsMobile";
             : processedQ.isError ? <ScreenState error onRetry={() => processedQ.refetch()} />
             : historyItems.length === 0
               ? <EmptyState icon="history" text="暂无历史记录。" />
-              : historyItems.map((h, k) => (
-                  <ApprovalCard key={"h" + k} q={h.q} state={h.state} when={h.when} />
+              : historyItems.map((h: any) => (
+                  <ApprovalCard key={h.q.id} q={h.q} state={h.state} when={h.when} />
                 ))
           )}
         </div>
 
-        <ApproveDialog item={confirm} onClose={() => setConfirm(null)}
-          onConfirm={(item) => { approve(item); setConfirm(null); }} />
+        <ApproveDialog item={confirm} busy={advance.isPending} onClose={() => setConfirm(null)}
+          onConfirm={async (item) => {
+            try {
+              await advance.mutateAsync({ id: item.reqId, next: "approved", note: "管理员已通过" });
+              toast("已通过 · " + item.who + " 的" + item.title);
+              setConfirm(null);
+            } catch (e) { toast(errMsg(e), { tone: "error" }); }
+          }} />
 
         <ProvisionDialog item={prov} busy={provBusy} onClose={() => setProv(null)}
           onConfirm={async (item, payload) => { const ok = await provisionApprove(item, payload); if (ok) setProv(null); }} />
 
-        <RejectDialog item={reject} onClose={() => setReject(null)}
-          onConfirm={(item) => { doReject(item); setReject(null); }} />
+        <RejectDialog item={reject} busy={advance.isPending} onClose={() => setReject(null)}
+          onConfirm={async (item, note) => {
+            try {
+              await advance.mutateAsync({ id: item.reqId, next: "rejected", note: note || "管理员已驳回" });
+              toast("已拒绝 · " + item.who + " 的" + item.title);
+              setReject(null);
+            } catch (e) { toast(errMsg(e), { tone: "error" }); }
+          }} />
       </div>
     );
   }

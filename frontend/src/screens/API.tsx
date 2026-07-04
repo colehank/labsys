@@ -122,8 +122,8 @@ import { useIsMobile } from "../lib/useIsMobile";
               ))}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {keys.map((k, i) => (
-                <div key={i} style={{ padding: "13px 15px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
+              {keys.map((k) => (
+                <div key={k.name} style={{ padding: "13px 15px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>{k.name}</span>
                     <Badge tone="success" size="sm" dot>启用中</Badge>
@@ -134,7 +134,7 @@ import { useIsMobile } from "../lib/useIsMobile";
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ flex: 1, height: 6, background: "var(--surface-sunken)", borderRadius: 999, overflow: "hidden" }}>
-                      <div style={{ width: `${(k.used / k.budget) * 100}%`, height: "100%", background: "var(--accent)" }} />
+                      <div style={{ width: `${k.budget > 0 ? Math.min(100, (k.used / k.budget) * 100) : 0}%`, height: "100%", background: "var(--accent)" }} />
                     </div>
                     <span className="cibol-mono" style={{ fontSize: 12, color: "var(--text-faint)" }}>¥{k.used} / {k.budget}</span>
                   </div>

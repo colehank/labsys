@@ -54,7 +54,7 @@ async def webssh(ws: WebSocket, server_id: str, token: str = "") -> None:
 
     # ── 握手帧：账号+密码，或 use_saved=用已保存的加密凭据自动连 ──
     try:
-        raw = await asyncio.wait_for(ws.receive_text(), timeout=120)
+        raw = await asyncio.wait_for(ws.receive_text(), timeout=10)
         hs = json.loads(raw)
         cols = int(hs.get("cols", 80))
         rows = int(hs.get("rows", 24))

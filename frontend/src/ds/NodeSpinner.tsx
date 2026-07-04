@@ -7,8 +7,8 @@ import React from "react";
 export function NodeSpinner({ size = 28, label, style = {} }: any) {
   const dot = Math.max(4, size * 0.16);
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, ...style }}>
-      <span style={{ position: "relative", display: "inline-block", width: size, height: size }}>
+    <span role="status" aria-label={label || "加载中"} style={{ display: "inline-flex", alignItems: "center", gap: 10, ...style }}>
+      <span aria-hidden="true" style={{ position: "relative", display: "inline-block", width: size, height: size }}>
         {[0, 1, 2].map((i) => {
           const angle = (-50 + i * 50) * (Math.PI / 180);
           const r = size * 0.36;
@@ -24,7 +24,6 @@ export function NodeSpinner({ size = 28, label, style = {} }: any) {
         })}
       </span>
       {label && <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>{label}</span>}
-      <style>{`@keyframes cibol-node-pulse{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}`}</style>
     </span>
   );
 }

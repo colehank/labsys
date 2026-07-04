@@ -78,8 +78,8 @@ export function Sidebar({
           if (it.section) {
             const firstSection = i === 0;
             return collapsed
-              ? <div key={i} style={{ height: firstSection ? 6 : 14 }} />
-              : <div key={i} style={{ fontSize: "var(--text-2xs)", fontWeight: "var(--fw-semibold)", letterSpacing: "var(--ls-widest)", textTransform: "uppercase", color: "var(--text-faint)", padding: firstSection ? "4px 12px 6px" : "16px 12px 6px" }}>{it.section}</div>;
+              ? <div key={it.section} style={{ height: firstSection ? 6 : 14 }} />
+              : <div key={it.section} style={{ fontSize: "var(--text-2xs)", fontWeight: "var(--fw-semibold)", letterSpacing: "var(--ls-widest)", textTransform: "uppercase", color: "var(--text-faint)", padding: firstSection ? "4px 12px 6px" : "16px 12px 6px" }}>{it.section}</div>;
           }
           const on = it.id === active;
           return <SideItem key={it.id} item={it} active={on} collapsed={collapsed} onClick={() => onSelect && onSelect(it.id)} />;

@@ -13,7 +13,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 // Server — 服务器：真实 WebSSH 终端。
 // 设计：网页终端 = 用户本人的 SSH 会话，账号密码由用户自己输入，
 // 后端只做 PTY↔WebSocket 透传，绝不持有 root 凭据（见 webssh.py）。
-const { Button, Badge, Input, Dialog, Textarea } = NS;
+const { Button, Badge, Input, Dialog, Textarea, ScreenState, EmptyState } = NS;
 
 const NET = {
   intranet: { tone: "info", label: "内网" },
@@ -32,18 +32,61 @@ const connDot = (conn?: Conn) =>
 // 真实终端：xterm.js ↔ WebSocket(/ws/ssh/{id}) ↔ 后端 PTY。
 function Terminal({ host, creds, token, onState, active }: any) {
   const isMobile = useIsMobile();
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
   const wrapRef = React.useRef<HTMLDivElement | null>(null);
   const fitRef = React.useRef<FitAddon | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
   const termRef = React.useRef<XTerm | null>(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
 
-  // 从隐藏切回显示时重新 fit 并通知后端 PTY 新尺寸（隐藏期间容器为 0 尺寸）
+  const toggleFullscreen = React.useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  // 全屏状态同步 → 过渡完成后重新 fit
+  React.useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      setTimeout(() => {
+        try { fitRef.current?.fit(); } catch {}
+        const term = termRef.current, ws = wsRef.current;
+        if (term && ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+        }
+      }, 80);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  // 浏览器标签页重新激活时重新 fit + refocus，避免切回后终端失响
+  React.useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== "visible" || !active) return;
+      setTimeout(() => {
+        try { fitRef.current?.fit(); } catch {}
+        const term = termRef.current, ws = wsRef.current;
+        if (term && ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+        }
+        termRef.current?.focus();
+      }, 50);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [active]);
+
+  // 服务器切换：从隐藏切回显示时重新 fit
   React.useEffect(() => {
     if (!active) return;
     const t = setTimeout(() => {
-      try { fitRef.current?.fit(); } catch { /* 尚未布局 */ }
+      try { fitRef.current?.fit(); } catch {}
       const term = termRef.current, ws = wsRef.current;
-      if (term && ws && ws.readyState === WebSocket.OPEN) {
+      if (term && ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
       }
       termRef.current?.focus();
@@ -54,9 +97,10 @@ function Terminal({ host, creds, token, onState, active }: any) {
   React.useEffect(() => {
     if (!wrapRef.current || !creds) return;
     const term = new XTerm({
-      fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
+      fontFamily: '"JetBrainsMono Nerd Font Mono", "JetBrainsMono Nerd Font", "Symbols Nerd Font Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
       fontSize: isMobile ? 12 : 13.5,
       cursorBlink: true,
+      scrollback: 5000,
       theme: {
         background: "#1a1b1e",
         foreground: "#e6e6e6",
@@ -68,7 +112,7 @@ function Terminal({ host, creds, token, onState, active }: any) {
     fitRef.current = fit;
     term.loadAddon(fit);
     term.open(wrapRef.current);
-    try { fit.fit(); } catch { /* container 尚未布局 */ }
+    try { fit.fit(); } catch {}
 
     onState?.("connecting");
     const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -76,7 +120,6 @@ function Terminal({ host, creds, token, onState, active }: any) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      // 首帧握手：useSaved=用后端已保存的加密凭据自动连；否则送账号密码(remember 则保存)
       ws.send(JSON.stringify(
         creds.useSaved
           ? { use_saved: true, cred_id: creds.credId, cols: term.cols, rows: term.rows }
@@ -91,53 +134,82 @@ function Terminal({ host, creds, token, onState, active }: any) {
     };
     ws.onclose = () => {
       term.write("\r\n\x1b[2m[连接已关闭]\x1b[0m\r\n");
-      onState?.(connectedOnce ? "closed" : "failed");  // 从未连上就关 = 连不上（黄）
+      onState?.(connectedOnce ? "closed" : "failed");
     };
     ws.onerror = () => onState?.("failed");
 
-    // 键盘输入透传
     const onData = term.onData((d) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(d);
     });
 
-    // 窗口大小变化 → fit + 通知后端
     const sendResize = () => {
-      try { fit.fit(); } catch { /* noop */ }
+      try { fit.fit(); } catch {}
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
       }
     };
     const ro = new ResizeObserver(() => sendResize());
     ro.observe(wrapRef.current);
-    window.addEventListener("resize", sendResize);
 
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", sendResize);
       onData.dispose();
       ws.close();
       term.dispose();
     };
-    // host.id/creds 变更（重连）时整体重挂
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [host.id, creds]);
 
+  const TITLE_H = 40;
+  const termH: string | number = isFullscreen ? `calc(100vh - ${TITLE_H}px)` : (isMobile ? 320 : 420);
+
   return (
-    <div style={{
-      background: "#1a1b1e", borderRadius: "var(--radius-lg)", overflow: "hidden",
-      border: "1px solid #000", boxShadow: "var(--shadow-lg)",
+    // 不用 overflow:hidden，避免圆角裁剪终端字符（内外背景色相同，视觉无差异）
+    <div ref={containerRef} style={{
+      background: "#1a1b1e",
+      border: isFullscreen ? "none" : "1px solid rgba(0,0,0,0.65)",
+      borderRadius: isFullscreen ? 0 : "var(--radius-lg)",
+      boxShadow: isFullscreen ? "none" : "0 4px 28px rgba(0,0,0,0.45)",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "rgba(0,0,0,0.25)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <span style={{ display: "flex", gap: 7 }}>
-          <span style={{ width: 11, height: 11, borderRadius: "50%", background: "#E06C57" }} />
-          <span style={{ width: 11, height: 11, borderRadius: "50%", background: "#E0B04A" }} />
-          <span style={{ width: 11, height: 11, borderRadius: "50%", background: "#7FB069" }} />
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        height: TITLE_H, padding: "0 14px",
+        background: "rgba(0,0,0,0.28)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderTopLeftRadius: isFullscreen ? 0 : "var(--radius-lg)",
+        borderTopRightRadius: isFullscreen ? 0 : "var(--radius-lg)",
+      }}>
+        <span className="cibol-mono" style={{
+          fontSize: 12.5, color: "rgba(230,230,230,0.5)",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {creds?.username}@{host.name} · {host.ip}:{host.ssh_port}
         </span>
-        <span className="cibol-mono" style={{ fontSize: 12.5, color: "rgba(230,230,230,0.6)", marginLeft: 6 }}>
-          ssh {creds?.username}@{host.name} ({host.ip}:{host.ssh_port})
-        </span>
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "退出全屏 (Esc)" : "全屏"}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.color = "rgba(230,230,230,0.85)";
+            (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.color = "rgba(230,230,230,0.38)";
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+          }}
+          style={{
+            flexShrink: 0, marginLeft: 10,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: 28, height: 28, border: "none",
+            background: "transparent", borderRadius: "var(--radius-sm)",
+            cursor: "pointer", color: "rgba(230,230,230,0.38)",
+            transition: "color 0.15s, background 0.15s",
+          }}
+        >
+          <Icon name={isFullscreen ? "minimize-2" : "maximize-2"} style={{ width: 14, height: 14 }} />
+        </button>
       </div>
-      <div ref={wrapRef} style={{ padding: "10px 12px", height: isMobile ? 320 : 420 }} />
+      <div ref={wrapRef} style={{ padding: "10px 12px", height: termH }} />
     </div>
   );
 }
@@ -182,7 +254,6 @@ function HostCard({ hh, on, conn, onSelect, onReconnect }: any) {
             {NET[hh.net] && <Badge tone={NET[hh.net].tone} size="sm">{NET[hh.net].label}</Badge>}
           </div>
         </div>
-        <style>{`@keyframes cibol-spin{to{transform:rotate(360deg)}}`}</style>
       </div>
       {!disabled && (
         <button type="button" onClick={reconnect} title="重连" aria-label={`重连 ${hh.name}`}
@@ -212,9 +283,10 @@ function HostCard({ hh, on, conn, onSelect, onReconnect }: any) {
   );
 }
 
-function Server() {
+function Server({ active: pageActive = true }: { active?: boolean }) {
   const isMobile = useIsMobile();
-  const { data: HOSTS = [] } = useServers();
+  const serversQ = useServers();
+  const HOSTS = serversQ.data ?? [];
   const token = useAccessToken();
   const createReq = useCreateRequest();
 
@@ -267,7 +339,7 @@ function Server() {
     if (host && activeCred && !sessions[host.id] && !suppressAuto.current.has(host.id)) {
       startSession(host.id, { username: activeCred.username, password: "", useSaved: true, credId: activeCred.id });
     }
-  }, [host?.id, activeCred?.id, sessions]);
+  }, [host?.id, activeCred?.id, !!sessions[host?.id]]);
 
   // 勾「记住」连上后刷新账密列表（新账号出现在选择器/设置页 → 与设置页同步）
   React.useEffect(() => {
@@ -276,7 +348,16 @@ function Server() {
     }
   }, [host?.id, connByHost]);
 
-  if (!HOSTS.length || !host) return null;
+  // 加载中 / 失败 / 真空三态 —— 不再以 return null 渲染空白页。
+  if (serversQ.isLoading) return <ScreenState loading />;
+  if (serversQ.isError) return <ScreenState error onRetry={() => serversQ.refetch()} />;
+  if (!HOSTS.length || !host) {
+    return (
+      <div style={{ maxWidth: 1060, margin: "0 auto", padding: isMobile ? "16px 14px 32px" : "24px 32px 48px" }}>
+        <EmptyState title="暂无服务器" description="管理员还没有登记任何服务器，登记后即可在此连接。" />
+      </div>
+    );
+  }
 
   const doConnect = () => {
     if (!username.trim()) { toast("请填写账号", { tone: "error" }); return; }
@@ -357,7 +438,7 @@ function Server() {
             const sess = sessions[h.id];
             return (
               <div key={h.id} style={{ display: h.id === host.id ? "block" : "none" }}>
-                <Terminal key={`${h.id}-${sess.nonce}`} host={h} active={h.id === host.id}
+                <Terminal key={`${h.id}-${sess.nonce}`} host={h} active={h.id === host.id && pageActive}
                   creds={sess} token={token}
                   onState={(s: Conn) => setConnByHost((c) => ({ ...c, [h.id]: s }))} />
               </div>
@@ -394,7 +475,7 @@ function Server() {
               <span>记住账号密码（加密保存，下次自动连接，跨设备）</span>
             </label>
           )}
-          <button onClick={() => { setCredsOpen(false); setReqOpen(true); }} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 13, cursor: "pointer", textAlign: "center" }}>
+          <button type="button" onClick={() => { setCredsOpen(false); setReqOpen(true); }} style={{ border: "none", background: "none", color: "var(--accent-text)", fontSize: 13, cursor: "pointer", textAlign: "center" }}>
             还没有服务器账号？申请开通 →
           </button>
         </div>

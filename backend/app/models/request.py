@@ -31,6 +31,9 @@ class Request(UUIDMixin, TimestampMixin, Base):
     requester_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     # 对调对象（swap 专用）
     target_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    # 对调涉及的两场组会（swap 专用）—— 接受后据此真正互换报告人。旧请求可能为空，则降级仅改状态。
+    from_meeting_id: Mapped[str | None] = mapped_column(ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True)
+    to_meeting_id: Mapped[str | None] = mapped_column(ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True)
 
     from_date: Mapped[str] = mapped_column(String(32), default="")   # 展示用日期标签
     to_date: Mapped[str] = mapped_column(String(32), default="")

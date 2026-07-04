@@ -68,7 +68,7 @@ import type { Me } from "../auth";
       toast("正在预约腾讯会议…门户审批约需 1–3 分钟，请保持页面打开", { tone: "info" });
       bookMeeting.mutate(id, {
         onSuccess: () => toast("已预约腾讯会议", { tone: "success" }),
-        onError: (e: any) => toast(`预约失败：${e?.message || "请稍后重试"}`, { tone: "error" }),
+        onError: (e: any) => toast(`预约失败：${e?.detail || e?.message || "请稍后重试"}`, { tone: "error" }),
       });
     };
 
@@ -78,7 +78,8 @@ import type { Me } from "../auth";
     const dateOf = (mt: any) => {
       if (mt.y != null && mt.mo != null && mt.day != null) return new Date(mt.y, mt.mo, mt.day);
       const [mm, dd] = (mt.mdLabel || "").split("/").map(Number);
-      return new Date(mm >= 6 ? 2026 : 2027, (mm || 1) - 1, dd || 1);
+      const now = new Date(), yr = now.getFullYear();
+      return new Date(mm < (now.getMonth() + 1) ? yr + 1 : yr, (mm || 1) - 1, dd || 1);
     };
     const dayDiff = (mt: any) => Math.round((+dateOf(mt) - +TODAY) / 86400000);
     const isPast = (mt: any) => dayDiff(mt) < 0;
@@ -101,7 +102,12 @@ import type { Me } from "../auth";
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [meetings]);
     const [selId, setSelId] = React.useState<string | null>(null);
-    React.useEffect(() => { if (!selId && MEETINGS[0]) setSelId(MEETINGS[0].id); }, [MEETINGS]);
+    React.useEffect(() => {
+      if (!MEETINGS.length) return;
+      if (!selId || !MEETINGS.find(x => x.id === selId)) {
+        setSelId(MEETINGS[0].id);
+      }
+    }, [MEETINGS]);
     const sel = MEETINGS.find((x) => x.id === selId) || MEETINGS[0] || null;
 
     if (cfgQ.isLoading || meetingsQ.isLoading) return <ScreenState loading />;
@@ -124,7 +130,7 @@ import type { Me } from "../auth";
                   const on = mt.id === selId;
                   const past = isPast(mt) && !on;   // 已开过且非当前选中 → 灰显
                   return (
-                    <button key={mt.id} onClick={() => setSelId(mt.id)}
+                    <button type="button" key={mt.id} onClick={() => setSelId(mt.id)}
                       style={{
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
                         width: 64, height: 60, padding: 0, cursor: "pointer", flexShrink: 0,
@@ -142,7 +148,7 @@ import type { Me } from "../auth";
               </div>
 
               {sel && (() => {
-                const myReq = (myRequests as any[]).find((r) => r.fromDate === sel.dateLabel) || null;
+                const myReq = (myRequests as any[]).find((r) => r.fromMeetingId === sel.id || r.fromDate === sel.dateLabel) || null;
                 const reqActive = myReq && ["pending", "submitted"].includes(myReq.status);
                 const iPresent = sel.presenters.some((p) => p.name === me.name);
                 return (
@@ -154,7 +160,7 @@ import type { Me } from "../auth";
                       {sel.online && sel.online.url
                         ? <>
                             <IconButton size="sm" variant="solid" icon={I("video")} label="在线会议" onClick={() => window.open(sel.online.url, "_blank")} />
-                            {admin && <Button size="sm" variant="ghost" iconLeft={I("rotate-cw")} loading={bookMeeting.isPending} onClick={() => doBook(sel.id)}>{bookMeeting.isPending ? "预约中…" : "重新预约"}</Button>}
+                            {admin && <Button size="sm" variant="ghost" iconLeft={I("rotate-cw")} loading={bookMeeting.isPending} disabled={bookMeeting.isPending} onClick={() => doBook(sel.id)}>{bookMeeting.isPending ? "预约中…" : "重新预约"}</Button>}
                           </>
                         : admin
                           ? <Button size="sm" variant="primary" iconLeft={I("video")} loading={bookMeeting.isPending}
@@ -162,12 +168,13 @@ import type { Me } from "../auth";
                           : <Badge tone="warning" size="sm" dot>在线会议待设置</Badge>}
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--text-muted)", fontSize: 13, marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--text-muted)", fontSize: 13, marginBottom: 14, flexWrap: "wrap" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("clock", { size: 14 })}{sel.time || md.time}</span>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("map-pin", { size: 14 })}{sel.place || md.place}</span>
+                    {sel.host && <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{I("mic", { size: 14 })}主持 {sel.host}</span>}
                   </div>
-                  {sel.presenters.map((p, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 0" }}>
+                  {sel.presenters.map((p) => (
+                    <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 0" }}>
                       <Avatar name={p.name} size="sm" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</div>
@@ -200,17 +207,13 @@ import type { Me } from "../auth";
   }
 
   function MyReportsList({ meetings, me }: { meetings: Meeting[]; me: Me }) {
-    const KEY = "cibol_my_topics";
-    // 从排期表派生：我作为报告人的场次（与「组会日历」同源，不再写死）。
+    // 从排期表派生：我作为报告人的场次，topic 直接取后端字段（单一数据源）。
     const REPORTS = (meetings || [])
       .filter((s) => s.presenters.some((p) => p.name === me.name))
-      .slice(0, 3)
-      .map((s) => ({ id: s.id, date: s.dateLabel, kind: s.type }));
-    const [topics, setTopics] = React.useState(() => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } });
-    const [editId, setEditId] = React.useState(null);
-    const [draft, setDraft] = React.useState("");
-    const begin = (id) => { setDraft(topics[id] || ""); setEditId(id); };
-    const save = (id) => { const next = { ...topics, [id]: draft }; setTopics(next); try { localStorage.setItem(KEY, JSON.stringify(next)); } catch (e) {} toast("已保存 · 报告主题"); setEditId(null); };
+      .map((s) => {
+        const presenter = s.presenters.find((p) => p.name === me.name);
+        return { id: s.id, date: s.dateLabel, kind: s.type, topic: presenter?.topic || "" };
+      });
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {REPORTS.length === 0 && (
@@ -224,42 +227,46 @@ import type { Me } from "../auth";
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)" }}>{r.date}</div>
-                <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{topics[r.id] ? "已设置主题" : "未设置主题"}</div>
+                <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{r.topic ? "已设置主题" : "主题待定"}</div>
               </div>
             </div>
-            {editId === r.id ? (
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <div style={{ flex: 1 }}><Input size="sm" placeholder="例如：基于扩散模型的神经表征解码" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus /></div>
-                <Button size="sm" variant="primary" iconLeft={I("check")} onClick={() => save(r.id)}>保存</Button>
-              </div>
-            ) : (
-              <button onClick={() => begin(r.id)} style={{ display: "flex", alignItems: "center", gap: 8, border: "1px dashed var(--border-default)", background: "none", cursor: "pointer", padding: "8px 10px", borderRadius: "var(--radius-sm)", textAlign: "left" }}>
-                <span style={{ flex: 1, fontSize: 13, color: topics[r.id] ? "var(--text-body)" : "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{topics[r.id] || "未设置主题 · 点击填写"}</span>
-                {I("pencil", { size: 14, style: { color: "var(--text-faint)" } })}
-              </button>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)" }}>
+              <span style={{ flex: 1, fontSize: 13, color: r.topic ? "var(--text-body)" : "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {r.topic || "未设置主题 · 由管理员在「组会管理」中设置"}
+              </span>
+              {r.topic && I("check", { size: 14, style: { color: "var(--success)", flexShrink: 0 } })}
+            </div>
           </div>
         ))}
       </div>
     );
   }
 
-  function ReportRating({ index, presenter, candidates, onSubmit }: any) {
+  function ReportRating({ index, presenter, candidates, onSubmit, isPending }: any) {
     const isMobile = useIsMobile();
     const [att, setAtt] = React.useState(0);
     const [pol, setPol] = React.useState(0);
+    const [log, setLog] = React.useState(0);
     const [confirm, setConfirm] = React.useState(false);
     // discussion Top5 for THIS report — ordered slots, pick from candidates
     const [top5, setTop5] = React.useState([null, null, null, null, null]);
     const [picking, setPicking] = React.useState(null); // slot index being filled
     const chosen = top5.filter(Boolean);
     const setSlot = (i, name) => setTop5((t) => t.map((v, j) => (j === i ? name : v)));
-    const clearSlot = (i) => setTop5((t) => t.map((v, j) => (j === i ? null : v)));
+    // clearSlot：移除该位置后将后续元素前移，保持列表无空洞
+    const clearSlot = (i) => setTop5((t) => {
+      const filled = t.filter(Boolean);
+      filled.splice(i, 1);
+      return [...filled, ...Array(5 - filled.length).fill(null)];
+    });
     const move = (i, dir) => setTop5((t) => {
       const j = i + dir; if (j < 0 || j >= t.length) return t;
       const a = [...t]; [a[i], a[j]] = [a[j], a[i]]; return a;
     });
-    const done = att > 0 && pol > 0 && chosen.length === 5;
+    // 提交门槛只要求三项报告评分完成；讨论 Top 5 可留空、可不选满（反馈 #3/#11：
+    // 原先强制选满 min(5, 候选数)，候选不足或不想选满时按钮永久置灰 → 「无法提交打分结果」）。
+    const missing = [att > 0 ? null : "报告态度", pol > 0 ? null : "制作精良", log > 0 ? null : "逻辑清晰"].filter(Boolean);
+    const done = missing.length === 0;
 
     return (
       <Card padding="none" style={{ overflow: "visible" }}>
@@ -291,6 +298,11 @@ import type { Me } from "../auth";
                 <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>幻灯片与材料的完成度</span>
                 <ScoreDots value={pol} onChange={setPol} />
               </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10, padding: "16px 0", borderTop: "1px solid var(--border-subtle)" }}>
+                <span style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-strong)" }}>逻辑清晰</span>
+                <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>报告条理是否清楚、论证是否连贯</span>
+                <ScoreDots value={log} onChange={setLog} />
+              </div>
             </div>
           </div>
 
@@ -302,29 +314,29 @@ import type { Me } from "../auth";
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {top5.map((name, i) => (
-                <div key={i} style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", background: name ? "var(--surface)" : "transparent" }}>
+                <div key={name ?? `slot-${i}`} style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", background: name ? "var(--surface)" : "transparent" }}>
                   <span className="cibol-numeral" style={{ fontSize: 15, color: name ? "var(--accent-text)" : "var(--text-faint)", width: 14, flexShrink: 0 }}>{i + 1}</span>
                   {name ? (
                     <>
-                      <button onClick={() => setPicking(picking === i ? null : i)}
+                      <button type="button" onClick={() => setPicking(picking === i ? null : i)}
                         style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 9, border: "none", background: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                         <Avatar name={name} size="xs" />
                         <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
                       </button>
                       <div style={{ display: "flex", flexDirection: "column", gap: 0, flexShrink: 0 }}>
-                        <button onClick={() => move(i, -1)} disabled={i === 0} style={{ border: "none", background: "none", cursor: i === 0 ? "default" : "pointer", color: i === 0 ? "var(--border-default)" : "var(--text-faint)", padding: 0, lineHeight: 0 }}>
+                        <button type="button" onClick={() => move(i, -1)} disabled={i === 0} style={{ border: "none", background: "none", cursor: i === 0 ? "default" : "pointer", color: i === 0 ? "var(--border-default)" : "var(--text-faint)", padding: 0, lineHeight: 0 }}>
                           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
                         </button>
-                        <button onClick={() => move(i, 1)} disabled={i === chosen.length - 1 || !top5[i + 1]} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 0, lineHeight: 0 }}>
+                        <button type="button" onClick={() => move(i, 1)} disabled={i >= chosen.length - 1} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 0, lineHeight: 0 }}>
                           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
                         </button>
                       </div>
-                      <button onClick={() => clearSlot(i)} aria-label="移除" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 0, lineHeight: 0, flexShrink: 0 }}>
+                      <button type="button" onClick={() => clearSlot(i)} aria-label="移除" style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text-faint)", padding: 0, lineHeight: 0, flexShrink: 0 }}>
                         {I("x", { size: 14 })}
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => setPicking(picking === i ? null : i)}
+                    <button type="button" onClick={() => setPicking(picking === i ? null : i)}
                       style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, border: "none", background: "none", cursor: "pointer", padding: "2px 0", textAlign: "left", color: "var(--text-faint)", fontSize: 13 }}>
                       {I("plus", { size: 14 })}选择第 {i + 1} 名
                     </button>
@@ -332,7 +344,7 @@ import type { Me } from "../auth";
                   {picking === i && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 30, maxHeight: 184, overflowY: "auto", background: "var(--surface-raised)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-lg)", padding: 5 }}>
                       {candidates.filter((c) => !chosen.includes(c) || c === name).map((c) => (
-                        <button key={c} onClick={() => { setSlot(i, c); setPicking(null); }}
+                        <button type="button" key={c} onClick={() => { setSlot(i, c); setPicking(null); }}
                           style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "7px 9px", border: "none", background: c === name ? "var(--accent-soft)" : "transparent", cursor: "pointer", textAlign: "left", borderRadius: "var(--radius-sm)", fontFamily: "var(--font-sans)", fontSize: 13.5, color: c === name ? "var(--accent-text)" : "var(--text-body)" }}
                           onMouseEnter={(e) => { if (c !== name) e.currentTarget.style.background = "var(--surface-hover)"; }}
                           onMouseLeave={(e) => { if (c !== name) e.currentTarget.style.background = "transparent"; }}>
@@ -350,7 +362,7 @@ import type { Me } from "../auth";
         {/* footer — per-report submit */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderTop: "1px solid var(--border-subtle)" }}>
           <span style={{ flex: 1, fontSize: 12.5, color: "var(--text-faint)" }}>
-            {done ? "评分匿名提交，报告人看不到具体打分人。" : "完成两项评分并选满讨论 Top 5 后可提交。"}
+            {done ? "三项评分已完成，讨论 Top 5 可选填。评分匿名提交，报告人看不到具体打分人。" : `还需完成：${missing.join("、")}。讨论 Top 5 可留空，不必选满。`}
           </span>
           <Button size="sm" variant="primary" iconLeft={I("check")} disabled={!done} onClick={() => setConfirm(true)}>提交本报告评分</Button>
         </div>
@@ -360,11 +372,12 @@ import type { Me } from "../auth";
           icon={I("check")} tone="accent" width={420}
           footer={<>
             <Button variant="ghost" onClick={() => setConfirm(false)}>再看看</Button>
-            <Button variant="primary" onClick={() => { setConfirm(false); onSubmit({ attitude: att, polish: pol, top5: chosen }); }}>确认提交</Button>
+            <Button variant="primary" disabled={isPending} onClick={() => { setConfirm(false); onSubmit({ attitude: att, polish: pol, logic: log, top5: chosen }); }}>确认提交</Button>
           </>}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13.5, color: "var(--text-body)" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>报告态度</span><ScoreDots value={att} readOnly showValue /></div>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>制作精良</span><ScoreDots value={pol} readOnly showValue /></div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>逻辑清晰</span><ScoreDots value={log} readOnly showValue /></div>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: "var(--text-muted)" }}>讨论 Top 5</span><span style={{ fontWeight: 600 }}>已选 {chosen.length} 人</span></div>
           </div>
         </Dialog>
@@ -373,27 +386,71 @@ import type { Me } from "../auth";
   }
 
   function Rating() {
-    const { data: reports = [] } = useEvalReports();
-    const { data: ev } = useEvalCompute();
+    const reportsQ = useEvalReports();
+    const reports = reportsQ.data ?? [];
+    const evQ = useEvalCompute();
+    const ev = evQ.data;
+    const { data: meetingsData = [] } = useMeetings();
     const submitRating = useSubmitRating();
-    const [submitted, setSubmitted] = React.useState<number[]>([]);
-    // 评分对象 = 评选期内最近一场组会。
-    const meeting = reports.length ? reports[reports.length - 1] : null;
-    const presenters = (meeting?.presenters || []).map((name) => ({ name, topic: "" }));
+    const [submitted, setSubmitted] = React.useState<Set<string>>(new Set());
+    // 数据加载完成后，用后端返回的 rated_by 初始化 submitted，使刷新后已评状态持久化。
+    React.useEffect(() => {
+      if (!reportsQ.data) return;
+      const preloaded = new Set<string>();
+      for (const r of reportsQ.data) {
+        for (const presenter of (r.rated_by ?? [])) {
+          preloaded.add(`${r.key}__${presenter}`);
+        }
+      }
+      setSubmitted(preloaded);
+    }, [reportsQ.data]);
+    // 评分对象 = 今天或最近已发生、且有报告人的那场（排除团建/工作坊/取消等空场）；
+    // 都还没发生则取最近一场即将到来的，避免误把评选期最后一场当「今日组会」。
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    // 仅「参与评分」且有报告人的场进入评分入口；工作坊/团建/仅考勤（scored=false）不评分（#8）。
+    const ratable = reports.filter((r: any) => (r.presenters || []).length > 0 && r.scored !== false);
+    const ts = (r: any) => new Date(r.y, r.mo, r.day).getTime();
+    const past = ratable.filter((r: any) => ts(r) <= today.getTime());
+    const meeting: any = past.length
+      ? past[past.length - 1]
+      : (ratable.length ? ratable[0] : null);
+    const isToday = !!meeting && ts(meeting) === today.getTime();
+    // #2：今天若有组会但不是当前评分场（非评分活动 / 尚无报告人），说明「为什么不是今天」，
+    // 避免首页「今天有组会」与评分页「最近组会」不一致造成困惑。
+    const todayM = (meetingsData as Meeting[]).find((m) => m.y === today.getFullYear() && m.mo === today.getMonth() && m.day === today.getDate());
+    const todayHint = todayM && todayM.id !== meeting?.key
+      ? `今天的「${todayM.type}」${todayM.scored === false ? "不参与评分" : "暂无报告人或未开放评分"}，先为最近一场评分。`
+      : "";
+    const mtg = (meetingsData as Meeting[]).find((m) => m.id === meeting?.key);
+    const presenters = (meeting?.presenters || []).map((name: string) => ({
+      name,
+      topic: mtg?.presenters?.find((p) => p.name === name)?.topic || "",
+    }));
     const allNames = (ev?.rows || []).map((r) => r.name);
-    const pending = presenters.map((p, i) => ({ p, i })).filter(({ i }) => !submitted.includes(i));
-    if (!meeting) return null;
+    // 过滤掉本场请假/缺席成员：他们未参与讨论，不应出现在 Top5 候选中
+    const meetingAtt = (meeting?.attendance || {}) as Record<string, string>;
+    const presentNames = allNames.filter((n) => !meetingAtt[n] || meetingAtt[n] === "present");
+    const pending = presenters.map((p, i) => ({ p, i })).filter(({ p }) => !submitted.has(`${meeting?.key}__${p.name}`));
+    if (reportsQ.isLoading || evQ.isLoading) return <ScreenState loading />;
+    if (reportsQ.isError) return <ScreenState error onRetry={() => reportsQ.refetch()} />;
+    if (!meeting) {
+      return <EmptyState title="暂无可评分的组会" description="评选期内还没有已结束的组会，组会结束后即可在此为报告人打分。" />;
+    }
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 16px", background: "var(--accent-soft)", border: "1px solid var(--accent-soft-bd)", borderRadius: "var(--radius-md)" }}>
-          {I("clock", { size: 16, style: { color: "var(--accent-text)" } })}
-          <span style={{ fontSize: 13.5, color: "var(--accent-text)" }}>今日组会·{meeting.dateLabel} · 评分 <strong>6 小时后关闭</strong></span>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 16px", background: "var(--accent-soft)", border: "1px solid var(--accent-soft-bd)", borderRadius: "var(--radius-md)" }}>
+          {I("clock", { size: 16, style: { color: "var(--accent-text)", marginTop: 1, flexShrink: 0 } })}
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 13.5, color: "var(--accent-text)" }}>{isToday ? "今日组会" : "最近组会"}·{meeting.dateLabel} · 为本场报告人评分</span>
+            {todayHint && <span style={{ fontSize: 12, color: "var(--accent-text)", opacity: 0.8 }}>{todayHint}</span>}
+          </div>
         </div>
 
         {pending.map(({ p, i }) => (
-          <ReportRating key={i} index={i} presenter={p}
-            candidates={allNames.filter((n) => n !== p.name)}
-            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => [...s, i]); } }); }} />
+          <ReportRating key={p.name} index={i} presenter={p}
+            candidates={presentNames.filter((n) => n !== p.name)}
+            isPending={submitRating.isPending}
+            onSubmit={(vals) => { submitRating.mutate({ key: meeting.key, presenter: p.name, attitude: vals.attitude, polish: vals.polish, logic: vals.logic, top5: vals.top5 }, { onSuccess: () => { toast("已提交 · 评分已计入表现统计"); setSubmitted((s) => new Set([...s, `${meeting.key}__${p.name}`])); }, onError: (e: any) => toast(`提交失败：${e?.detail || e?.message || "请稍后重试"}`, { tone: "error" }) }); }} />
         ))}
 
         {pending.length === 0 && (
@@ -425,7 +482,7 @@ import type { Me } from "../auth";
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {presets.map(([v, t]) => (
-            <button key={v} onClick={() => onPreset(v)}
+            <button type="button" key={v} onClick={() => onPreset(v)}
               style={{
                 height: 30, padding: "0 12px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13,
                 fontWeight: 500, borderRadius: "var(--radius-pill)",
@@ -445,7 +502,7 @@ import type { Me } from "../auth";
     return (
       <div style={{ display: "inline-flex", padding: 3, gap: 2, background: "var(--surface-sunken)", borderRadius: "var(--radius-md)" }}>
         {opts.map((o) => (
-          <button key={o.value} onClick={() => onChange(o.value)}
+          <button type="button" key={o.value} onClick={() => onChange(o.value)}
             style={{ padding: "6px 14px", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, borderRadius: "var(--radius-sm)",
               background: value === o.value ? "var(--surface-raised)" : "transparent",
               color: value === o.value ? "var(--accent-text)" : "var(--text-muted)",
@@ -539,19 +596,21 @@ import type { Me } from "../auth";
     const isMobile = useIsMobile();
     const { data: ev } = useEvalCompute();
     const [open, setOpen] = React.useState(false);
-    const row = ev?.rows.find((r) => r.name === me.name) || ev?.rows[0];
+    // 仅取「我」本人的行；找不到（未纳入本期评分名册）则不展示，绝不回退到他人数据冒充。
+    const row = ev?.rows.find((r) => r.name === me.name);
     if (!ev || !row) return null;
     const w: any = ev.weights;
-    const wSum = (w.attitude + w.polish + w.attendance + w.discussion) || 1;
+    const wSum = (w.attitude + w.polish + (w.logic || 0) + w.attendance + w.discussion) || 1;
     const subs = [
       { label: "汇报态度", raw: row.attitude.toFixed(1), unit: "/ 5", norm: row.nAttitude, weight: w.attitude, color: "var(--terracotta-500)" },
       { label: "汇报精良", raw: row.polish.toFixed(1), unit: "/ 5", norm: row.nPolish, weight: w.polish, color: "var(--amber-500)" },
+      { label: "逻辑清晰", raw: (row.logic ?? 0).toFixed(1), unit: "/ 5", norm: row.nLogic, weight: w.logic || 0, color: "var(--terracotta-400)" },
       { label: "讨论", raw: String(row.discuss), unit: "次", norm: row.nDisc, weight: w.discussion, color: "var(--slate-500)" },
       { label: "出勤", raw: row.attRate + "%", unit: "", norm: row.nAtt, weight: w.attendance, color: "var(--sage-500)" },
     ];
     return (
       <div style={{ padding: "16px 20px" }}>
-        <button onClick={() => setOpen((o) => !o)}
+        <button type="button" onClick={() => setOpen((o) => !o)}
           style={{ width: "100%", display: "flex", alignItems: "stretch", gap: 10, padding: 0, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}>
           {/* 总分 */}
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", width: 96, padding: "10px 0", background: "var(--accent-soft)", borderRadius: "var(--radius-md)" }}>
@@ -598,17 +657,39 @@ import type { Me } from "../auth";
 
   function Rank({ me }: { me: Me }) {
     const isMobile = useIsMobile();
-    const PRESETS: Record<string, string[]> = {
-      month: ["2026-05-12", "2026-06-12"],
-      term: ["2026-02-24", "2026-06-12"],
-      year: ["2026-01-01", "2026-06-12"],
-    };
+    const cfgQ = useConfig(); // 学期起止日期
+    const cfg = cfgQ.data;
+    const fmtISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const today = fmtISO(new Date());
+    const getPreset = React.useCallback((p: string): [string, string] => {
+      const now = new Date();
+      const t = fmtISO(now);
+      if (p === "month") { const f = new Date(now); f.setDate(f.getDate() - 30); return [fmtISO(f), t]; }
+      if (p === "term") {
+        const start = (cfg as any)?.semester?.start || (() => {
+          const m = now.getMonth(), yr = now.getFullYear();
+          return (m >= 1 && m <= 6) ? `${yr}-02-24` : `${m >= 8 ? yr : yr - 1}-09-01`;
+        })();
+        return [start, t];
+      }
+      if (p === "year") return [`${now.getFullYear()}-01-01`, t];
+      return [t, t];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [(cfg as any)?.semester?.start]);
     const META: Record<string, string> = { total: "总分", report: "报告", discuss: "讨论" };
     const [preset, setPreset] = React.useState("month");
-    const [from, setFrom] = React.useState(PRESETS.month[0]);
-    const [to, setTo] = React.useState(PRESETS.month[1]);
+    const [from, setFrom] = React.useState(() => getPreset("month")[0]);
+    const [to, setTo] = React.useState(today);
     const [metric, setMetric] = React.useState("total");
-    const applyPreset = (p) => { setPreset(p); setFrom(PRESETS[p][0]); setTo(PRESETS[p][1]); };
+    // cfg 加载后刷新"本学期"预设的起始日期
+    React.useEffect(() => {
+      if ((cfg as any)?.semester?.start && preset === "term") {
+        const [f, t] = getPreset("term");
+        setFrom(f); setTo(t);
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [(cfg as any)?.semester?.start]);
+    const applyPreset = (p: string) => { const [f, t] = getPreset(p); setPreset(p); setFrom(f); setTo(t); };
 
     // 真实评选数据：来自后端引擎（与 demo 对拍一致）。
     const evQ = useEvalCompute();
@@ -616,7 +697,7 @@ import type { Me } from "../auth";
     const ev = evQ.data;
     const exc = excQ.data;
     const { data: series } = useRankSeries(me.name, from, to, metric);
-    const total = ev?.rows.length ?? 20;
+    const total = ev?.rows.length ?? 0;
     const hasData = !!series && series.ranks.length > 0;
     const points = hasData ? series!.points : [{ label: "—" }];
     const ranks = hasData ? series!.ranks : [total];
@@ -708,7 +789,7 @@ import type { Me } from "../auth";
     const peerSessions = meetingsData
       .filter((s) => s.presenters.some((p) => p.name !== meName))
       .flatMap((s) => s.presenters.filter((p) => p.name !== meName).map((p) => ({
-        id: `${s.id}__${p.name}`, date: s.dateLabel, mdLabel: s.mdLabel, type: s.type, name: p.name,
+        id: `${s.id}__${p.name}`, meetingId: s.id, date: s.dateLabel, mdLabel: s.mdLabel, type: s.type, name: p.name,
         topic: p.topic || "主题待定",
       })))
       .slice(0, 12);
@@ -717,25 +798,24 @@ import type { Me } from "../auth";
     const submit = () => {
       if (kind === "swap") {
         if (!picked) return;
-        createReq.mutate({ kind: "swap", fromDate: mine, toName: picked.name, toDate: picked.date, topic: picked.topic, reason, note: `已向 ${picked.name} 发送对调请求` }, { onSuccess: () => toast("已发送对调请求") });
+        createReq.mutate({ kind: "swap", fromDate: mine, toName: picked.name, toDate: picked.date, topic: picked.topic, reason, note: `已向 ${picked.name} 发送对调请求`, fromMeetingId: (session && session.id) || null, toMeetingId: picked.meetingId }, { onSuccess: () => { toast("已发送对调请求"); onClose(); }, onError: () => toast("发送失败，请重试", { tone: "error" }) });
       } else if (kind === "absence") {
-        createReq.mutate({ kind: "absence", fromDate: mine, reason, note: "已提交轮空请假，等待管理员审批" }, { onSuccess: () => toast("已提交请假申请") });
+        createReq.mutate({ kind: "absence", fromDate: mine, reason, note: "已提交轮空请假，等待管理员审批" }, { onSuccess: () => { toast("已提交请假申请"); onClose(); }, onError: () => toast("提交失败，请重试", { tone: "error" }) });
       } else return;
-      onClose();
     };
     return (
       <Dialog open={open} onClose={onClose} title="申请请假" subtitle={`${mine} · 你是本次报告人之一`}
         icon={I("calendar-off")} tone="accent" width={480}
         footer={<>
           <Button variant="ghost" onClick={onClose}>取消</Button>
-          <Button variant="primary" disabled={!kind || (kind === "swap" && !swapId)} onClick={submit}>{kind === "absence" ? "提交申请（待审批）" : kind === "swap" ? "发送对调请求" : "提交"}</Button>
+          <Button variant="primary" disabled={!kind || (kind === "swap" && !swapId) || createReq.isPending} onClick={submit}>{createReq.isPending ? "提交中…" : kind === "absence" ? "提交申请（待审批）" : kind === "swap" ? "发送对调请求" : "提交"}</Button>
         </>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-body)", marginBottom: 8 }}>请假方式</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
               {[["absence", "轮空请假", "本次报告轮空 · 记为未出勤", "calendar-x"], ["swap", "对调请假", "与他人对调顺序 · 记为未出勤", "repeat"]].map(([v, t, sub, ic]) => (
-                <button key={v} onClick={() => setKind(v)}
+                <button type="button" key={v} onClick={() => setKind(v)}
                   style={{ textAlign: "left", padding: "12px 14px", cursor: "pointer",
                     border: `1.5px solid ${kind === v ? "var(--accent)" : "var(--border-default)"}`,
                     background: kind === v ? "var(--accent-soft)" : "var(--surface)",

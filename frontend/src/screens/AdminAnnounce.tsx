@@ -32,13 +32,15 @@ import { useIsMobile } from "../lib/useIsMobile";
     const ds = { height: 38, padding: "0 11px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", color: "var(--text-strong)", fontFamily: "var(--font-sans)", fontSize: 14, colorScheme: "light dark", width: "100%" };
 
     const submit = () => {
-      if (!valid) return;
+      if (!valid || publish.isPending) return;
+      // author 留空 —— 后端按当前登录管理员真实姓名填充（管理员 · {name}），不写死。
       publish.mutate(
-        { title: f.title, body: f.body, level: f.level as "info" | "important" | "urgent", pinned: f.pinned, audience: f.audience, author: "管理员 · 周明", expiresAt: f.expiresAt || null },
-        { onSuccess: () => toast("已发布") },
+        { title: f.title, body: f.body, level: f.level as "info" | "important" | "urgent", pinned: f.pinned, audience: f.audience as "all" | "students", author: "", expiresAt: f.expiresAt || null },
+        {
+          onSuccess: () => { toast("已发布"); setF(empty); onPublish && onPublish(); },
+          onError: (e: any) => toast(e?.detail || e?.message || "发布失败，请重试", { tone: "error" }),
+        },
       );
-      setF(empty);
-      onPublish && onPublish();
     };
 
     return (
@@ -53,7 +55,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               {Object.entries(LEVELS).map(([v, m]) => {
                 const on = f.level === v;
                 return (
-                  <button key={v} onClick={() => set("level", v)}
+                  <button type="button" key={v} onClick={() => set("level", v)}
                     style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px", cursor: "pointer",
                       border: `1.5px solid ${on ? `var(--${m.tone})` : "var(--border-default)"}`,
                       background: on ? `var(--${m.tone}-soft)` : "var(--surface)", borderRadius: "var(--radius-md)" }}>
@@ -70,7 +72,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               options={Object.entries(AUDIENCE).map(([value, label]) => ({ value, label }))} />
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-body)", marginBottom: 6 }}>失效时间（可选）</div>
-              <input type="date" value={f.expiresAt} onChange={(e) => set("expiresAt", e.target.value)} style={ds} />
+              <input type="date" min={new Date().toISOString().slice(0, 10)} value={f.expiresAt} onChange={(e) => set("expiresAt", e.target.value)} style={ds} />
             </div>
           </div>
 
@@ -79,7 +81,7 @@ import { useIsMobile } from "../lib/useIsMobile";
               <Switch checked={f.pinned} onChange={(v) => set("pinned", v)} />
               <span style={{ fontSize: 13.5, color: "var(--text-body)" }}>置顶展示</span>
             </div>
-            <Button variant="primary" iconLeft={I("send")} disabled={!valid} onClick={submit}>发布到全员首页</Button>
+            <Button variant="primary" iconLeft={I("send")} disabled={!valid || publish.isPending} onClick={submit}>发布到全员首页</Button>
           </div>
         </div>
       </Card>

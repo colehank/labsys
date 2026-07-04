@@ -15,6 +15,7 @@ import { AdminMeetingHub } from "./screens/AdminMeetingHub";
 import { AdminServers } from "./screens/AdminServers";
 import { AdminAnnounce } from "./screens/AdminAnnounce";
 import { AdminPeople } from "./screens/AdminPeople";
+import { AdminFeedback } from "./screens/AdminFeedback";
 
 const LINKS = { mark: "/assets/mark-stone.svg" };
 
@@ -38,10 +39,17 @@ export function App() {
   const toggleAdmin = () => {
     if (!isAdmin(me)) return; // 仅真实管理员可切换管理员视图
     setAdmin((a) => !a);
-    if (admin && ["approvals", "meeting-hub", "server-admin", "announce", "people-admin"].includes(view)) setView("home");
+    if (admin && ["approvals", "meeting-hub", "server-admin", "announce", "people-admin", "feedback-admin"].includes(view)) setView("home");
   };
 
   useFeel(t);
+
+  React.useEffect(() => {
+    if (!panel) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPanel(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [panel]);
 
   // 有 token 但仍在拉取当前用户：短暂留白，避免闪现登录页。
   if (meLoading) return null;
@@ -50,17 +58,21 @@ export function App() {
     return <Login mark="/assets/mark-stone.svg" />;
   }
 
+  // server 页一旦访问过就保持 mount（避免切页面断开 WebSocket 会话）
+  const [serverMounted, setServerMounted] = React.useState(false);
+  React.useEffect(() => { if (view === "server") setServerMounted(true); }, [view]);
+
   const screen = (() => {
     switch (view) {
       case "home": return <Home onNavigate={navigate} me={me} />;
       case "meetings": return <Meetings key={mtNonce} initialTab={mtTab} admin={admin} me={me} />;
-      case "server": return <Server />;
       case "api": return <API />;
-      case "approvals": return <Approvals />;
-      case "meeting-hub": return <AdminMeetingHub />;
-      case "server-admin": return <AdminServers />;
-      case "announce": return <AdminAnnounce />;
-      case "people-admin": return <AdminPeople />;
+      case "approvals": return isAdmin(me) ? <Approvals /> : <Home onNavigate={navigate} me={me} />;
+      case "meeting-hub": return isAdmin(me) ? <AdminMeetingHub /> : <Home onNavigate={navigate} me={me} />;
+      case "server-admin": return isAdmin(me) ? <AdminServers /> : <Home onNavigate={navigate} me={me} />;
+      case "announce": return isAdmin(me) ? <AdminAnnounce /> : <Home onNavigate={navigate} me={me} />;
+      case "people-admin": return isAdmin(me) ? <AdminPeople /> : <Home onNavigate={navigate} me={me} />;
+      case "feedback-admin": return isAdmin(me) ? <AdminFeedback /> : <Home onNavigate={navigate} me={me} />;
       default: return <Home onNavigate={navigate} me={me} />;
     }
   })();
@@ -69,7 +81,9 @@ export function App() {
   return (
     <>
       <AppShell active={view} onNavigate={navigate} admin={admin} onToggleAdmin={toggleAdmin} onOpenPanel={setPanel} onLogout={() => { setPanel(null); setView("home"); setAdmin(false); logout(); }} links={LINKS} me={me}>
-        {screen}
+        {/* server 常驻：隐藏而非卸载，WebSocket 会话不中断 */}
+        {serverMounted && <div style={{ display: view === "server" ? "block" : "none" }}><Server active={view === "server"} /></div>}
+        {view !== "server" && screen}
         {panel && (
           <div onClick={() => setPanel(null)}
             style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "5vh 24px", background: "var(--overlay-scrim)", backdropFilter: "blur(2px)" }}>
