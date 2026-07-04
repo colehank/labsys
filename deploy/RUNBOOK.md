@@ -46,8 +46,29 @@ cp .env.example .env
 | `CIBOL_BOOKING_ACCOUNT` / `CIBOL_BOOKING_PASSWORD` | 腾讯会议预约（校园门户账号） |
 | `CIBOL_SSH_ADMIN_KEY_PATH` | SSH 账号下发（labadmin 私钥，见 §6） |
 
-> `.env` 已被 `.gitignore` 忽略，勿提交。`CIBOL_DATABASE_URL` 不用填——
+> `.env` 已被 `.gitignore` 忽略，勿提交。默认情况下 `CIBOL_DATABASE_URL` 不用填——
 > 容器由 compose 注入 `postgres` 主机，本地走代码默认 `localhost`。
+
+### 2.1 接入你自己的数据库（可选）
+
+数据库连接由环境变量 **`CIBOL_DATABASE_URL`** 决定，格式：
+
+```
+postgresql+asyncpg://用户名:密码@主机:端口/库名
+```
+
+要求：**PostgreSQL 14+**（模型用了 PG enum / JSON / `ON CONFLICT`）、驱动必须是 **`+asyncpg`**。
+Alembic 只建**表**不建**库**，所以库要先 `createdb`，且连接用户需有建表权限。
+
+**三种接法：**
+
+| 场景 | 怎么做 |
+|---|---|
+| 只想换密码，仍用自带 postgres | `.env` 里改 `POSTGRES_PASSWORD`（自带库与注入 URL 共用它） |
+| 本地跑 + 外部库 | `.env` 里加 `CIBOL_DATABASE_URL=postgresql+asyncpg://…`，再 `cd backend && uv run alembic upgrade head && uv run python -m app.db.seed` |
+| 容器部署 + 外部库 | 改 `docker-compose.yml` 里 `api` 的 `CIBOL_DATABASE_URL`，并删掉自带的 `postgres` 服务及 `depends_on`；entrypoint 会自动迁移 + seed |
+
+> 首次接入新库务必跑一次 `alembic upgrade head`（建表）+ `python -m app.db.seed`（管理员/成员种子，默认密码 `cibol1234`，登录后请改）。
 
 ## 3. 起服务（首次自动迁移 + seed）
 
