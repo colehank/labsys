@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.core.deps import AdminUser, CurrentUser, DbSession
 from app.domains.notify.service import notify
 from app.domains.requests.engine import can_transition, initial_status, required_role
-from app.models import Meeting, Presenter, Request, RequestEvent, RequestKind, Role, User
+from app.models import Meeting, Request, RequestEvent, RequestKind, Role, User
 from app.schemas.request import AdvanceRequest, CreateRequest, RequestEventOut, RequestOut
 
 router = APIRouter(prefix="/requests", tags=["requests"])
@@ -97,8 +97,16 @@ async def _apply_swap(db, req: Request) -> str:
     )).scalar_one_or_none()
     if fm is None or tm is None:
         raise _SwapLegacy()
-    p1 = next((p for p in fm.presenters if p.user_id == req.requester_id), None)
-    p2 = next((p for p in tm.presenters if p.user_id == req.target_user_id), None)
+
+    def _slot(presenters, user_id, name):
+        # 报告位的身份标识以【姓名】为准（全系统一致）：排期按姓名建的行 user_id 为空，
+        # 外部嘉宾亦无 user_id，只按 user_id 匹配会恒空 → 对调永远 409。
+        # 先按 user_id 精确匹配（已关联账号时更准），再按姓名兜底。
+        by_uid = next((p for p in presenters if p.user_id and p.user_id == user_id), None)
+        return by_uid or next((p for p in presenters if p.name == name), None)
+
+    p1 = _slot(fm.presenters, req.requester_id, req.requester.name)
+    p2 = _slot(tm.presenters, req.target_user_id, req.target.name)
     if p1 is None:
         raise _SwapDataError(
             f"在 {fm.date} 的组会中找不到发起人（{req.requester.name}）的报告位，"

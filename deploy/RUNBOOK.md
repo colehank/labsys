@@ -119,6 +119,47 @@ find /var/backups -name 'cibol_*.dump' -mtime +14 -delete
 
 之后换应用机零迁移；真要迁 DB 机用 `pg_dump`/`pg_restore`（见 §7 或 §8）。
 
+### 2.3 导入真实数据（CSV 批量）
+
+`seed` 只灌 demo 假名册。要写**真实**成员/排期/服务器，用 CSV 导入器
+（`backend/app/db/import_csv.py`，在 `backend/` 目录跑 `uv run`；容器里用 `docker compose exec api uv run …`）。
+
+**三步：拿模板 → 填表 → 导入**
+
+```bash
+cd backend
+# ① 打印模板（自带一行示例，改成你的数据；Excel 填完另存为 CSV/UTF-8 亦可）
+uv run python -m app.db.import_csv members  --template > members.csv
+uv run python -m app.db.import_csv meetings --template > meetings.csv
+uv run python -m app.db.import_csv servers  --template > servers.csv
+
+# ② 先干跑校验（只解析、不写库，看新增/更新条数与告警）
+uv run python -m app.db.import_csv members members.csv --dry-run
+
+# ③ 正式导入
+uv run python -m app.db.import_csv members  members.csv
+uv run python -m app.db.import_csv meetings meetings.csv
+uv run python -m app.db.import_csv servers  servers.csv
+```
+
+**各类型的列**（`role`/`scored`/`status` 可留空走默认）：
+
+| 类型 | 列 | 认主键（重复只更新） |
+|---|---|---|
+| `members` | `name,email,title,role,password` | `email`（次选 `name`） |
+| `meetings` | `date,type,time,place,template,scored,host,presenters` | `date` |
+| `servers` | `name,ip,ssh_port,gpu,status,net,desc` | `name` |
+
+要点：
+- **幂等**：同一 CSV 重复导入不会重复插，按主键更新。改完再导即可覆盖。
+- **报告人**：`meetings` 的 `presenters` 列用 `;` 或 `，` 分隔姓名，按 `name` 匹配成员库；
+  匹配不到仍存姓名快照（兼容外部嘉宾）并打印提醒——先导 `members` 再导 `meetings` 匹配率最高。
+- **成员密码**：`password` 留空则用默认 `cibol1234`，登录后请改。
+- **申请/评分/考勤等运行时数据**不建议 CSV 导入（应由应用产生）；要迁历史走整库 `pg_dump`/`pg_restore`（§7 / §8）。
+
+> 想彻底换掉 demo 假名册：先导入真实 `members.csv`，再把种子里的 `member01~20@cibol.lab`
+> 停用或删除（有历史记录的用软删 `disabled=true`）。
+
 ## 3. 起服务（首次自动迁移 + seed）
 
 从 `deploy/` 运行，并用 `--env-file ../.env` 让 compose 读到根 `.env`（用于 `${POSTGRES_PASSWORD}` 替换 + 注入容器）：

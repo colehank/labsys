@@ -8,6 +8,7 @@ import { Home } from "./screens/Home";
 import { Meetings } from "./screens/Meetings";
 import { Server } from "./screens/Server";
 import { API } from "./screens/API";
+import { Docs } from "./screens/Docs";
 import { My } from "./screens/My";
 import { Inbox } from "./screens/Inbox";
 import { Approvals } from "./screens/Approvals";
@@ -51,6 +52,12 @@ export function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [panel]);
 
+  // server 页一旦访问过就保持 mount（避免切页面断开 WebSocket 会话）
+  // ⚠️ 必须在下方任何提前 return 之前调用：否则「未登录 → 登录成功」这次渲染的
+  //    Hook 数量会突变，触发 React "Rendered more hooks than during the previous render" 崩溃。
+  const [serverMounted, setServerMounted] = React.useState(false);
+  React.useEffect(() => { if (view === "server") setServerMounted(true); }, [view]);
+
   // 有 token 但仍在拉取当前用户：短暂留白，避免闪现登录页。
   if (meLoading) return null;
 
@@ -58,15 +65,12 @@ export function App() {
     return <Login mark="/assets/mark-stone.svg" />;
   }
 
-  // server 页一旦访问过就保持 mount（避免切页面断开 WebSocket 会话）
-  const [serverMounted, setServerMounted] = React.useState(false);
-  React.useEffect(() => { if (view === "server") setServerMounted(true); }, [view]);
-
   const screen = (() => {
     switch (view) {
       case "home": return <Home onNavigate={navigate} me={me} />;
       case "meetings": return <Meetings key={mtNonce} initialTab={mtTab} admin={admin} me={me} />;
       case "api": return <API />;
+      case "docs": return <Docs />;
       case "approvals": return isAdmin(me) ? <Approvals /> : <Home onNavigate={navigate} me={me} />;
       case "meeting-hub": return isAdmin(me) ? <AdminMeetingHub /> : <Home onNavigate={navigate} me={me} />;
       case "server-admin": return isAdmin(me) ? <AdminServers /> : <Home onNavigate={navigate} me={me} />;

@@ -13,6 +13,7 @@ const NAV = [
   { id: "meetings", label: "组会", icon: I("presentation") },
   { id: "server", label: "服务器", icon: I("terminal") },
   { id: "api", label: "密钥管理", icon: I("key-round") },
+  { id: "docs", label: "文档", icon: I("book-open") },
 ];
 
 const ADMIN_NAV = [
@@ -135,7 +136,7 @@ function MobileTabBar({ active, onNavigate, admin, onOpenMore, badge }: any) {
     { id: "api", label: "密钥", icon: I("key-round") },
   ];
   const adminViews = ["approvals", "meeting-hub", "people-admin", "server-admin", "announce", "feedback-admin"];
-  const moreActive = adminViews.includes(active);
+  const moreActive = adminViews.includes(active) || active === "docs";
   const cell = (key: string, on: boolean, icon: React.ReactNode, label: string, onClick: () => void, dot?: boolean) => (
     <button key={key} type="button" onClick={onClick} style={{
       flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
@@ -209,6 +210,7 @@ function MobileMoreSheet({ open, onClose, admin, onNavigate, onToggleAdmin, onOp
               <div style={{ height: 1, background: "var(--border-subtle)", margin: "6px 12px" }} />
             </>
           )}
+          {row(I("book-open"), "文档", () => onNavigate("docs"))}
           {row(I("bell"), "消息", () => onOpenPanel("inbox"), unread)}
           {row(I("settings"), "设置", () => onOpenPanel("settings"))}
           {row(I(admin ? "shield-check" : "shield"), admin ? "管理员视图（点击切换为成员）" : "成员视图（点击切换为管理员）", onToggleAdmin)}
