@@ -8,6 +8,7 @@ import { Home } from "./screens/Home";
 import { Meetings } from "./screens/Meetings";
 import { Server } from "./screens/Server";
 import { API } from "./screens/API";
+import { Docs } from "./screens/Docs";
 import { My } from "./screens/My";
 import { Inbox } from "./screens/Inbox";
 import { Approvals } from "./screens/Approvals";
@@ -69,6 +70,7 @@ export function App() {
       case "home": return <Home onNavigate={navigate} me={me} />;
       case "meetings": return <Meetings key={mtNonce} initialTab={mtTab} admin={admin} me={me} />;
       case "api": return <API />;
+      case "docs": return <Docs />;
       case "approvals": return isAdmin(me) ? <Approvals /> : <Home onNavigate={navigate} me={me} />;
       case "meeting-hub": return isAdmin(me) ? <AdminMeetingHub /> : <Home onNavigate={navigate} me={me} />;
       case "server-admin": return isAdmin(me) ? <AdminServers /> : <Home onNavigate={navigate} me={me} />;
