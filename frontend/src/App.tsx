@@ -51,16 +51,18 @@ export function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, [panel]);
 
+  // server 页一旦访问过就保持 mount（避免切页面断开 WebSocket 会话）
+  // ⚠️ 必须在下方任何提前 return 之前调用：否则「未登录 → 登录成功」这次渲染的
+  //    Hook 数量会突变，触发 React "Rendered more hooks than during the previous render" 崩溃。
+  const [serverMounted, setServerMounted] = React.useState(false);
+  React.useEffect(() => { if (view === "server") setServerMounted(true); }, [view]);
+
   // 有 token 但仍在拉取当前用户：短暂留白，避免闪现登录页。
   if (meLoading) return null;
 
   if (!me) {
     return <Login mark="/assets/mark-stone.svg" />;
   }
-
-  // server 页一旦访问过就保持 mount（避免切页面断开 WebSocket 会话）
-  const [serverMounted, setServerMounted] = React.useState(false);
-  React.useEffect(() => { if (view === "server") setServerMounted(true); }, [view]);
 
   const screen = (() => {
     switch (view) {
