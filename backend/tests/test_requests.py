@@ -46,9 +46,20 @@ async def test_swap_only_target_can_accept(client: AsyncClient) -> None:
     m = await _token(client, "member03@cibol.lab")
     a = await _token(client, "admin@cibol.lab")
 
-    # 苏沐 向 周明(admin) 发起对调
-    r = await client.post(f"{API}/requests", headers=_h(m),
-                          json={"kind": "swap", "toName": "周明", "fromDate": "6/14", "toDate": "6/21"})
+    # 管理员先排两场组会（6/14 苏沐、6/21 周明），对调需引用双方组会 id（新契约）
+    sch = await client.put(f"{API}/meetings/schedule", headers=_h(a), json={"meetings": [
+        {"date": "2026-06-14", "type": "进展汇报", "presenters": [{"name": "苏沐"}]},
+        {"date": "2026-06-21", "type": "文献精读", "presenters": [{"name": "周明"}]},
+    ]})
+    ms = sch.json()
+    m1 = next(x for x in ms if x["presenters"][0]["name"] == "苏沐")
+    m2 = next(x for x in ms if x["presenters"][0]["name"] == "周明")
+
+    # 苏沐 向 周明(admin) 发起对调（带双方组会 id）
+    r = await client.post(f"{API}/requests", headers=_h(m), json={
+        "kind": "swap", "toName": "周明", "fromDate": "6/14", "toDate": "6/21",
+        "fromMeetingId": m1["id"], "toMeetingId": m2["id"],
+    })
     rid = r.json()["id"]
     assert r.json()["status"] == "pending"
 

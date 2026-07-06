@@ -57,15 +57,12 @@ async def test_swap_accept_swaps_presenters(client: AsyncClient) -> None:
     assert [p["name"] for p in a2["presenters"]] == ["苏沐"]
 
 
-async def test_swap_without_meeting_ids_degrades(client: AsyncClient) -> None:
-    """旧式对调（无 meeting id）仅改状态、不报错。"""
+async def test_swap_without_meeting_ids_rejected(client: AsyncClient) -> None:
+    """新契约：对调申请必须带双方组会 id，缺失即 422（不再有旧式「仅改状态」降级）。"""
     m = await _token(client, "member03@cibol.lab")
-    a = await _token(client, "admin@cibol.lab")
     r = await client.post(f"{API}/requests", headers=_h(m),
                           json={"kind": "swap", "toName": "周明", "fromDate": "6/14", "toDate": "6/21"})
-    rid = r.json()["id"]
-    ok = await client.post(f"{API}/requests/{rid}/advance", headers=_h(a), json={"next": "accepted"})
-    assert ok.status_code == 200 and ok.json()["status"] == "accepted"
+    assert r.status_code == 422
 
 
 async def test_rating_dedup_repeat_submit(client: AsyncClient, db_session: AsyncSession) -> None:
