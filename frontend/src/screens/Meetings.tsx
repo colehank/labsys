@@ -115,10 +115,10 @@ import type { Me } from "../auth";
     if (!md || !MEETINGS.length) return <EmptyState title="本学期暂无排期" description="管理员在“组会中心”完成排期后，这里会显示组会日历与你的报告安排。" style={{ padding: "64px 20px" }} />;
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20, flex: 1, minHeight: 0 }}>
         {/* 组会日历 + 我的本学期报告 */}
-        <Card padding="none">
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1.1fr) minmax(0, 1fr)" }}>
+        <Card padding="none" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1.1fr) minmax(0, 1fr)", gridTemplateRows: "1fr" }}>
             {/* LEFT — meeting-date blocks; click a block to reveal its detail */}
             <div style={{ padding: 20, minWidth: 0, display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -160,7 +160,7 @@ import type { Me } from "../auth";
                 const reqActive = myReq && ["pending", "submitted"].includes(myReq.status);
                 const iPresent = sel.presenters.some((p) => p.name === me.name);
                 return (
-                <div style={{ marginTop: 18, paddingTop: 18, borderTop: "1px solid var(--border-subtle)" }}>
+                <div style={{ marginTop: 18, paddingTop: 18, borderTop: "1px solid var(--border-subtle)", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                     <div className="cibol-eyebrow">{sel.dateLabel}</div>
                     {iPresent && !reqActive && <Button size="sm" variant="secondary" iconLeft={I("calendar-off")} onClick={() => onLeave(sel)}>申请请假</Button>}
@@ -202,16 +202,16 @@ import type { Me } from "../auth";
             </div>
 
             {/* RIGHT — 我的本学期报告 (replaces the old day-detail panel) */}
-            <div style={{ padding: 20, minWidth: 0, borderLeft: isMobile ? "none" : "1px solid var(--border-subtle)", borderTop: isMobile ? "1px solid var(--border-subtle)" : "none" }}>
+            <div style={{ padding: 20, minWidth: 0, minHeight: 0, borderLeft: isMobile ? "none" : "1px solid var(--border-subtle)", borderTop: isMobile ? "1px solid var(--border-subtle)" : "none", display: "flex", flexDirection: "column" }}>
               {sel && sel.presenters.some((p) => p.name === me.name) ? (
-                <MyTopicEditor meeting={sel} me={me} />
+                <div style={{ flex: 1, overflow: "auto" }}><MyTopicEditor meeting={sel} me={me} /></div>
               ) : (
-                <>
+                <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
                   <div className="cibol-eyebrow" style={{ marginBottom: 4 }}>我的报告</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", marginBottom: 4 }}>我的本学期报告</div>
                   <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>点击日历中带标记的日子，设置该场汇报主题</p>
                   <MyReportsList meetings={MEETINGS} me={me} />
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -936,7 +936,7 @@ import type { Me } from "../auth";
     const [tab, setTab] = React.useState(initialTab || "schedule");
     const [leave, setLeave] = React.useState(null);
     return (
-      <div style={{ maxWidth: 1140, margin: "0 auto", padding: isMobile ? "16px 14px 28px" : "20px 32px 48px" }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, maxWidth: 1140, margin: "0 auto", padding: isMobile ? "16px 14px 28px" : "20px 32px 48px" }}>
         <Tabs active={tab} onChange={setTab} style={{ marginBottom: 24 }}
           tabs={[{ id: "schedule", label: "安排" }, { id: "rating", label: "评分" }, { id: "rank", label: "表现" }]} />
         {tab === "schedule" && <Schedule onLeave={(s) => setLeave(s)} admin={admin} me={me} />}
