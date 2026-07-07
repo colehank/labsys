@@ -2,7 +2,7 @@ import React from "react";
 import * as NS from "../ds";
 import { I, Icon } from "../lib/icons";
 import { toast } from "../store";
-import { useConfig, useMeetings, useEvalCompute, useExcellence, useRankSeries, useCreateRequest, useEvalReports, useSubmitRating, useBookMeeting, useBookingSettings, useMyRequests, type Meeting } from "../api/hooks";
+import { useConfig, useMeetings, useEvalCompute, useExcellence, useRankSeries, useCreateRequest, useEvalReports, useSubmitRating, useBookMeeting, useBookingSettings, useMyRequests, useSetMyTopic, type Meeting } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 import type { Me } from "../auth";
 
@@ -118,9 +118,9 @@ import type { Me } from "../auth";
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* 组会日历 + 我的本学期报告 */}
         <Card padding="none">
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.1fr 1fr" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1.1fr) minmax(0, 1fr)" }}>
             {/* LEFT — meeting-date blocks; click a block to reveal its detail */}
-            <div style={{ padding: 20 }}>
+            <div style={{ padding: 20, minWidth: 0, display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div className="cibol-eyebrow">组会日历</div>
                 <span style={{ fontSize: 12, color: "var(--text-faint)" }}>本学期共 {MEETINGS.length} 次</span>
@@ -129,19 +129,27 @@ import type { Me } from "../auth";
                 {MEETINGS.map((mt) => {
                   const on = mt.id === selId;
                   const past = isPast(mt) && !on;   // 已开过且非当前选中 → 灰显
+                  const mine = mt.presenters.some((p) => p.name === me.name);  // 我是本场报告人 → 日历标注提醒
                   return (
                     <button type="button" key={mt.id} onClick={() => setSelId(mt.id)}
+                      title={mine ? "你在本场有汇报" : undefined}
                       style={{
+                        position: "relative",
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
                         width: 64, height: 60, padding: 0, cursor: "pointer", flexShrink: 0,
-                        border: `1px solid ${on ? "var(--accent)" : "var(--border-default)"}`,
-                        background: on ? "var(--accent)" : past ? "var(--surface-sunken)" : "var(--surface)",
+                        border: `1px solid ${on ? "var(--accent)" : mine ? "var(--accent-soft-bd)" : "var(--border-default)"}`,
+                        background: on ? "var(--accent)" : past ? "var(--surface-sunken)" : mine ? "var(--accent-soft)" : "var(--surface)",
                         borderRadius: "var(--radius-md)",
                         opacity: past ? 0.5 : 1,
                         transition: "all var(--dur-fast) var(--ease-out)",
                       }}>
+                      {mine && (
+                        <span aria-hidden style={{ position: "absolute", top: 5, right: 5, width: 14, height: 14, borderRadius: "50%", background: on ? "rgba(255,255,255,0.22)" : "var(--accent)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                          {I("mic", { size: 9 })}
+                        </span>
+                      )}
                       <span className="cibol-numeral" style={{ fontSize: 17, fontWeight: 600, lineHeight: 1, color: on ? "#fff" : past ? "var(--text-faint)" : "var(--text-strong)" }}>{mt.mdLabel}</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", color: on ? "rgba(255,255,255,0.82)" : "var(--text-faint)" }}>{daysLabel(mt)}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", color: on ? "rgba(255,255,255,0.82)" : mine ? "var(--accent-text)" : "var(--text-faint)" }}>{daysLabel(mt)}</span>
                     </button>
                   );
                 })}
@@ -194,11 +202,17 @@ import type { Me } from "../auth";
             </div>
 
             {/* RIGHT — 我的本学期报告 (replaces the old day-detail panel) */}
-            <div style={{ padding: 20, borderLeft: isMobile ? "none" : "1px solid var(--border-subtle)", borderTop: isMobile ? "1px solid var(--border-subtle)" : "none" }}>
-              <div className="cibol-eyebrow" style={{ marginBottom: 4 }}>我的报告</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", marginBottom: 4 }}>我的本学期报告</div>
-              <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>点击设置汇报主题</p>
-              <MyReportsList meetings={MEETINGS} me={me} />
+            <div style={{ padding: 20, minWidth: 0, borderLeft: isMobile ? "none" : "1px solid var(--border-subtle)", borderTop: isMobile ? "1px solid var(--border-subtle)" : "none" }}>
+              {sel && sel.presenters.some((p) => p.name === me.name) ? (
+                <MyTopicEditor meeting={sel} me={me} />
+              ) : (
+                <>
+                  <div className="cibol-eyebrow" style={{ marginBottom: 4 }}>我的报告</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", marginBottom: 4 }}>我的本学期报告</div>
+                  <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>点击日历中带标记的日子，设置该场汇报主题</p>
+                  <MyReportsList meetings={MEETINGS} me={me} />
+                </>
+              )}
             </div>
           </div>
         </Card>
@@ -232,12 +246,45 @@ import type { Me } from "../auth";
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)" }}>
               <span style={{ flex: 1, fontSize: 13, color: r.topic ? "var(--text-body)" : "var(--text-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {r.topic || "未设置主题 · 由管理员在「组会管理」中设置"}
+                {r.topic || "未设置主题 · 点日历中该场设置"}
               </span>
               {r.topic && I("check", { size: 14, style: { color: "var(--success)", flexShrink: 0 } })}
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  // 单场汇报主题设置 —— 选中「我是报告人」的那场时展示，组员自行填写/修改本场主题。
+  function MyTopicEditor({ meeting, me }: { meeting: Meeting; me: Me }) {
+    const mine = meeting.presenters.find((p) => p.name === me.name);
+    const saved = mine?.topic || "";
+    const [topic, setTopic] = React.useState(saved);
+    const setMyTopic = useSetMyTopic();
+    React.useEffect(() => { setTopic(mine?.topic || ""); }, [meeting.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    const dirty = topic.trim() !== saved.trim();
+    const save = () => setMyTopic.mutate(
+      { meetingId: meeting.id, topic: topic.trim() },
+      {
+        onSuccess: () => toast("已保存汇报主题", { tone: "success" }),
+        onError: (e: any) => toast(`保存失败：${e?.message || "请稍后重试"}`, { tone: "error" }),
+      },
+    );
+    return (
+      <div>
+        <div className="cibol-eyebrow" style={{ marginBottom: 4 }}>我的汇报</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", marginBottom: 4 }}>设置本场汇报主题</div>
+        <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14 }}>{meeting.dateLabel} · 仅影响你自己这一场</p>
+        <Textarea label="汇报主题" placeholder="填写你的汇报主题 / 文献标题（可含 DOI，较长亦可）" rows={4} maxLength={500} value={topic} onChange={(e) => setTopic(e.target.value)} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+          {saved
+            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--success-text)" }}>{I("check", { size: 14 })}已设置主题</span>
+            : <span style={{ fontSize: 12.5, color: "var(--text-faint)" }}>尚未设置主题</span>}
+          <div style={{ marginLeft: "auto" }}>
+            <Button size="sm" variant="primary" iconLeft={I("check")} disabled={!dirty || setMyTopic.isPending} loading={setMyTopic.isPending} onClick={save}>{setMyTopic.isPending ? "保存中…" : "保存主题"}</Button>
+          </div>
+        </div>
       </div>
     );
   }
