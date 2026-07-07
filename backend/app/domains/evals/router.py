@@ -282,7 +282,8 @@ async def get_config(_: AdminUser, db: DbSession) -> EvalConfigIO:
                         range=data["rng"], progress_order=data["progress_order"],
                         period=data.get("period", ""),
                         award_excellence=data.get("award_excellence", 1000),
-                        award_attendance=data.get("award_attendance", 100))
+                        award_attendance=data.get("award_attendance", 100),
+                        award_duty=data.get("award_duty", 200))
 
 
 @router.put("/config", response_model=EvalConfigIO)
@@ -298,6 +299,7 @@ async def put_config(body: EvalConfigIO, admin: AdminUser, db: DbSession) -> Eva
     cfg.period = body.period
     cfg.award_excellence = body.award_excellence
     cfg.award_attendance = body.award_attendance
+    cfg.award_duty = body.award_duty
     await write_audit(db, actor=admin.name, action="update_eval_config",
                       summary=f"更新评选标准（区间 {body.range.get('from', '')}~{body.range.get('to', '')}）")
     await db.commit()
