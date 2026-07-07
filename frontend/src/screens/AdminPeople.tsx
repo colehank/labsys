@@ -86,9 +86,11 @@ import { useIsMobile } from "../lib/useIsMobile";
     const [title, setTitle] = React.useState("");
     const [perm, setPerm] = React.useState("member");
     const [password, setPassword] = React.useState("");
+    const [duty, setDuty] = React.useState("0");
     React.useEffect(() => {
       if (!member) return;
       setName(member.name); setEmail(member.email); setTitle(member.title || ""); setPerm(member.role); setPassword("");
+      setDuty(String(member.duty_allowance ?? 0));
     }, [member]);
     if (!member) return null;
     const isMe = !!(me && member.id === me.id);
@@ -98,7 +100,7 @@ import { useIsMobile } from "../lib/useIsMobile";
     const submit = () => {
       if (!name.trim()) { toast("姓名必填", { tone: "error" }); return; }
       if (!EMAIL_RE.test(email.trim())) { toast("邮箱格式不正确", { tone: "error" }); return; }
-      const patch: any = { name: name.trim(), email: email.trim(), title: title.trim(), role: perm };
+      const patch: any = { name: name.trim(), email: email.trim(), title: title.trim(), role: perm, duty_allowance: Math.max(0, parseInt(duty, 10) || 0) };
       if (password) patch.password = password;
       update.mutate({ id: member.id, patch }, {
         onSuccess: () => { toast("已保存 · " + name.trim(), { tone: "success" }); onClose(); },
@@ -115,6 +117,7 @@ import { useIsMobile } from "../lib/useIsMobile";
           <Select label="身份" placeholder="选择或留空" value={title} onChange={(e: any) => setTitle(e.target.value)} options={ROLES} />
           <PermPicker perm={perm} setPerm={setPerm} disabled={permDisabled} />
           {permHint && <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: -8 }}>{permHint}</p>}
+          <Input label="月职务津贴（元）" type="number" min={0} step={100} placeholder="无职务填 0" value={duty} onChange={(e: any) => setDuty(e.target.value)} iconLeft={I("badge")} suffix="元/月" />
           <Input label="重置密码" type="password" placeholder="留空则不修改密码" value={password} onChange={(e: any) => setPassword(e.target.value)} iconLeft={I("lock")} autoComplete="new-password" />
         </div>
       </Dialog>

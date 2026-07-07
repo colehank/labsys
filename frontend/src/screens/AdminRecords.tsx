@@ -1,7 +1,7 @@
 import React from "react";
 import * as NS from "../ds";
 import { I } from "../lib/icons";
-import { useExcellenceAll } from "../api/hooks";
+import { useExcellenceAll, useUsers } from "../api/hooks";
 import { useIsMobile } from "../lib/useIsMobile";
 import { toast } from "../store";
 
@@ -87,7 +87,7 @@ function PeriodCard({ exc, isMobile }: { exc: Excellence; isMobile: boolean }) {
   );
 }
 
-function BonusTable({ history, isMobile }: { history: Excellence[]; isMobile: boolean }) {
+function BonusTable({ history, members, isMobile }: { history: Excellence[]; members: any[]; isMobile: boolean }) {
   const [open, setOpen] = React.useState(false);
 
   // 汇总每人奖金
@@ -111,24 +111,63 @@ function BonusTable({ history, isMobile }: { history: Excellence[]; isMobile: bo
   }
   const rows = [...map.values()].sort((a, b) => b.total - a.total);
 
-  // 按月/评选周期导出做账表（#10）：明细（姓名/奖项/金额/周期/发放状态/备注）+ 按人汇总。
+  // 导出做账表（#10）：按月透视（姓名/全勤/优秀/职务/总额，列同人工 Excel）+ 跨周期按人合计。
+  // 数据全部来自系统：全勤/优秀来自各评选期发布结果，职务来自成员「月职务津贴」。
   const exportBonusCSV = () => {
     const esc = (v: any) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    // 职务津贴（当前值，按月固定发放）与在册成员顺序
+    const dutyOf = new Map<string, number>();
+    const roster: string[] = [];
+    for (const m of members || []) {
+      if (m.disabled) continue;
+      dutyOf.set(m.name, m.duty_allowance || 0);
+      roster.push(m.name);
+    }
+    const seen = new Set(roster);
+    // 跨周期按人合计
+    type Sum = { att: number; exc: number; duty: number; total: number };
+    const grand = new Map<string, Sum>();
+    const bump = (n: string, k: keyof Sum, v: number) => {
+      const s = grand.get(n) ?? { att: 0, exc: 0, duty: 0, total: 0 };
+      s[k] += v; s.total += v; grand.set(n, s);
+    };
     const lines: string[] = [];
-    lines.push("做账明细");
-    lines.push(["评选周期", "起止", "姓名", "奖项类型", "金额", "发放状态", "备注"].join(","));
+    lines.push("奖金做账表 · 按月（姓名/全勤/优秀/职务/总额，金额单位：元）");
+    // 每个评选周期一段（对应人工 Excel 的每月一个 sheet）
     for (const e of history) {
       const awdExc = e.award_excellence ?? 1000;
       const awdAtt = e.award_attendance ?? 100;
-      const span = `${e.from ?? ""}~${e.to ?? ""}`;
-      for (const n of e.names || []) lines.push([e.period, span, n, "优秀奖", awdExc, "待发放", e.note ?? ""].map(esc).join(","));
-      for (const n of e.perfect_attendance || []) lines.push([e.period, span, n, "全勤奖", awdAtt, "待发放", ""].map(esc).join(","));
+      const nameSet = new Set(e.names || []);
+      const attSet = new Set(e.perfect_attendance || []);
+      // 本期名单 = 在册成员 ∪ 本期任一获奖者（含已离开的成员，保证不漏）
+      const monthNames = [...roster];
+      for (const n of [...nameSet, ...attSet]) if (!seen.has(n)) monthNames.push(n);
+      lines.push("");
+      lines.push(esc(`${e.period || "（未命名评选期）"}  ${e.from ?? ""}~${e.to ?? ""}`));
+      lines.push(["姓名", "全勤", "优秀", "职务", "总额"].join(","));
+      let sa = 0, se = 0, sd = 0, st = 0;
+      for (const n of monthNames) {
+        const att = attSet.has(n) ? awdAtt : 0;
+        const exc = nameSet.has(n) ? awdExc : 0;
+        const duty = dutyOf.get(n) ?? 0;
+        const total = att + exc + duty;
+        lines.push([n, att, exc, duty, total].map(esc).join(","));
+        sa += att; se += exc; sd += duty; st += total;
+        bump(n, "att", att); bump(n, "exc", exc); bump(n, "duty", duty);
+      }
+      lines.push(["小计", sa, se, sd, st].map(esc).join(","));
     }
+    // 跨周期按人合计
     lines.push("");
-    lines.push("按人汇总（一人多奖合并）");
-    lines.push(["姓名", "全勤奖次数", "优秀奖次数", "合计金额"].join(","));
-    for (const r of rows) lines.push([r.name, r.attCount, r.excCount, r.total].map(esc).join(","));
-    lines.push(["合计", "", "", rows.reduce((s, r) => s + r.total, 0)].join(","));
+    lines.push("跨周期按人合计");
+    lines.push(["姓名", "全勤合计", "优秀合计", "职务合计", "总合计"].join(","));
+    const sums = [...grand.entries()].sort((a, b) => b[1].total - a[1].total);
+    let ga = 0, ge = 0, gd = 0, gt = 0;
+    for (const [n, s] of sums) {
+      lines.push([n, s.att, s.exc, s.duty, s.total].map(esc).join(","));
+      ga += s.att; ge += s.exc; gd += s.duty; gt += s.total;
+    }
+    lines.push(["合计", ga, ge, gd, gt].map(esc).join(","));
     const csv = "﻿" + lines.join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
@@ -194,6 +233,7 @@ function AdminRecords() {
   const isMobile = useIsMobile();
   const allQ = useExcellenceAll();
   const history: Excellence[] = (allQ.data as any) || [];
+  const { data: members = [] } = useUsers();
 
   if (allQ.isLoading) return <ScreenState loading />;
   if (allQ.isError) return <ScreenState error onRetry={() => allQ.refetch()} />;
@@ -229,7 +269,7 @@ function AdminRecords() {
       )}
 
       {/* 奖金汇总（可展开） */}
-      <BonusTable history={history} isMobile={isMobile} />
+      <BonusTable history={history} members={members as any[]} isMobile={isMobile} />
     </div>
   );
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import JSON, Boolean, Enum, String, Text
+from sqlalchemy import JSON, Boolean, Enum, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -23,6 +23,8 @@ class User(UUIDMixin, TimestampMixin, Base):
     role: Mapped[Role] = mapped_column(Enum(Role, name="user_role"), default=Role.member)
     # 角色头衔，如「硕士二年级 / 博士后 / 访问学者」（对应 demo 的 member.role）
     title: Mapped[str] = mapped_column(String(64), default="")
+    # 月职务津贴（元）：有行政职务的成员每月固定发放，无职务为 0。做账表「职务」列来源。
+    duty_allowance: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # 成员自己的 SSH 公钥，账号下发时注入目标机（P3）
     ssh_pubkey: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 个人设置（通知偏好等），对应前端「我的」页
