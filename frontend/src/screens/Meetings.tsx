@@ -125,7 +125,7 @@ import type { Me } from "../auth";
                 <div className="cibol-eyebrow">组会日历</div>
                 <span style={{ fontSize: 12, color: "var(--text-faint)" }}>本学期共 {MEETINGS.length} 次</span>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, maxHeight: 240, overflowY: "auto", paddingRight: 4 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, flex: 3, minHeight: 0, overflowY: "auto", paddingRight: 4 }}>
                 {MEETINGS.map((mt) => {
                   const on = mt.id === selId;
                   const past = isPast(mt) && !on;   // 已开过且非当前选中 → 灰显
