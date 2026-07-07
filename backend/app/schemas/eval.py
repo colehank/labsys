@@ -112,6 +112,7 @@ class EvalConfigIO(BaseModel):
     period: str = ""
     award_excellence: int = 1000
     award_attendance: int = 100
+    award_duty: int = 200
 
 
 class PublishExcellence(BaseModel):

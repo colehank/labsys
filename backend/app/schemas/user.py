@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     email: EmailStr
     role: Role
     title: str
+    duty_allowance: int = 0
     disabled: bool = False
     ssh_pubkey: str | None = None
     settings: dict
@@ -44,6 +45,7 @@ class UserAdminUpdate(BaseModel):
     email: EmailStr | None = None
     title: str | None = None
     role: Role | None = None
+    duty_allowance: int | None = Field(default=None, ge=0)
     password: str | None = Field(default=None, min_length=8, max_length=128)
     disabled: bool | None = None
 

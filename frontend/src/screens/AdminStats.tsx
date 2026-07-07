@@ -9,6 +9,8 @@ import {
   usePublishExcellence,
   useExcellence,
   useConfig,
+  useUsers,
+  useAdminUpdateUser,
 } from "../api/hooks";
 import { useMe } from "../auth";
 import { useIsMobile } from "../lib/useIsMobile";
@@ -75,7 +77,9 @@ import { useIsMobile } from "../lib/useIsMobile";
     );
   }
 
-  function FilterField({ label, value, onChange, suffix, min = 0, max = 999, step = 1, color, hint }: any) {
+  // exact=true：确定值（如奖金金额），不显示「≥」阈值语义，放宽上限、加宽输入框。
+  function FilterField({ label, value, onChange, suffix, min = 0, max = 999, step = 1, color, hint, exact }: any) {
+    const hi = exact ? Math.max(max, 1_000_000) : max;
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 12.5, color: "var(--text-body)", display: "inline-flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
@@ -84,9 +88,9 @@ import { useIsMobile } from "../lib/useIsMobile";
           {hint && <span style={{ fontSize: 10.5, color: "var(--text-faint)" }}>{hint}</span>}
         </span>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "0 9px", height: 32, border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", background: "var(--surface)", flexShrink: 0 }}>
-          <span style={{ fontSize: 12, color: "var(--text-faint)" }}>≥</span>
-          <input type="number" aria-label={label + '下限'} min={min} max={max} step={step} value={value} onChange={(e) => onChange(Math.max(min, Math.min(max, +e.target.value || 0)))}
-            style={{ width: 44, border: "none", background: "transparent", color: "var(--text-strong)", fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 600, outline: "none", textAlign: "right", MozAppearance: "textfield" }} />
+          {!exact && <span style={{ fontSize: 12, color: "var(--text-faint)" }}>≥</span>}
+          <input type="number" aria-label={label + (exact ? "" : "下限")} min={min} max={hi} step={step} value={value} onChange={(e) => onChange(Math.max(min, Math.min(hi, +e.target.value || 0)))}
+            style={{ width: exact ? 60 : 44, border: "none", background: "transparent", color: "var(--text-strong)", fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 600, outline: "none", textAlign: "right", MozAppearance: "textfield" }} />
           {suffix && <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{suffix}</span>}
         </div>
       </div>
@@ -147,6 +151,8 @@ import { useIsMobile } from "../lib/useIsMobile";
     const { data: excellence } = useExcellence();
     const updateConfig = useUpdateEvalConfig();
     const publishExc = usePublishExcellence();
+    const { data: members = [] } = useUsers();
+    const updateUser = useAdminUpdateUser();
     const [dragItem, setDragItem] = React.useState<string | null>(null);   // 正在拖拽的成员名
     const [liveOrder, setLiveOrder] = React.useState<string[] | null>(null); // 拖拽中的临时序列（实时挤压预览）
     // 组会权重 + 评选过滤收进「设置」弹窗（本次评选标准）
@@ -181,6 +187,10 @@ import { useIsMobile } from "../lib/useIsMobile";
       range: cfg.range,
       progress_order: cfg.progress_order,
       period: (cfg as any).period ?? "",
+      // 奖金额度始终带上当前值，避免只改其一时其它被后端默认值重置（潜在 bug 一并修复）。
+      award_excellence: (cfg as any).award_excellence ?? 1000,
+      award_attendance: (cfg as any).award_attendance ?? 100,
+      award_duty: (cfg as any).award_duty ?? 200,
       ...patch,
     });
     // 统一提交配置：失败时透传后端具体原因，避免评选标准/区间保存静默失败（反馈 #12）。
@@ -191,6 +201,8 @@ import { useIsMobile } from "../lib/useIsMobile";
     const setEvalFilters = (patch: any) => saveCfg({ filters: { ...cfg.filters, ...patch } });
     const awardExcellence: number = (cfg as any).award_excellence ?? 1000;
     const awardAttendance: number = (cfg as any).award_attendance ?? 100;
+    const awardDuty: number = (cfg as any).award_duty ?? 200;
+    const activeMembers = (members as any[]).filter((m) => !m.disabled);
     const setEvalRange = (patch: any) => saveCfg({ range: { ...cfg.range, ...patch } });
     const semesterStart: string | undefined = (semCfg as any)?.semester?.start;
     const resetProgressOrder = () => saveCfg({ progress_order: null });
@@ -462,12 +474,45 @@ import { useIsMobile } from "../lib/useIsMobile";
             <div style={{ paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>奖金设置</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <FilterField label="全勤奖" color="var(--sage-500)" value={awardAttendance} suffix="元" min={0} step={50}
+                <FilterField exact label="全勤奖" color="var(--sage-500)" value={awardAttendance} suffix="元" min={0} step={50}
                   onChange={(v) => saveCfg({ award_attendance: v })} />
-                <FilterField label="优秀奖" color="var(--amber-500)" value={awardExcellence} suffix="元" min={0} step={100}
+                <FilterField exact label="优秀奖" color="var(--amber-500)" value={awardExcellence} suffix="元" min={0} step={100}
                   onChange={(v) => saveCfg({ award_excellence: v })} />
+                <FilterField exact label="职务津贴" color="var(--terracotta-500)" value={awardDuty} suffix="元" min={0} step={50}
+                  onChange={(v) => saveCfg({ award_duty: v })} />
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>发布时快照，修改不影响历史记录</div>
+              <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 6 }}>优秀/全勤发布时快照，修改不影响历史记录；职务按月固定发放。</div>
+
+              {/* 职务人员：勾选=按上面「职务津贴」标准额度发放（写入该成员月职务津贴）；个别额度不同可在人员管理覆盖 */}
+              <div style={{ paddingTop: 14, marginTop: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)" }}>职务人员</span>
+                  <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>勾选=按标准发；个别额度可在人员管理覆盖</span>
+                  <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-faint)" }}>{activeMembers.filter((m) => (m.duty_allowance || 0) > 0).length} 人</span>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {activeMembers.map((m) => {
+                    const on = (m.duty_allowance || 0) > 0;
+                    const custom = on && m.duty_allowance !== awardDuty;
+                    return (
+                      <button key={m.id} type="button" disabled={updateUser.isPending}
+                        onClick={() => updateUser.mutate({ id: m.id, patch: { duty_allowance: on ? 0 : awardDuty } as any })}
+                        title={custom ? `个别额度 ¥${m.duty_allowance}/月（在人员管理设置）` : undefined}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px",
+                          borderRadius: "var(--radius-pill)", cursor: "pointer",
+                          border: "1px solid " + (on ? "var(--terracotta-500)" : "var(--border-default)"),
+                          background: on ? "var(--terracotta-soft, var(--accent-soft))" : "var(--surface)",
+                          color: on ? "var(--terracotta-text, var(--accent-text))" : "var(--text-body)",
+                          fontSize: 12, fontWeight: on ? 600 : 500,
+                        }}>
+                        <span style={{ width: 13, height: 13, display: "inline-flex" }}>{I(on ? "check" : "plus", { size: 13 })}</span>
+                        {m.name}{custom ? ` ¥${m.duty_allowance}` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </Dialog>

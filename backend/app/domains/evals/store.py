@@ -117,6 +117,7 @@ async def load_eval_data(db: AsyncSession) -> dict:
         "period": cfg.period if cfg else "",
         "award_excellence": cfg.award_excellence if cfg else 1000,
         "award_attendance": cfg.award_attendance if cfg else 100,
+        "award_duty": cfg.award_duty if cfg else 200,
         "config_row": cfg,
         "meetings_rows": meetings,
     }

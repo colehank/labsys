@@ -76,6 +76,8 @@ class EvalConfig(UUIDMixin, Base):
     period: Mapped[str] = mapped_column(String(64), default="", server_default="")
     award_excellence: Mapped[int] = mapped_column(Integer, default=1000, server_default="1000")
     award_attendance: Mapped[int] = mapped_column(Integer, default=100, server_default="100")
+    # 职务津贴标准额度（元/月）：勾选「有职务」的成员按此额度发；个人可在人员管理里覆盖。
+    award_duty: Mapped[int] = mapped_column(Integer, default=200, server_default="200")
 
 
 class Excellence(UUIDMixin, Base):
